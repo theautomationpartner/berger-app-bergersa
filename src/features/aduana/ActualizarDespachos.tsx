@@ -12,6 +12,7 @@ import { avisarProximaArribar } from '@/services/monday/avisos'
 import { ESTADO_CARGA, PROXIMA_A_ARRIBAR, URL_TABLERO_DESPACHANTE } from '@/services/monday/columns'
 import { contenedoresDeOp, tractoresDeOps } from '@/services/monday/contenedoresDespacho'
 import { actualizarDespacho, ARCHIVOS_OP, ROTULO_ARCHIVO } from '@/services/monday/despachos'
+import { sincronizarPorEstadoDeCarga } from '@/services/monday/estadoInventario'
 import { subirArchivoAColumna } from '@/services/monday/sdk'
 import type {
   ArchivosDespacho,
@@ -285,6 +286,17 @@ export function ActualizarDespachos() {
       }
 
       if (tocada) actualizadas.push(nombre)
+
+      /* El estado de carga es de la CARGA; el del Inventario es de cada tractor, y tiene que
+         seguirlo. Sólo cuando el estado cambió de verdad: volver a guardar la misma OP no vuelve a
+         escribir los mismos tractores. */
+      if (cambios.estadoCarga && cambios.estadoCarga !== op.estadoCarga) {
+        const inventarioIds = (tractores[op.id] ?? [])
+          .map((t) => t.inventarioId)
+          .filter((id): id is string => Boolean(id))
+        const fallas = await sincronizarPorEstadoDeCarga(cambios.estadoCarga, inventarioIds)
+        advertencias.push(...fallas.map((f) => `${nombre}: ${f}`))
+      }
 
       /* El aviso a BERGER sale sólo cuando la OP RECIÉN pasa a "Próxima a Arribar": si ya estaba
          en ese estado, volver a guardarla no vuelve a avisar. */

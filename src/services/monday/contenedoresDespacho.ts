@@ -54,6 +54,7 @@ const COLUMNAS_CONTENEDOR = [
   COL_CONT_DESPACHO.fechaArribo,
   COL_CONT_DESPACHO.estadoEnvioTurno,
   COL_CONT_DESPACHO.tractores,
+  COL_CONT_DESPACHO.inventario,
   COL_CONT_DESPACHO.opDespacho,
   COL_CONT_DESPACHO.nroOpDespachante,
   COL_CONT_DESPACHO.idOp,
@@ -86,6 +87,7 @@ function aContenedor(item: {
     fechaArribo: fechaISO(c[COL_CONT_DESPACHO.fechaArribo]),
     transportistaId: c[COL_CONT_DESPACHO.transportista]?.linked_item_ids?.[0] ?? null,
     tractorIds: c[COL_CONT_DESPACHO.tractores]?.linked_item_ids ?? [],
+    inventarioIds: c[COL_CONT_DESPACHO.inventario]?.linked_item_ids ?? [],
     opId: c[COL_CONT_DESPACHO.opDespacho]?.linked_item_ids?.[0] ?? null,
     // Los espejos traen su valor en `display_value`, nunca en `text`.
     nroOpDespachante: espejo(c[COL_CONT_DESPACHO.nroOpDespachante]),

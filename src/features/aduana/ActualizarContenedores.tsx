@@ -14,6 +14,7 @@ import {
   depositosDeEntrega,
   listarTransportistas,
 } from '@/services/monday/contenedoresDespacho'
+import { sincronizarArribo } from '@/services/monday/estadoInventario'
 import { SinAcceso } from '@/services/monday/sdk'
 import type { Contacto, ContenedorDespacho, EdicionContenedor } from '@/types'
 
@@ -236,6 +237,20 @@ export function ActualizarContenedores() {
     setErrorGuardar(null)
     try {
       await actualizarContenedor(c.id, cambios)
+
+      /* Marcar el contenedor arribado es decir que esos tractores llegaron: el Inventario tiene
+         que enterarse. Sólo al PASAR a arribado —no cada vez que se guarda uno que ya lo estaba—
+         y sólo con los tractores de ESE contenedor, que son los que viajaron en él. */
+      if (
+        cambios.estadoArribo === ESTADO_ARRIBO.ARRIBADO &&
+        c.estadoArribo !== ESTADO_ARRIBO.ARRIBADO
+      ) {
+        const fallas = await sincronizarArribo(c.inventarioIds)
+        if (fallas.length > 0) {
+          setErrorGuardar(`${c.numero || c.nombre}: ${fallas.join(' · ')}`)
+        }
+      }
+
       setGuardados((a) => [...a, c.id])
       /* Se actualiza la fila en memoria en vez de recargar el tablero entero: el resto no cambió,
          y recargar haría desaparecer de golpe el que se acaba de completar. */

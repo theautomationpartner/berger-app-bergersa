@@ -378,6 +378,8 @@ export interface ContenedorDespacho {
   transportistaId: string | null
   /** Ids de los subitems (tractores) que van adentro. */
   tractorIds: string[]
+  /** Los mismos tractores, pero como items del 🧮Inventario. */
+  inventarioIds: string[]
   /** OP a la que pertenece, conectada a nivel item. */
   opId: string | null
   /** Datos de esa OP, espejados: sirven para reconocerlo y para buscarlo. */

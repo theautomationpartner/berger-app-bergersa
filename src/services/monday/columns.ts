@@ -364,6 +364,26 @@ export const ESTADO_PAGO_VEP = {
   NO_PAGADO: 'NO PAGADO',
 } as const
 
+/**
+ * Cómo se traduce el estado de carga de la OP al 🤖Estado Pedido de cada tractor.
+ *
+ * Son dos tableros que cuentan lo mismo desde dos lados: la OP dice dónde está la carga, el
+ * Inventario dice dónde está cada tractor. Mientras avanzan juntos, el del tractor tiene que
+ * seguir al de su OP.
+ *
+ * **Ojo con las etiquetas:** no son iguales. La OP dice "Próxim**a** a Arribar" —habla de la
+ * carga— y el Inventario "Próxim**o** a Arribar" —habla del tractor—. Escribir una etiqueta que
+ * no existe hace fallar la escritura ENTERA del item, así que el mapa va explícito y no se deduce.
+ */
+export const ESTADO_PEDIDO_POR_CARGA: Record<string, string> = {
+  'En Transito': 'En Transito',
+  'Próxima a Arribar': 'Próximo a Arribar',
+  Nacionalizado: 'Nacionalizado',
+}
+
+/** El estado del tractor cuando su contenedor se marca arribado. */
+export const PEDIDO_ARRIBADO = 'Arribado'
+
 /** El estado de carga que obliga a tener los contenedores armados y dispara el aviso a BERGER. */
 export const PROXIMA_A_ARRIBAR = 'Próxima a Arribar'
 

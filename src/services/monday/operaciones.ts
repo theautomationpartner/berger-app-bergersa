@@ -78,6 +78,8 @@ export type NombreOperacion =
   | 'contenedoresDelTablero'
   | 'contenedoresDelTableroDespachante'
   | 'etiquetasDeColumna'
+  | 'estadoPedidoDesdeAduana'
+  | 'estadoPedidoDesdeBerger'
   | 'asignarTurnoContenedor'
   | 'crearContenedorDespacho'
   | 'actualizarContenedorDespacho'
@@ -465,6 +467,21 @@ const CONSULTA_CONTENEDORES = `
     }
   }
 `
+
+/** Escribir el Estado Pedido de UN tractor del Inventario. Nada más que eso. */
+const CONSULTA_ESTADO_PEDIDO = `
+  mutation ($tablero: ID!, $item: ID!, $valores: JSON!) {
+    change_multiple_column_values(board_id: $tablero, item_id: $item, column_values: $valores) { id }
+  }
+`
+
+const validarEstadoPedido = (v: Record<string, unknown>) => ({
+  tablero: TABLEROS.inventario,
+  item: idMonday(v.item, 'item'),
+  /* Una sola columna escribible, y el tablero lo pone el servidor: desde acá no se puede tocar el
+     estado de pago ni ningún otro item que no sea el que se pasa. */
+  valores: valoresAcotados(v.valores, new Set([COL_INV.estadoPedido]), 'el estado del tractor'),
+})
 
 const validarTablero = (v: Record<string, unknown>) => ({
   tablero: TABLEROS.contenedoresDespacho,
@@ -1149,6 +1166,27 @@ export const OPERACIONES: Record<NombreOperacion, Operacion> = {
     modulo: 'aduana',
     query: CONSULTA_CONTENEDORES,
     validar: validarTablero,
+  },
+
+  /**
+   * El Estado Pedido de un tractor del Inventario, desde el módulo del DESPACHANTE.
+   *
+   * Existe para que el estado del tractor siga al de su OP. Es deliberadamente angosta: **una sola
+   * columna de un solo tablero**. El despachante es externo, y darle la operación genérica de
+   * escritura al Inventario —que también toca el estado de pago— sería darle mucho más de lo que
+   * este circuito necesita.
+   */
+  estadoPedidoDesdeAduana: {
+    modulo: 'aduana',
+    query: CONSULTA_ESTADO_PEDIDO,
+    validar: validarEstadoPedido,
+  },
+
+  /** Lo mismo, desde el módulo de BERGER: es quien marca el arribo de un contenedor. */
+  estadoPedidoDesdeBerger: {
+    modulo: 'aduanaBerger',
+    query: CONSULTA_ESTADO_PEDIDO,
+    validar: validarEstadoPedido,
   },
 
   /**
