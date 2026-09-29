@@ -31,6 +31,7 @@ import {
   puedeEnAduana,
 } from '@/lib/navegacion'
 import { clienteIngreso } from '@/services/acceso/cliente'
+import { MODULOS_APP } from '@/services/monday/operaciones'
 import { mondayHabilitado } from '@/services/monday/sdk'
 import type {
   ModalidadDespacho,
@@ -78,7 +79,7 @@ export function App() {
       <AppAdentro
         sesion={{
           perfil: { id: 'desarrollo', nombre: 'Desarrollo local' },
-          modulos: ['despacho', 'aduana', 'aduanaBerger', 'aduanaDashboard', 'drafts', 'fechas'],
+          modulos: [...MODULOS_APP],
           salir: () => {},
           recuperacionRestantes: null,
         }}

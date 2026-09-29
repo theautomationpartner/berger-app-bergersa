@@ -11,6 +11,7 @@
  * Para probar los mensajes, `000000` es siempre un código incorrecto. Con
  * `?vista-previa=verificar` arranca en la pantalla del código del día, como un día cualquiera.
  */
+import { MODULOS_APP } from '@/services/monday/operaciones'
 import type { ClienteIngreso, RespuestaIngreso } from '@/services/acceso/cliente'
 
 const PERFIL = { id: '1', nombre: 'Camila TAP' }
@@ -53,7 +54,7 @@ export const clienteVistaPrevia: ClienteIngreso = {
         if (pedido.codigo === '000000') return { estado: 'codigo_incorrecto', intentosRestantes: 2 }
         return {
           estado: 'listo',
-          modulos: ['despacho', 'aduana', 'aduanaBerger', 'aduanaDashboard', 'drafts', 'fechas'],
+          modulos: [...MODULOS_APP],
           perfil: PERFIL,
           sesion: 'vista-previa',
           codigosRecuperacion: Array.from({ length: 10 }, () => `${azar(5)}-${azar(5)}`),
@@ -63,7 +64,7 @@ export const clienteVistaPrevia: ClienteIngreso = {
         if (pedido.codigo === '000000') return { estado: 'codigo_incorrecto', intentosRestantes: 4 }
         return {
           estado: 'listo',
-          modulos: ['despacho', 'aduana', 'aduanaBerger', 'aduanaDashboard', 'drafts', 'fechas'],
+          modulos: [...MODULOS_APP],
           perfil: PERFIL,
           sesion: 'vista-previa',
           ...(pedido.recuperacion ? { recuperacionRestantes: 9 } : {}),

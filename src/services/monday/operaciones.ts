@@ -53,15 +53,18 @@ import {
  * habilitado. Es lo que impide que un despachante pida los pagos del inventario aunque la pantalla
  * no se los muestre.
  */
-export type ModuloApp =
-  | 'despacho'
-  | 'aduana'
-  | 'aduanaBerger'
-  | 'aduanaDashboard'
-  | 'drafts'
-  | 'fechas'
+export const MODULOS_APP = [
+  'despacho',
+  'aduana',
+  'aduanaBerger',
+  'aduanaDashboard',
+  'drafts',
+  'fechas',
   /** Alta y baja de gente en la 🔒Lista Blanca. Sólo Administración. */
-  | 'usuarios'
+  'usuarios',
+] as const
+
+export type ModuloApp = (typeof MODULOS_APP)[number]
 
 /** Nombre de cada operación. Es lo único que viaja del cliente al servidor. */
 export type NombreOperacion =
