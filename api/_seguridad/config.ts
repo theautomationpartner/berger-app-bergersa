@@ -106,7 +106,7 @@ export const TEAM = {
  * habilite a un externo.
  */
 export const TEAM_MONDAY = {
-  ADMINISTRACION: '1504155',
+  ADMINISTRACION: '1509236',
   DESPACHANTES: '1504184',
 } as const
 

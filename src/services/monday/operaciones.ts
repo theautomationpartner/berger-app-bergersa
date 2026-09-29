@@ -26,6 +26,7 @@ import {
   COL_DESPACHANTE_SUB,
   COL_DRAFT,
   COL_INV,
+  COL_LISTA_BLANCA,
   COL_PAGO,
   COL_PAGO_SUB,
   COL_PLANIF,
@@ -53,7 +54,14 @@ import {
  * no se los muestre.
  */
 export type ModuloApp =
-  'despacho' | 'aduana' | 'aduanaBerger' | 'aduanaDashboard' | 'drafts' | 'fechas' | 'drafts'
+  | 'despacho'
+  | 'aduana'
+  | 'aduanaBerger'
+  | 'aduanaDashboard'
+  | 'drafts'
+  | 'fechas'
+  /** Alta y baja de gente en la 🔒Lista Blanca. Sólo Administración. */
+  | 'usuarios'
 
 /** Nombre de cada operación. Es lo único que viaja del cliente al servidor. */
 export type NombreOperacion =
@@ -78,6 +86,10 @@ export type NombreOperacion =
   | 'contenedoresDelTablero'
   | 'contenedoresDelTableroDespachante'
   | 'etiquetasDeColumna'
+  | 'usuariosDeListaBlanca'
+  | 'crearUsuarioListaBlanca'
+  | 'estadoUsuarioListaBlanca'
+  | 'etiquetasDeListaBlanca'
   | 'estadoPedidoDesdeAduana'
   | 'estadoPedidoDesdeBerger'
   | 'asignarTurnoContenedor'
@@ -467,6 +479,25 @@ const CONSULTA_CONTENEDORES = `
     }
   }
 `
+
+/**
+ * Lo único que la app escribe al dar de alta a alguien en la 🔒Lista Blanca.
+ *
+ * Cada columna de acá es un permiso que se le otorga a una persona, así que la lista es la
+ * definición de cuánto puede hacer esta operación. Lo que no está, no se puede tocar: ni el
+ * autenticador, ni los perfiles, ni el ID de usuario de monday —que lo completa la automatización
+ * cuando la persona acepta la invitación—.
+ */
+const COLUMNAS_DE_USUARIO = new Set<string>([
+  COL_LISTA_BLANCA.nombreCompleto,
+  COL_LISTA_BLANCA.estado,
+  COL_LISTA_BLANCA.email,
+  COL_LISTA_BLANCA.telefono,
+  COL_LISTA_BLANCA.appsIds,
+  COL_LISTA_BLANCA.team,
+  COL_LISTA_BLANCA.tipoUsuario,
+  COL_LISTA_BLANCA.tablerosDespachante,
+])
 
 /** Escribir el Estado Pedido de UN tractor del Inventario. Nada más que eso. */
 const CONSULTA_ESTADO_PEDIDO = `
@@ -1166,6 +1197,86 @@ export const OPERACIONES: Record<NombreOperacion, Operacion> = {
     modulo: 'aduana',
     query: CONSULTA_CONTENEDORES,
     validar: validarTablero,
+  },
+
+  /* ---------------------------------------------------------------- *
+   * 🔒Lista Blanca — alta y baja de gente
+   *
+   * Es el tablero que decide quién entra a la app, así que todo lo de acá vive en su propio
+   * módulo (`usuarios`) que sólo tiene Administración, y escribe una lista de columnas tan corta
+   * como el formulario. El id del tablero lo pone el servidor: el cliente no puede apuntar a otro.
+   * ---------------------------------------------------------------- */
+
+  /** Las filas de la Lista Blanca, para ver a quién dar de baja. */
+  usuariosDeListaBlanca: {
+    modulo: 'usuarios',
+    query: `
+      query ($tablero: ID!, $columnas: [String!], $limite: Int!) {
+        boards(ids: [$tablero]) {
+          items_page(limit: $limite) {
+            items { id name column_values(ids: $columnas) { ${CAMPOS_COLUMNA} } }
+          }
+        }
+      }
+    `,
+    validar: (v) => ({
+      tablero: TABLEROS.listaBlanca,
+      columnas: idsDeColumnas(v.columnas),
+      limite: entero(v.limite, 'limite', 1, 500),
+    }),
+  },
+
+  /** Las etiquetas de los desplegables del tablero: apps, equipos y tableros del despachante. */
+  etiquetasDeListaBlanca: {
+    modulo: 'usuarios',
+    query: `
+      query ($tablero: ID!, $columnas: [String!]) {
+        boards(ids: [$tablero]) { columns(ids: $columnas) { id settings_str } }
+      }
+    `,
+    validar: (v) => ({
+      tablero: TABLEROS.listaBlanca,
+      columnas: idsDeColumnas(v.columnas),
+    }),
+  },
+
+  /** Da de alta una persona. Siempre INVITADO y Activo: eso lo fija la app, no el formulario. */
+  crearUsuarioListaBlanca: {
+    modulo: 'usuarios',
+    query: `
+      mutation ($tablero: ID!, $nombre: String!, $valores: JSON!) {
+        create_item(board_id: $tablero, item_name: $nombre, column_values: $valores) { id name }
+      }
+    `,
+    validar: (v) => ({
+      tablero: TABLEROS.listaBlanca,
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_USUARIO, 'el alta de un usuario'),
+    }),
+  },
+
+  /**
+   * El estado de una fila: lo único que se puede cambiar de alguien ya creado.
+   *
+   * Una sola columna escribible. Desde acá no se le puede cambiar el equipo, el tipo ni las apps
+   * a nadie: para eso está monday, donde queda registro de quién lo hizo.
+   */
+  estadoUsuarioListaBlanca: {
+    modulo: 'usuarios',
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $valores: JSON!) {
+        change_multiple_column_values(board_id: $tablero, item_id: $item, column_values: $valores) { id }
+      }
+    `,
+    validar: (v) => ({
+      tablero: TABLEROS.listaBlanca,
+      item: idMonday(v.item, 'item'),
+      valores: valoresAcotados(
+        v.valores,
+        new Set([COL_LISTA_BLANCA.estado]),
+        'el estado del usuario',
+      ),
+    }),
   },
 
   /**

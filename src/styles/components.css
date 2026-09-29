@@ -907,3 +907,11 @@
   border-color: var(--tint-neutral-bd);
   color: var(--text-gray);
 }
+
+/* Varias opciones que se eligen tocando, en vez de un desplegable múltiple: son pocas y se ven
+   todas de una, así que elegir dos es un toque y un toque, no abrir, elegir, abrir, elegir. */
+.opciones-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

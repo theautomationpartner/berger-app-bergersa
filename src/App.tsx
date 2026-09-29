@@ -6,6 +6,7 @@ import { Ingreso, type SesionIngreso } from '@/features/acceso/Ingreso'
 import { ActualizarDespachos } from '@/features/aduana/ActualizarDespachos'
 import { ActualizarContenedores } from '@/features/aduana/ActualizarContenedores'
 import { ActualizarOpBerger } from '@/features/aduana/ActualizarOpBerger'
+import { RegistroUsuario } from '@/features/usuarios/RegistroUsuario'
 import { ActualizarTurnos } from '@/features/aduana/ActualizarTurnos'
 import { DashboardDespachos } from '@/features/aduana/DashboardDespachos'
 import { DespachoAnticipado } from '@/features/anticipado/DespachoAnticipado'
@@ -221,6 +222,8 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
           onElegir={setOperacionFechas}
         />
       )}
+
+      {principal === 'usuarios' && <RegistroUsuario />}
 
       {principal === 'fechas' && operacionFechas === 'confirmar' && <ConfirmarProponerFecha />}
       {principal === 'fechas' && operacionFechas === 'enviar' && <EnviarConfirmacion />}

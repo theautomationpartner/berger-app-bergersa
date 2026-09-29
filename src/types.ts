@@ -16,7 +16,7 @@
  * El primer nivel hoy tiene una sola opción, pero existe desde ya: es donde se van a sumar los
  * próximos tipos de operación sin tener que rearmar la pantalla de entrada.
  */
-export type OperacionPrincipal = 'despacho' | 'aduana' | 'drafts' | 'fechas'
+export type OperacionPrincipal = 'usuarios' | 'despacho' | 'aduana' | 'drafts' | 'fechas'
 
 /** Operaciones dentro de "Fechas de Producción Inventario". */
 export type OperacionFechas = 'confirmar' | 'enviar'
@@ -402,6 +402,21 @@ export interface ContenedorEnArmado {
 export interface ResultadoContenedores {
   creados: string[]
   advertencias: string[]
+}
+
+/** Una fila de la 🔒Lista Blanca, como la muestra la pantalla de usuarios. */
+export interface UsuarioListaBlanca {
+  id: string
+  /** El nombre del item: el alias con el que se lo identifica. */
+  alias: string
+  nombreCompleto: string
+  estado: string
+  email: string
+  telefono: string
+  team: string
+  tipoUsuario: string
+  /** Los tableros del despachante, como los devuelve el dropdown. */
+  tableros: string
 }
 
 /** Un contacto del tablero de Contactos: de ahí salen los transportistas. */

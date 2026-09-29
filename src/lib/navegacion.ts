@@ -20,6 +20,14 @@ import type {
 export const OPERACIONES_PRINCIPALES: (OpcionPanel<OperacionPrincipal> & { modulo: ModuloApp })[] =
   [
     {
+      id: 'usuarios',
+      modulo: 'usuarios',
+      titulo: 'REGISTRO DE USUARIO',
+      corto: 'Registro de usuario',
+      detalle: 'Dar de alta gente en la Lista Blanca, y desactivar invitados que ya no entran.',
+      icono: 'fa-solid fa-user-shield',
+    },
+    {
       id: 'drafts',
       modulo: 'drafts',
       titulo: 'PLANIFICACIÓN DE DRAFTS',
@@ -42,8 +50,8 @@ export const OPERACIONES_PRINCIPALES: (OpcionPanel<OperacionPrincipal> & { modul
     {
       id: 'despacho',
       modulo: 'despacho',
-      titulo: 'PAGOS DESPACHO',
-      corto: 'Pagos despacho',
+      titulo: 'GESTIÓN DE LOS PAGOS',
+      corto: 'Gestión de los pagos',
       detalle: 'Despacho de tractores del inventario, con pago anticipado o a la vista.',
       icono: 'fa-solid fa-truck-ramp-box',
     },

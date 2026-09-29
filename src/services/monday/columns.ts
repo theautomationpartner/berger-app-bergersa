@@ -38,6 +38,15 @@ export const TABLEROS = {
   contenedoresDespacho: '18431711942',
   /** Contactos: de ahí salen los transportistas. */
   contactos: '18428421093',
+  /**
+   * 🔒Lista Blanca — quién entra a la app y a qué.
+   *
+   * OJO: el circuito de seguridad de `api/_seguridad` lee este mismo tablero desde la variable
+   * de entorno `SEGURIDAD_LISTA_BLANCA_TABLERO_ID`, porque lo comparten varias apps de BERGER.
+   * Acá está escrito porque la operación de alta/baja pasa por el catálogo como todas las demás.
+   * **Si alguna vez se cambia el tablero, hay que cambiarlo en los dos lados.**
+   */
+  listaBlanca: '18430553527',
   /** Drafts: un item por draft del proveedor, con un subitem por producto. */
   drafts: '18428667614',
   draftsSubitems: '18428672791',
@@ -465,6 +474,40 @@ export const COL_DESPACHANTE_SUB = {
 } as const
 
 /**
+ * 🔒Lista Blanca (18430553527) — las columnas que la app escribe al dar de alta a alguien.
+ *
+ * Es el tablero que decide quién entra: cada columna de acá es un permiso. Por eso la operación
+ * que lo escribe tiene su propio módulo —`usuarios`, sólo para Administración— y una lista de
+ * columnas escribibles tan corta como este objeto.
+ */
+export const COL_LISTA_BLANCA = {
+  nombreCompleto: 'text_mm77m57b',
+  estado: 'status',
+  email: 'email_mm72cz3e',
+  telefono: 'phone_mm72fchr',
+  /** Las apps habilitadas, por id de tablero. Es lo que compara el portón al ingresar. */
+  appsIds: 'dropdown_mm72bgr3',
+  team: 'dropdown_mm72dj2g',
+  tipoUsuario: 'color_mm728j0d',
+  /** Sólo para el team Despachantes: a qué tableros se lo suma. */
+  tablerosDespachante: 'dropdown_mm7m1kj4',
+} as const
+
+/** Las etiquetas de la Lista Blanca que usa el alta. */
+export const USUARIO = {
+  ACTIVO: 'Activo',
+  INACTIVO: 'Inactivo',
+  /** Todo usuario que se crea desde la app entra como INVITADO. */
+  INVITADO: 'INVITADO',
+} as const
+
+/** Los equipos, tal como figuran en el dropdown del tablero. */
+export const TEAM_LISTA = {
+  ADMINISTRACION: 'Administracion',
+  DESPACHANTES: 'Despachantes',
+} as const
+
+/**
  * Contactos (18428421093) — de ahí salen los transportistas.
  *
  * El tablero es la agenda entera de BERGER: transportistas, clientes, despachantes y proveedores
@@ -576,6 +619,14 @@ export const URL_TABLERO_CONTENEDORES = 'https://maquinariasagricolas.monday.com
  * no en el código: así el día que entre un despachante nuevo no hay que tocar ni desplegar nada.
  */
 export const TEAM_DESPACHANTES = '1504184'
+
+/**
+ * Equipo "Administración Berger SA" de la cuenta (`/teams/1509236`).
+ *
+ * Reemplazó al anterior (1504155) el 29/09/2026: el viejo no admitía invitados, y este circuito
+ * necesita que un INVITADO pueda estar en Administración.
+ */
+export const TEAM_ADMINISTRACION = '1509236'
 
 /**
  * Los puertos que acepta la columna del Despachante.

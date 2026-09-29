@@ -32,6 +32,7 @@ export const MODULOS: Modulo[] = [
   'aduanaDashboard',
   'drafts',
   'fechas',
+  'usuarios',
 ]
 
 /** Que el valor venga de afuera y sea uno de los módulos conocidos. */
