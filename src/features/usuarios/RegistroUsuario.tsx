@@ -325,9 +325,7 @@ export function RegistroUsuario() {
                         key={app}
                         type="button"
                         aria-pressed={datos.apps.includes(app)}
-                        className={`chip chip--boton${
-                          datos.apps.includes(app) ? ' chip--activo' : ''
-                        }`}
+                        className="chip--opcion"
                         onClick={() => alternarApp(app)}
                       >
                         {app}
@@ -354,9 +352,7 @@ export function RegistroUsuario() {
                           key={t}
                           type="button"
                           aria-pressed={datos.tableros.includes(t)}
-                          className={`chip chip--boton${
-                            datos.tableros.includes(t) ? ' chip--activo' : ''
-                          }`}
+                          className="chip--opcion chip--opcion-violeta"
                           onClick={() => alternarTablero(t)}
                         >
                           {t}

@@ -915,3 +915,93 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/*
+ * Una opción que se elige tocando.
+ *
+ * Elegida y no elegida tienen que distinguirse a un metro de la pantalla, porque son la diferencia
+ * entre habilitar una app y no habilitarla. Por eso no cambia sólo el borde: la elegida se pinta
+ * entera del color de su grupo y la que no, se apaga. El círculo de la izquierda está siempre, con
+ * el mismo tamaño, así que marcar y desmarcar no mueve nada de lugar.
+ *
+ * El color sale de --acento, que pone cada grupo: las apps y los tableros del despachante son dos
+ * decisiones distintas y conviene que no se confundan entre sí.
+ */
+.chip--opcion {
+  --acento: var(--primary-blue);
+  --acento-suave: #e6f1fd;
+  --acento-borde: #a9cff6;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 9px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: var(--tint-neutral);
+  color: var(--text-gray);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+/* El círculo: vacío mientras no está elegida, con el tilde adentro cuando lo está. */
+.chip--opcion::before {
+  content: '✓';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: transparent;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.chip--opcion:hover {
+  border-color: var(--acento-borde);
+  background: var(--acento-suave);
+  color: var(--text-dark);
+}
+
+.chip--opcion:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+.chip--opcion[aria-pressed='true'] {
+  background: var(--acento);
+  border-color: var(--acento);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.18);
+}
+
+.chip--opcion[aria-pressed='true']::before {
+  background: #fff;
+  border-color: #fff;
+  color: var(--acento);
+}
+
+.chip--opcion[aria-pressed='true']:hover {
+  filter: brightness(1.06);
+}
+
+/* Los tableros del despachante, en violeta: se eligen en el mismo formulario que las apps y son
+   otra cosa. */
+.chip--opcion-violeta {
+  --acento: var(--purple);
+  --acento-suave: #f4ecfb;
+  --acento-borde: #dcc3ef;
+}
