@@ -8,11 +8,5 @@
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
-  ],
-  "git": {
-    "deploymentEnabled": {
-      "main": true,
-      "testeo-pre-produccion": false
-    }
-  }
+  ]
 }

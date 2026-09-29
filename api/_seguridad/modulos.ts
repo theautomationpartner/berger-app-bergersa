@@ -81,6 +81,9 @@ async function estaEnElEquipo(usuarioId: string, equipoId: string): Promise<bool
   return (datos.teams?.[0]?.users ?? []).some((u) => String(u.id) === usuarioId)
 }
 
+/** Los módulos que no alcanza con tenerlos en la fila: hace falta el equipo de monday. */
+const EXIGEN_EQUIPO = (m: Modulo): boolean => m.startsWith('aduana') || m === 'usuarios'
+
 /**
  * Los módulos definitivos de un perfil, ya con el equipo de monday comprobado.
  *
@@ -108,7 +111,11 @@ export async function modulosDelPerfil(perfil: Perfil, usuarioId: string): Promi
   if (enElEquipo) return deLaLista
 
   /* El equipo no confirma. Para un despachante eso es quedarse sin nada: su único módulo depende
-     de estar en el equipo. Para alguien de Administración, se le cae todo lo de Aduana y conserva
-     Despacho, que es lo que la fila le habilita por sí sola. */
-  return deLaLista.filter((m) => !m.startsWith('aduana'))
+     de estar en el equipo. Para alguien de Administración se le caen los módulos que exigen el
+     equipo —todo lo de Aduana y el alta de usuarios, que escribe la Lista Blanca— y conserva
+     Despacho, que es lo que la fila le habilita por sí sola.
+
+     Que "usuarios" esté acá importa: es el módulo que decide quién entra a la app, así que no
+     puede sostenerse sólo en la fila del tablero. Si el equipo no se pudo comprobar, no se otorga. */
+  return deLaLista.filter((m) => !EXIGEN_EQUIPO(m))
 }
