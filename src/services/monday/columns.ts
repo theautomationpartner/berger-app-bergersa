@@ -485,7 +485,16 @@ export const COL_LISTA_BLANCA = {
   estado: 'status',
   email: 'email_mm72cz3e',
   telefono: 'phone_mm72fchr',
-  /** Las apps habilitadas, por id de tablero. Es lo que compara el portón al ingresar. */
+  /**
+   * 🤚App Habilitadas: las apps por su nombre. Es lo que se elige en el formulario y lo que se lee
+   * de un vistazo en el tablero.
+   */
+  apps: 'dropdown_mm72c615',
+  /**
+   * 🤖ID APP Habilitadas: las mismas apps, por id de tablero. Es lo que compara el portón al
+   * ingresar, así que se escribe junto con la de arriba: una fila con el nombre y sin el id
+   * parece habilitada y no deja entrar a nadie.
+   */
   appsIds: 'dropdown_mm72bgr3',
   team: 'dropdown_mm72dj2g',
   tipoUsuario: 'color_mm728j0d',

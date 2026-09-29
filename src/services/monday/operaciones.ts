@@ -496,6 +496,7 @@ const COLUMNAS_DE_USUARIO = new Set<string>([
   COL_LISTA_BLANCA.estado,
   COL_LISTA_BLANCA.email,
   COL_LISTA_BLANCA.telefono,
+  COL_LISTA_BLANCA.apps,
   COL_LISTA_BLANCA.appsIds,
   COL_LISTA_BLANCA.team,
   COL_LISTA_BLANCA.tipoUsuario,

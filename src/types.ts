@@ -413,6 +413,8 @@ export interface UsuarioListaBlanca {
   estado: string
   email: string
   telefono: string
+  /** Las apps habilitadas, por su nombre. */
+  apps: string
   team: string
   tipoUsuario: string
   /** Los tableros del despachante, como los devuelve el dropdown. */
