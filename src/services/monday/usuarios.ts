@@ -15,18 +15,6 @@ import { porId, texto, type ColumnaCruda } from './parse'
 import { mondayApi } from './sdk'
 import type { UsuarioListaBlanca } from '@/types'
 
-/**
- * Una app habilitada: el nombre que se elige y el id con el que el portón la reconoce.
- *
- * Son dos columnas del tablero —🤚App Habilitadas y 🤖ID APP Habilitadas— y se llenan juntas. La
- * de nombres es la que se lee; la de ids es la que decide si la persona entra.
- */
-export interface AppHabilitada {
-  nombre: string
-  /** Vacío si esa app todavía no tiene su id cargado en el tablero. */
-  id: string
-}
-
 /** Los datos del formulario de alta. */
 export interface AltaUsuario {
   /** Alias. Si viene vacío se usa el nombre completo: monday no acepta items sin nombre. */
@@ -34,8 +22,8 @@ export interface AltaUsuario {
   nombreCompleto: string
   email: string
   telefono: string
-  /** Las apps habilitadas, tal como figuran en los dropdowns del tablero. */
-  apps: AppHabilitada[]
+  /** Las apps habilitadas, por el nombre de su etiqueta en 🤚App Habilitadas. */
+  apps: string[]
   team: string
   /** Sólo para el team Despachantes. */
   tableros: string[]
@@ -47,7 +35,6 @@ const COLUMNAS = [
   COL_LISTA_BLANCA.estado,
   COL_LISTA_BLANCA.email,
   COL_LISTA_BLANCA.telefono,
-  COL_LISTA_BLANCA.appsIds,
   COL_LISTA_BLANCA.team,
   COL_LISTA_BLANCA.tipoUsuario,
   COL_LISTA_BLANCA.tablerosDespachante,
@@ -85,15 +72,13 @@ export async function crearUsuario(d: AltaUsuario): Promise<{ id: string; nombre
     [COL_LISTA_BLANCA.nombreCompleto]: d.nombreCompleto.trim(),
     [COL_LISTA_BLANCA.estado]: { label: USUARIO.ACTIVO },
     [COL_LISTA_BLANCA.email]: { email: d.email.trim(), text: d.email.trim() },
-    [COL_LISTA_BLANCA.apps]: { labels: d.apps.map((a) => a.nombre) },
+    [COL_LISTA_BLANCA.apps]: { labels: d.apps },
     [COL_LISTA_BLANCA.team]: { labels: [d.team] },
     [COL_LISTA_BLANCA.tipoUsuario]: { label: USUARIO.INVITADO },
   }
-  /* El id va en su propia columna, y sólo el de las apps que lo tengan cargado. Una etiqueta que
-     no existe hace fallar la escritura entera del item, así que mandar un id vacío costaría el
-     alta completa. */
-  const ids = d.apps.map((a) => a.id).filter(Boolean)
-  if (ids.length > 0) valores[COL_LISTA_BLANCA.appsIds] = { labels: ids }
+  /* 🤖ID APP Habilitadas no se toca: la completa la automatización de BERGER al detectar el item
+     nuevo, como el ID de usuario. Por eso tampoco está entre las columnas que la operación puede
+     escribir. */
 
   if (d.telefono.trim()) {
     valores[COL_LISTA_BLANCA.telefono] = { phone: d.telefono.trim(), countryShortName: 'AR' }
@@ -153,7 +138,7 @@ export async function desactivarUsuario(id: string): Promise<void> {
  * una etiqueta que no existe hace fallar la escritura entera del item.
  */
 export async function etiquetasDeListaBlanca(): Promise<{
-  apps: AppHabilitada[]
+  apps: string[]
   teams: string[]
   tableros: string[]
 }> {
@@ -162,36 +147,25 @@ export async function etiquetasDeListaBlanca(): Promise<{
     {
       columnas: [
         COL_LISTA_BLANCA.apps,
-        COL_LISTA_BLANCA.appsIds,
         COL_LISTA_BLANCA.team,
         COL_LISTA_BLANCA.tablerosDespachante,
       ],
     },
   )
 
-  const labelsDe = (id: string): { id: number; name: string }[] => {
+  const etiquetasDe = (id: string): string[] => {
     const crudo = r.boards?.[0]?.columns?.find((c) => c.id === id)?.settings_str
     if (!crudo) return []
     try {
       const ajustes = JSON.parse(crudo) as { labels?: { id: number; name: string }[] }
-      return (ajustes.labels ?? []).filter((l) => l?.name)
+      return (ajustes.labels ?? []).map((l) => l.name).filter(Boolean)
     } catch {
       return []
     }
   }
-  const etiquetasDe = (id: string): string[] => labelsDe(id).map((l) => l.name)
-
-  /* El nombre de la app y su id son dos columnas distintas, y lo que las une es el número de
-     etiqueta: la etiqueta 1 de "App Habilitadas" y la etiqueta 1 de "ID APP Habilitadas" son la
-     misma app. Un nombre sin su id queda con id vacío en vez de desaparecer: esconder una app que
-     existe en el tablero sería peor que ofrecerla y avisar. */
-  const ids = new Map(labelsDe(COL_LISTA_BLANCA.appsIds).map((l) => [l.id, l.name]))
 
   return {
-    apps: labelsDe(COL_LISTA_BLANCA.apps).map((l) => ({
-      nombre: l.name,
-      id: ids.get(l.id) ?? '',
-    })),
+    apps: etiquetasDe(COL_LISTA_BLANCA.apps),
     teams: etiquetasDe(COL_LISTA_BLANCA.team),
     tableros: etiquetasDe(COL_LISTA_BLANCA.tablerosDespachante),
   }

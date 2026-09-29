@@ -9,7 +9,6 @@ import {
   faltaParaElAlta,
   usuariosDeListaBlanca,
   type AltaUsuario,
-  type AppHabilitada,
 } from '@/services/monday/usuarios'
 import type { UsuarioListaBlanca } from '@/types'
 
@@ -45,7 +44,7 @@ export function RegistroUsuario() {
 
   const [datos, setDatos] = useState<AltaUsuario>(VACIO)
   const [opciones, setOpciones] = useState({
-    apps: [] as AppHabilitada[],
+    apps: [] as string[],
     teams: [] as string[],
     tableros: [] as string[],
   })
@@ -107,12 +106,10 @@ export function RegistroUsuario() {
     )
   }, [invitadosActivos, busqueda])
 
-  const alternarApp = (app: AppHabilitada) =>
+  const alternarApp = (app: string) =>
     setDatos((d) => ({
       ...d,
-      apps: d.apps.some((a) => a.nombre === app.nombre)
-        ? d.apps.filter((a) => a.nombre !== app.nombre)
-        : [...d.apps, app],
+      apps: d.apps.includes(app) ? d.apps.filter((x) => x !== app) : [...d.apps, app],
     }))
 
   const alternarTablero = (t: string) =>
@@ -323,27 +320,19 @@ export function RegistroUsuario() {
                     Apps habilitadas <span className="campo-req">· obligatorio</span>
                   </span>
                   <div className="opciones-chips">
-                    {opciones.apps.map((app) => {
-                      const elegida = datos.apps.some((a) => a.nombre === app.nombre)
-                      return (
-                        <button
-                          key={app.nombre}
-                          type="button"
-                          aria-pressed={elegida}
-                          className={`chip chip--boton${elegida ? ' chip--activo' : ''}`}
-                          onClick={() => alternarApp(app)}
-                          title={
-                            app.id
-                              ? `Id de la app: ${app.id}`
-                              : 'Esta app todavía no tiene su id cargado en el tablero: se va a ' +
-                                'guardar el nombre, pero no va a dar acceso hasta que alguien lo cargue.'
-                          }
-                        >
-                          {app.nombre}
-                          {!app.id && ' ⚠'}
-                        </button>
-                      )
-                    })}
+                    {opciones.apps.map((app) => (
+                      <button
+                        key={app}
+                        type="button"
+                        aria-pressed={datos.apps.includes(app)}
+                        className={`chip chip--boton${
+                          datos.apps.includes(app) ? ' chip--activo' : ''
+                        }`}
+                        onClick={() => alternarApp(app)}
+                      >
+                        {app}
+                      </button>
+                    ))}
                     {opciones.apps.length === 0 && (
                       <span className="campo-ayuda">
                         No se pudieron leer las apps del tablero. Recargá la pantalla.

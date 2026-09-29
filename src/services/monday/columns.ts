@@ -492,8 +492,8 @@ export const COL_LISTA_BLANCA = {
   apps: 'dropdown_mm72c615',
   /**
    * 🤖ID APP Habilitadas: las mismas apps, por id de tablero. Es lo que compara el portón al
-   * ingresar, así que se escribe junto con la de arriba: una fila con el nombre y sin el id
-   * parece habilitada y no deja entrar a nadie.
+   * ingresar, pero **la app no la escribe**: la completa la automatización de BERGER cuando
+   * detecta el item nuevo. Está acá porque el circuito de seguridad la lee.
    */
   appsIds: 'dropdown_mm72bgr3',
   team: 'dropdown_mm72dj2g',
