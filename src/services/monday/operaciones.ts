@@ -80,6 +80,9 @@ export type NombreOperacion =
   | 'crearSubitemDePago'
   | 'crearItemDeDespachante'
   | 'crearSubitemDeDespachante'
+  | 'fobDelDespacho'
+  | 'totalFobDelDespacho'
+  | 'prorrateoDeSubitem'
   | 'actualizarColumnas'
   | 'despachosDeAduana'
   | 'despachosPaginaSiguiente'
@@ -815,6 +818,69 @@ export const OPERACIONES: Record<NombreOperacion, Operacion> = {
       padre: idMonday(v.padre, 'padre'),
       nombre: nombre(v.nombre),
       valores: valoresDeColumnas(v.valores, TABLEROS.despachanteSubitems),
+    }),
+  },
+
+  /**
+   * El FOB de cada tractor del despacho, ya creados los subitems.
+   *
+   * Es un espejo del Inventario, así que se lee de monday y no se calcula acá: el precio lo carga
+   * quien compra, y la app sólo lo suma.
+   */
+  fobDelDespacho: {
+    modulo: 'despacho',
+    query: `
+      query ($item: [ID!], $columnas: [String!]) {
+        items(ids: $item) {
+          id
+          subitems { id name column_values(ids: $columnas) { ${CAMPOS_COLUMNA} } }
+        }
+      }
+    `,
+    validar: (v) => ({ item: [idMonday(v.item, 'item')], columnas: idsDeColumnas(v.columnas) }),
+  },
+
+  /**
+   * El TOTAL FOB del despacho. Una sola columna, en un solo tablero.
+   *
+   * No reusa `actualizarColumnas` porque el tablero del Despachante no está entre los escribibles
+   * de aquella —la app sólo lo crea— y porque acá alcanza con una columna: cuanto más angosta la
+   * operación, menos hay que revisar el día que algo salga mal.
+   */
+  totalFobDelDespacho: {
+    modulo: 'despacho',
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $valores: JSON!) {
+        change_multiple_column_values(board_id: $tablero, item_id: $item, column_values: $valores) { id }
+      }
+    `,
+    validar: (v) => ({
+      tablero: TABLEROS.despachante,
+      item: idMonday(v.item, 'item'),
+      valores: valoresAcotados(
+        v.valores,
+        new Set([COL_DESPACHANTE.totalFob]),
+        'el total FOB del despacho',
+      ),
+    }),
+  },
+
+  /** El % de prorrateo de UN tractor. Misma idea: una columna, un tablero. */
+  prorrateoDeSubitem: {
+    modulo: 'despacho',
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $valores: JSON!) {
+        change_multiple_column_values(board_id: $tablero, item_id: $item, column_values: $valores) { id }
+      }
+    `,
+    validar: (v) => ({
+      tablero: TABLEROS.despachanteSubitems,
+      item: idMonday(v.item, 'item'),
+      valores: valoresAcotados(
+        v.valores,
+        new Set([COL_DESPACHANTE_SUB.prorrateo]),
+        'el prorrateo de un tractor',
+      ),
     }),
   },
 

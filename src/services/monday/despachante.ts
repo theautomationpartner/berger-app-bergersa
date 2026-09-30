@@ -27,6 +27,7 @@ import {
   PUERTOS_DESPACHANTE,
   TABLEROS,
 } from './columns'
+import { prorratearDespacho } from './prorrateo'
 import { mondayApi } from './sdk'
 
 const motivo = (e: unknown): string => (e instanceof Error ? e.message : String(e))
@@ -63,6 +64,8 @@ export interface ResultadoDespachante {
   /** Item creado en el Despachante de aduana. No confundir con el id del despachante persona. */
   itemId: string
   subitemIds: string[]
+  /** La suma del FOB de los tractores. `null` si no se pudo calcular. */
+  totalFob: number | null
   advertencias: string[]
 }
 
@@ -156,5 +159,11 @@ export async function crearDespachoDeAduana({
     }
   }
 
-  return { itemId, subitemIds, advertencias }
+  /* Con todos los subitems creados —y no antes— se suma el FOB del despacho y se reparte el
+     porcentaje de cada tractor. Antes no se puede: el FOB es un espejo del Inventario y no existe
+     hasta que el subitem está conectado, y el porcentaje necesita el total de TODOS. */
+  const { total, advertencias: deProrrateo } = await prorratearDespacho(itemId)
+  advertencias.push(...deProrrateo)
+
+  return { itemId, subitemIds, totalFob: total, advertencias }
 }

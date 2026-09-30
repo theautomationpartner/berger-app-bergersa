@@ -304,6 +304,15 @@ export const COL_DESPACHANTE = {
   puertoOrigen: 'dropdown_mm79vwr1',
   proveedor: 'dropdown_mm77czh3',
   importador: 'color_mm77sys5',
+  /**
+   * TOTAL 🤖FOB: la suma del FOB de todos los tractores del despacho.
+   *
+   * La escribe la app al crear el despacho, con los subitems ya armados. Es una columna de números
+   * y no un espejo porque sobre ella se calcula el prorrateo, y un número escrito queda igual
+   * aunque después cambie el Inventario: el reparto de gastos de una importación no se puede
+   * mover solo.
+   */
+  totalFob: 'numeric_mm7pb5r5',
 
   /* Lo que completa BERGER cuando la carga está por llegar. */
   formaPago: 'dropdown_mm77scb3',
@@ -469,6 +478,17 @@ export const COL_DESPACHANTE_SUB = {
   rodado: 'lookup_mm78j0hk',
   /** N° de la factura de compra del tractor, espejado del Inventario. */
   nroFactCompra: 'lookup_mm7avmwm',
+  /** FOB - Precio Unitario del tractor, espejado del Inventario. */
+  fob: 'lookup_mm7fqs33',
+
+  /**
+   * % Prorrateo: cuánto pesa el FOB de este tractor sobre el total del despacho.
+   *
+   * Un tractor de 10 en un despacho de 100 lleva 10. Es con lo que después se reparten los gastos
+   * e impuestos de la importación entre los tractores, así que lo escribe la app junto con el
+   * total: calcularlo a mano, tractor por tractor, es donde se cuelan los errores.
+   */
+  prorrateo: 'numeric_mm7nrxcp',
   /** Contenedor en el que viaja. Vacío = todavía no se armó. */
   contenedor: 'board_relation_mm7a62tt',
 } as const
