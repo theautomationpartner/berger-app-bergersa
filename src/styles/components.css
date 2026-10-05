@@ -1005,3 +1005,187 @@
   --acento-suave: #f4ecfb;
   --acento-borde: #dcc3ef;
 }
+
+/* ===== VENTA · alta de cuentas y contactos ===== */
+
+/* Un aviso que no es ni un problema ni un logro: contexto. El resumen de los contactos que ya
+   tiene la cuenta es eso — no hay nada que corregir, sólo algo que conviene mirar antes. */
+.aviso--neutro {
+  background: var(--tint-neutral);
+  border-color: var(--tint-neutral-bd);
+  color: var(--text-mid);
+}
+
+.lista-compacta {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lista-compacta li {
+  line-height: 1.5;
+}
+
+/*
+ * El teléfono, en partes.
+ *
+ * El prefijo del país no es un campo: es el dato que la app ya sabe por el país elegido, y
+ * mostrarlo como casillero invitaría a escribirlo de nuevo. Va como etiqueta pegada al área.
+ */
+.tel-partes {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.tel-prefijo {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--tint-neutral);
+  border: 1px solid var(--border);
+  color: var(--text-mid);
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* El área es corta y el abonado largo: darles el mismo ancho haría escribir cuatro dígitos en un
+   campo de veinte. */
+.tel-area {
+  flex: 0 0 90px;
+}
+.tel-partes .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ===== Buscador de operaciones ===== */
+
+/*
+ * Con diez operaciones repartidas en dos áreas y tres niveles, llegar a una son cuatro clics y
+ * saber de antemano dónde vive. Quien usa la app todos los días escribe dos letras y entra.
+ */
+.buscador {
+  position: relative;
+  margin-bottom: 18px;
+}
+.buscador-campo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-radius: 11px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+}
+.buscador-campo:focus-within {
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(0, 115, 234, 0.14);
+}
+.buscador-campo > i {
+  color: var(--text-gray);
+  font-size: 14px;
+}
+.buscador-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  padding: 13px 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-dark);
+}
+/* El navegador dibuja su propia cruz en los `type="search"`, con otro aspecto en cada uno. */
+.buscador-input::-webkit-search-cancel-button {
+  display: none;
+}
+.buscador-limpiar {
+  border: none;
+  background: none;
+  color: var(--text-gray);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.buscador-limpiar:hover {
+  background: var(--tint-neutral);
+  color: var(--text-dark);
+}
+
+.buscador-resultados {
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.1);
+  overflow: hidden;
+}
+.buscador-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 14px;
+  border: none;
+  border-bottom: 1px solid var(--border-soft);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.buscador-item:last-child {
+  border-bottom: none;
+}
+.buscador-item--on {
+  background: #e6f1fd;
+}
+.buscador-item-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--berger-red-soft);
+  color: var(--berger-red);
+  flex: 0 0 auto;
+}
+.buscador-item-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.buscador-item-tit {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-dark);
+  line-height: 1.3;
+}
+/* Dónde vive: con dos "ACTUALIZAR OP" en la app, el título solo no alcanza para saber cuál es. */
+.buscador-item-donde {
+  font-size: 11.5px;
+  color: var(--text-gray);
+}
+.buscador-item-flecha {
+  color: var(--text-gray);
+  font-size: 12px;
+}
+.buscador-vacio {
+  padding: 14px;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+/* Las áreas del inicio: dos tarjetas, más grandes que las operaciones, porque son la primera
+   pregunta y descartan la mitad de la app. */
+.panel-opciones--areas {
+  gap: 12px;
+}
+.panel-opcion--area .panel-opcion-tit {
+  font-size: 17px;
+  letter-spacing: 0.02em;
+}

@@ -7,16 +7,25 @@
  */
 
 /**
- * Navegación de la app, en tres niveles:
+ * Navegación de la app, en cuatro niveles:
  *
- *   Operación principal  →  Modalidad  →  Etapa
- *   DESPACHO             →  ANTICIPADO →  Cargar / Aprobar / Confirmar
- *                        →  VISTA      →  (paso único)
+ *   Área     →  Operación principal  →  Operación   →  Etapa
+ *   COMPRA   →  DESPACHO             →  ANTICIPADO  →  Cargar / Aprobar / Confirmar
+ *   VENTA    →  ALTA DE CUENTAS...   →  (pantalla única)
  *
- * El primer nivel hoy tiene una sola opción, pero existe desde ya: es donde se van a sumar los
- * próximos tipos de operación sin tener que rearmar la pantalla de entrada.
+ * El área se sumó cuando la app dejó de ser sólo de importación: con diez operaciones en una sola
+ * lista, encontrar la que se busca era leerlas todas.
  */
-export type OperacionPrincipal = 'usuarios' | 'despacho' | 'aduana' | 'drafts' | 'fechas'
+export type AreaApp = 'compra' | 'venta'
+
+export type OperacionPrincipal =
+  | 'usuarios'
+  | 'despacho'
+  | 'aduana'
+  | 'drafts'
+  | 'fechas'
+  /** VENTA · alta de cuentas y contactos en el CRM. */
+  | 'clientes'
 
 /** Operaciones dentro de "Fechas de Producción Inventario". */
 export type OperacionFechas = 'confirmar' | 'enviar'

@@ -16,30 +16,30 @@ import { DashboardDrafts } from '@/features/drafts/DashboardDrafts'
 import { EnviarPlanificacion } from '@/features/drafts/EnviarPlanificacion'
 import { PlanificarPeriodo } from '@/features/drafts/PlanificarPeriodo'
 import { Migas, type Miga } from '@/features/inicio/Migas'
+import { Buscador } from '@/features/inicio/Buscador'
+import { PanelLateral } from '@/features/inicio/PanelLateral'
+import { AltaCuentasContactos } from '@/features/ventas/AltaCuentasContactos'
 import { PanelOpciones } from '@/features/inicio/PanelOpciones'
 import { DespachoVista } from '@/features/vista/DespachoVista'
 import { useAccesoMonday } from '@/hooks/useAccesoMonday'
 import {
   aduanaDeModulos,
+  areasDeModulos,
+  AREAS,
   MODALIDADES_DESPACHO,
   OPERACIONES_ADUANA,
   OPERACIONES_DRAFTS,
   OPERACIONES_FECHAS,
   OPERACIONES_PRINCIPALES,
-  principalesDeModulos,
+  principalesDeArea,
   SECCIONES_ADUANA,
   puedeEnAduana,
 } from '@/lib/navegacion'
+import { destinosDe, RUTA_INICIO, type Destino, type Ruta } from '@/lib/catalogo'
 import { clienteIngreso } from '@/services/acceso/cliente'
 import { MODULOS_APP } from '@/services/monday/operaciones'
 import { mondayHabilitado } from '@/services/monday/sdk'
-import type {
-  ModalidadDespacho,
-  OperacionAduana,
-  OperacionDrafts,
-  OperacionFechas,
-  OperacionPrincipal,
-} from '@/types'
+import type { AreaApp } from '@/types'
 
 const TITULO = 'Importación Berger S.A.'
 const SUBTITULO = 'Tractores · BERGER S.A.'
@@ -109,14 +109,28 @@ export function App() {
  * Administración ve las dos.
  */
 function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
-  const [principal, setPrincipal] = useState<OperacionPrincipal | null>(null)
-  const [modalidad, setModalidad] = useState<ModalidadDespacho | null>(null)
-  const [operacionAduana, setOperacionAduana] = useState<OperacionAduana | null>(null)
-  const [operacionDrafts, setOperacionDrafts] = useState<OperacionDrafts | null>(null)
-  const [operacionFechas, setOperacionFechas] = useState<OperacionFechas | null>(null)
+  /* Un solo objeto y no cinco estados sueltos: así el buscador y el panel lateral pueden saltar
+     a cualquier pantalla con un `setRuta`, sin tener que acordarse de limpiar los otros cuatro. */
+  const [ruta, setRuta] = useState<Ruta>(RUTA_INICIO)
+  const [lateralAbierto, setLateralAbierto] = useState(false)
 
-  const principales = principalesDeModulos(sesion.modulos)
+  const {
+    area,
+    principal,
+    modalidad,
+    aduana: operacionAduana,
+    drafts: operacionDrafts,
+    fechas: operacionFechas,
+  } = ruta
+
+  const areas = areasDeModulos(sesion.modulos)
   const operacionesAduana = aduanaDeModulos(sesion.modulos)
+  const destinos = destinosDe(sesion.modulos)
+
+  const irA = (d: Destino) => setRuta(d.ruta)
+  const irAlArea = (id: AreaApp) => setRuta({ ...RUTA_INICIO, area: id })
+  const elegirPrincipal = (id: (typeof OPERACIONES_PRINCIPALES)[number]['id']) =>
+    setRuta((v) => ({ ...RUTA_INICIO, area: v.area, principal: id }))
 
   const barra = (
     <BarraMarca
@@ -147,21 +161,26 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
     )
   }
 
-  const irAlInicio = () => {
-    setPrincipal(null)
-    setModalidad(null)
-    setOperacionAduana(null)
-    setOperacionDrafts(null)
-    setOperacionFechas(null)
+  const irAlInicio = () => setRuta(RUTA_INICIO)
+  const volverAlArea = () => setRuta((v) => ({ ...RUTA_INICIO, area: v.area }))
+  const volverAlPrincipal = () =>
+    setRuta((v) => ({ ...RUTA_INICIO, area: v.area, principal: v.principal }))
+
+  /**
+   * Un paso atrás: al panel del nivel anterior.
+   *
+   * La miga de pan ya decía dónde estaba parado el usuario, pero para volver había que apuntarle a
+   * un renglón de texto chico. Dentro del iframe de monday el "atrás" del navegador no sirve, y en
+   * el celular directamente no existe, así que sin un botón la única salida era recargar la app.
+   */
+  const volverAtras = () => {
+    if (operacionAduana || operacionDrafts || operacionFechas || modalidad)
+      return volverAlPrincipal()
+    if (principal) return volverAlArea()
+    irAlInicio()
   }
 
-  const volverAlPrincipal = () => {
-    setModalidad(null)
-    setOperacionAduana(null)
-    setOperacionDrafts(null)
-    setOperacionFechas(null)
-  }
-
+  const defArea = AREAS.find((a) => a.id === area)
   const defPrincipal = OPERACIONES_PRINCIPALES.find((o) => o.id === principal)
   const defSegundo =
     MODALIDADES_DESPACHO.find((m) => m.id === modalidad) ??
@@ -170,8 +189,19 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
     OPERACIONES_FECHAS.find((o) => o.id === operacionFechas)
 
   const migas: Miga[] = [{ rotulo: 'Operaciones', onIr: irAlInicio }]
+  if (defArea) migas.push({ rotulo: defArea.corto, onIr: volverAlArea })
   if (defPrincipal) migas.push({ rotulo: defPrincipal.corto, onIr: volverAlPrincipal })
   if (defSegundo) migas.push({ rotulo: defSegundo.corto })
+
+  /* El destino actual, para marcarlo en el panel lateral. */
+  const idActual = destinos.find(
+    (d) =>
+      d.ruta.principal === principal &&
+      d.ruta.modalidad === modalidad &&
+      d.ruta.aduana === operacionAduana &&
+      d.ruta.drafts === operacionDrafts &&
+      d.ruta.fechas === operacionFechas,
+  )?.id
 
   return (
     <div className="app">
@@ -192,14 +222,86 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
         </div>
       )}
 
-      <Migas migas={migas} />
+      <div className="navbar">
+        <div className="view navbar-in">
+          <button
+            type="button"
+            className="navbar-btn"
+            aria-label="Abrir el menú de operaciones"
+            onClick={() => setLateralAbierto(true)}
+          >
+            <i className="fa-solid fa-bars" aria-hidden="true" />
+            <span className="navbar-btn-txt">Operaciones</span>
+          </button>
 
-      {principal === null && (
+          {/* "Atrás" sólo existe si hay a dónde volver: un botón que no hace nada es peor que no
+              tenerlo, porque hay que probarlo para descubrirlo. */}
+          {area && (
+            <button type="button" className="navbar-btn" onClick={volverAtras}>
+              <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+              <span className="navbar-btn-txt">Atrás</span>
+            </button>
+          )}
+          {area && (
+            <button type="button" className="navbar-btn" onClick={irAlInicio}>
+              <i className="fa-solid fa-house" aria-hidden="true" />
+              <span className="navbar-btn-txt">Inicio</span>
+            </button>
+          )}
+
+          <Migas migas={migas} />
+        </div>
+      </div>
+
+      <PanelLateral
+        abierto={lateralAbierto}
+        onCerrar={() => setLateralAbierto(false)}
+        destinos={destinos}
+        onIr={irA}
+        actual={idActual}
+      />
+
+      {area === null && (
+        <div className="scroll">
+          <div className="view">
+            <div className="panel-head">
+              <h1 className="panel-tit">¿Qué vas a hacer?</h1>
+              <p className="panel-det">
+                Elegí el área, o buscá directamente la operación que necesitás.
+              </p>
+            </div>
+
+            <Buscador destinos={destinos} onIr={irA} />
+
+            <div className="panel-opciones panel-opciones--areas">
+              {areas.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  className="panel-opcion panel-opcion--area"
+                  onClick={() => irAlArea(a.id)}
+                >
+                  <span className="panel-opcion-ic">
+                    <i className={a.icono} aria-hidden="true" />
+                  </span>
+                  <span className="panel-opcion-txt">
+                    <span className="panel-opcion-tit">{a.titulo}</span>
+                    <span className="panel-opcion-det">{a.detalle}</span>
+                  </span>
+                  <i className="fa-solid fa-chevron-right panel-opcion-flecha" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {area !== null && principal === null && (
         <PanelOpciones
-          titulo="¿Qué operación vas a hacer?"
-          detalle="Elegí el tipo de operación sobre el inventario de tractores."
-          opciones={principales}
-          onElegir={setPrincipal}
+          titulo={defArea?.titulo ?? ''}
+          detalle={defArea?.detalle ?? ''}
+          opciones={principalesDeArea(sesion.modulos, area)}
+          onElegir={elegirPrincipal}
         />
       )}
 
@@ -208,7 +310,7 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
           titulo="Despacho"
           detalle="Elegí cómo se despachan los tractores."
           opciones={MODALIDADES_DESPACHO}
-          onElegir={setModalidad}
+          onElegir={(id) => setRuta((v) => ({ ...v, modalidad: id }))}
         />
       )}
 
@@ -220,11 +322,13 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
           titulo="Fechas de producción"
           detalle="El ida y vuelta con el proveedor por la fecha de cada tractor."
           opciones={OPERACIONES_FECHAS}
-          onElegir={setOperacionFechas}
+          onElegir={(id) => setRuta((v) => ({ ...v, fechas: id }))}
         />
       )}
 
       {principal === 'usuarios' && <RegistroUsuario />}
+
+      {principal === 'clientes' && <AltaCuentasContactos />}
 
       {principal === 'fechas' && operacionFechas === 'confirmar' && <ConfirmarProponerFecha />}
       {principal === 'fechas' && operacionFechas === 'enviar' && <EnviarConfirmacion />}
@@ -234,7 +338,7 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
           titulo="Planificación de drafts"
           detalle="Lo que pasa antes de que el tractor exista: qué se pide y para cuándo."
           opciones={OPERACIONES_DRAFTS}
-          onElegir={setOperacionDrafts}
+          onElegir={(id) => setRuta((v) => ({ ...v, drafts: id }))}
         />
       )}
 
@@ -248,7 +352,7 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
           detalle="Seguimiento de las OP que ya salieron del circuito de despacho."
           opciones={operacionesAduana}
           secciones={SECCIONES_ADUANA}
-          onElegir={setOperacionAduana}
+          onElegir={(id) => setRuta((v) => ({ ...v, aduana: id }))}
         />
       )}
 

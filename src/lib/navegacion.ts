@@ -1,5 +1,6 @@
 import type { ModuloApp } from '@/services/monday/operaciones'
 import type {
+  AreaApp,
   ModalidadDespacho,
   OpcionPanel,
   OperacionAduana,
@@ -10,6 +11,39 @@ import type {
 } from '@/types'
 
 /**
+ * Las áreas: el primer panel de la app.
+ *
+ * La app nació para la importación y durante meses todo lo que tenía era eso. Cuando se sumó la
+ * venta, dejar las dos cosas en una sola lista obligaba a leer diez operaciones para encontrar
+ * una. Separarlas en COMPRA y VENTA no es decoración: es la primera pregunta que se hace alguien
+ * al entrar, y contestarla descarta la mitad de la app.
+ */
+export const AREAS: OpcionPanel<AreaApp>[] = [
+  {
+    id: 'compra',
+    titulo: 'COMPRA',
+    corto: 'Compra',
+    detalle:
+      'Todos los procedimientos de importación de tractores: los drafts, las fechas de producción, ' +
+      'los pagos del despacho y el seguimiento en aduana.',
+    icono: 'fa-solid fa-ship',
+  },
+  {
+    id: 'venta',
+    titulo: 'VENTA',
+    corto: 'Venta',
+    detalle: 'La venta de los tractores a los concesionarios: las cuentas y sus contactos.',
+    icono: 'fa-solid fa-handshake',
+  },
+]
+
+/** Las áreas que tienen al menos una operación visible para este perfil. */
+export const areasDeModulos = (modulos: ModuloApp[]): OpcionPanel<AreaApp>[] =>
+  AREAS.filter((a) =>
+    OPERACIONES_PRINCIPALES.some((o) => o.area === a.id && modulos.includes(o.modulo)),
+  )
+
+/**
  * Operaciones principales: el primer panel de la app.
  *
  * Cada una pertenece a un módulo, y cada persona ve sólo las de los módulos que tiene habilitados:
@@ -17,56 +51,81 @@ import type {
  * comodidad —el permiso lo aplica el servidor en cada pedido—, pero ofrecerle a alguien una
  * pantalla que va a rebotar es peor que no ofrecérsela.
  */
-export const OPERACIONES_PRINCIPALES: (OpcionPanel<OperacionPrincipal> & { modulo: ModuloApp })[] =
-  [
-    {
-      id: 'usuarios',
-      modulo: 'usuarios',
-      titulo: 'REGISTRO DE USUARIO',
-      corto: 'Registro de usuario',
-      detalle: 'Dar de alta gente en la Lista Blanca, y desactivar invitados que ya no entran.',
-      icono: 'fa-solid fa-user-shield',
-    },
-    {
-      id: 'drafts',
-      modulo: 'drafts',
-      titulo: 'PLANIFICACIÓN DE DRAFTS',
-      corto: 'Planificación de drafts',
-      detalle:
-        'Período de producción de cada draft y envío de la planificación al proveedor, antes de que ' +
-        'el tractor exista.',
-      icono: 'fa-solid fa-calendar-check',
-    },
-    {
-      id: 'fechas',
-      modulo: 'fechas',
-      titulo: 'FECHAS DE PRODUCCIÓN INVENTARIO',
-      corto: 'Fechas de producción',
-      detalle:
-        'El ida y vuelta con el proveedor por la fecha de producción de cada tractor: confirmarla o ' +
-        'proponer otra.',
-      icono: 'fa-solid fa-calendar-day',
-    },
-    {
-      id: 'despacho',
-      modulo: 'despacho',
-      titulo: 'GESTIÓN DE LOS PAGOS',
-      corto: 'Gestión de los pagos',
-      detalle: 'Despacho de tractores del inventario, con pago anticipado o a la vista.',
-      icono: 'fa-solid fa-truck-ramp-box',
-    },
-    {
-      id: 'aduana',
-      modulo: 'aduana',
-      titulo: 'DESPACHO DE ADUANA',
-      corto: 'Despacho de aduana',
-      detalle:
-        'Seguimiento de las OP ya despachadas: estado de la carga, contenedores, arribos y pago.',
-      icono: 'fa-solid fa-passport',
-    },
-  ]
+export const OPERACIONES_PRINCIPALES: (OpcionPanel<OperacionPrincipal> & {
+  modulo: ModuloApp
+  area: AreaApp
+})[] = [
+  {
+    id: 'usuarios',
+    area: 'compra',
+    modulo: 'usuarios',
+    titulo: 'REGISTRO DE USUARIO',
+    corto: 'Registro de usuario',
+    detalle: 'Dar de alta gente en la Lista Blanca, y desactivar invitados que ya no entran.',
+    icono: 'fa-solid fa-user-shield',
+  },
+  {
+    id: 'drafts',
+    area: 'compra',
+    modulo: 'drafts',
+    titulo: 'PLANIFICACIÓN DE DRAFTS',
+    corto: 'Planificación de drafts',
+    detalle:
+      'Período de producción de cada draft y envío de la planificación al proveedor, antes de que ' +
+      'el tractor exista.',
+    icono: 'fa-solid fa-calendar-check',
+  },
+  {
+    id: 'fechas',
+    area: 'compra',
+    modulo: 'fechas',
+    titulo: 'FECHAS DE PRODUCCIÓN INVENTARIO',
+    corto: 'Fechas de producción',
+    detalle:
+      'El ida y vuelta con el proveedor por la fecha de producción de cada tractor: confirmarla o ' +
+      'proponer otra.',
+    icono: 'fa-solid fa-calendar-day',
+  },
+  {
+    id: 'despacho',
+    area: 'compra',
+    modulo: 'despacho',
+    titulo: 'GESTIÓN DE LOS PAGOS',
+    corto: 'Gestión de los pagos',
+    detalle: 'Despacho de tractores del inventario, con pago anticipado o a la vista.',
+    icono: 'fa-solid fa-truck-ramp-box',
+  },
+  {
+    id: 'aduana',
+    area: 'compra',
+    modulo: 'aduana',
+    titulo: 'DESPACHO DE ADUANA',
+    corto: 'Despacho de aduana',
+    detalle:
+      'Seguimiento de las OP ya despachadas: estado de la carga, contenedores, arribos y pago.',
+    icono: 'fa-solid fa-passport',
+  },
+  {
+    id: 'clientes',
+    area: 'venta',
+    modulo: 'ventas',
+    titulo: 'ALTA DE CUENTAS Y CONTACTOS',
+    corto: 'Alta de cuentas y contactos',
+    detalle:
+      'Dar de alta una cuenta con su CUIT, o un contacto de una cuenta que ya existe. Es el único ' +
+      'lugar donde se controla que el CUIT esté bien y que no haya duplicados.',
+    icono: 'fa-solid fa-address-book',
+  },
+]
 
-/** Las operaciones principales que puede ver este perfil. */
+/** Las operaciones principales de un área que puede ver este perfil. */
+export const principalesDeArea = (
+  modulos: ModuloApp[],
+  area: AreaApp,
+): OpcionPanel<OperacionPrincipal>[] =>
+  OPERACIONES_PRINCIPALES.filter((o) => o.area === area && modulos.includes(o.modulo))
+
+/** Todas las que puede ver, sin mirar el área. La usa el panel lateral. */
 export const principalesDeModulos = (modulos: ModuloApp[]): OpcionPanel<OperacionPrincipal>[] =>
   OPERACIONES_PRINCIPALES.filter((o) => modulos.includes(o.modulo))
 

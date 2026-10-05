@@ -22,6 +22,8 @@ import {
   COL_CATALOGO,
   COL_CONFIRMACION,
   COL_CONT_DESPACHO,
+  COL_CONTACTO,
+  COL_CUENTA,
   COL_DESPACHANTE,
   COL_DESPACHANTE_SUB,
   COL_DRAFT,
@@ -62,6 +64,8 @@ export const MODULOS_APP = [
   'fechas',
   /** Alta y baja de gente en la 🔒Lista Blanca. Sólo Administración. */
   'usuarios',
+  /** VENTA · el CRM: cuentas y contactos. */
+  'ventas',
 ] as const
 
 export type ModuloApp = (typeof MODULOS_APP)[number]
@@ -92,6 +96,12 @@ export type NombreOperacion =
   | 'contenedoresDelTablero'
   | 'contenedoresDelTableroDespachante'
   | 'etiquetasDeColumna'
+  | 'cuentasDelCrm'
+  | 'contactosDelCrm'
+  | 'concesionariosDelCrm'
+  | 'etiquetasDelCrm'
+  | 'crearCuentaCrm'
+  | 'crearContactoCrm'
   | 'usuariosDeListaBlanca'
   | 'crearUsuarioListaBlanca'
   | 'estadoUsuarioListaBlanca'
@@ -475,6 +485,56 @@ const CAMPOS_COLUMNA = `
   ... on LocationValue { lat lng }
 `
 
+/** Los items de un tablero del CRM, con las columnas que pida quien llama. */
+const CONSULTA_ITEMS_CRM = `
+  query ($tablero: ID!, $columnas: [String!], $limite: Int!) {
+    boards(ids: [$tablero]) {
+      items_page(limit: $limite) {
+        items { id name column_values(ids: $columnas) { ${CAMPOS_COLUMNA} } }
+      }
+    }
+  }
+`
+
+/**
+ * Lo único que la app escribe al dar de alta una cuenta.
+ *
+ * Es deliberadamente más corta que el tablero: desde acá no se puede dar de baja una cuenta ni
+ * tocarle la fecha de baja. El alta da de alta; lo demás se hace en monday, donde queda
+ * registrado quién lo hizo.
+ */
+const COLUMNAS_DE_CUENTA = new Set<string>([
+  COL_CUENTA.tipoPersona,
+  COL_CUENTA.estado,
+  COL_CUENTA.clasificacion,
+  COL_CUENTA.categoria,
+  COL_CUENTA.cuit,
+  COL_CUENTA.condicionFiscal,
+  COL_CUENTA.direccion,
+  COL_CUENTA.direccionTexto,
+  COL_CUENTA.ciudad,
+  COL_CUENTA.provincia,
+  COL_CUENTA.pais,
+  COL_CUENTA.descripcion,
+  COL_CUENTA.contactos,
+  COL_CUENTA.concesionario,
+  COL_CUENTA.fechaAlta,
+])
+
+/** Lo único que la app escribe al dar de alta un contacto. */
+const COLUMNAS_DE_CONTACTO = new Set<string>([
+  COL_CONTACTO.nombres,
+  COL_CONTACTO.apellidos,
+  COL_CONTACTO.estado,
+  COL_CONTACTO.categoria,
+  COL_CONTACTO.email,
+  COL_CONTACTO.pais,
+  COL_CONTACTO.whatsapp,
+  COL_CONTACTO.comentarios,
+  COL_CONTACTO.cuenta,
+  COL_CONTACTO.fechaAlta,
+])
+
 /** Todos los contenedores del tablero. La usan BERGER y el despachante, cada uno con su módulo. */
 const CONSULTA_CONTENEDORES = `
   query ($tablero: ID!, $columnas: [String!], $limite: Int!) {
@@ -505,6 +565,108 @@ const COLUMNAS_DE_USUARIO = new Set<string>([
   COL_LISTA_BLANCA.tablerosDespachante,
 ])
 
+/* ------------------------------------------------------------------ *
+ * Módulo de ventas: el CRM
+ * ------------------------------------------------------------------ */
+
+const OPS_CRM = {
+  /** Las cuentas, para buscarlas y para controlar que un CUIT no esté repetido. */
+  cuentasDelCrm: {
+    modulo: 'ventas' as const,
+    query: CONSULTA_ITEMS_CRM,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.cuentas,
+      columnas: idsDeColumnas(v.columnas),
+      limite: entero(v.limite, 'limite', 1, 500),
+    }),
+  },
+
+  /**
+   * Los contactos, enteros.
+   *
+   * Se traen todos y no los de una cuenta porque la comprobación de duplicados necesita mirar el
+   * mail y el WhatsApp de cada uno: preguntarlo de a una cuenta sería una consulta por tecla.
+   */
+  contactosDelCrm: {
+    modulo: 'ventas' as const,
+    query: CONSULTA_ITEMS_CRM,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.contactos,
+      columnas: idsDeColumnas(v.columnas),
+      limite: entero(v.limite, 'limite', 1, 500),
+    }),
+  },
+
+  /** Los concesionarios, sólo por nombre: es lo único que se elige de ellos. */
+  concesionariosDelCrm: {
+    modulo: 'ventas' as const,
+    query: `
+      query ($tablero: ID!, $limite: Int!) {
+        boards(ids: [$tablero]) { items_page(limit: $limite) { items { id name } } }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.concesionarios,
+      limite: entero(v.limite, 'limite', 1, 500),
+    }),
+  },
+
+  /**
+   * Las etiquetas de los desplegables de los dos tableros, en una sola consulta.
+   *
+   * Se leen de monday en vez de estar escritas acá porque una etiqueta inexistente hace fallar la
+   * escritura ENTERA del item: si alguien agrega "Contratista" a Categoría, la app la ofrece sin
+   * que haya que desplegar nada.
+   */
+  etiquetasDelCrm: {
+    modulo: 'ventas' as const,
+    query: `
+      query ($tableros: [ID!], $columnasCuenta: [String!], $columnasContacto: [String!]) {
+        boards(ids: $tableros) {
+          id
+          cuenta: columns(ids: $columnasCuenta) { id settings_str }
+          contacto: columns(ids: $columnasContacto) { id settings_str }
+        }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tableros: [TABLEROS.cuentas, TABLEROS.contactos],
+      columnasCuenta: idsDeColumnas(v.columnasCuenta),
+      columnasContacto: idsDeColumnas(v.columnasContacto),
+    }),
+  },
+
+  /** Alta de una cuenta. El tablero lo fija el servidor y las columnas son una lista cerrada. */
+  crearCuentaCrm: {
+    modulo: 'ventas' as const,
+    query: `
+      mutation ($tablero: ID!, $nombre: String!, $valores: JSON!) {
+        create_item(board_id: $tablero, item_name: $nombre, column_values: $valores) { id name }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.cuentas,
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_CUENTA, 'el alta de una cuenta'),
+    }),
+  },
+
+  /** Alta de un contacto. */
+  crearContactoCrm: {
+    modulo: 'ventas' as const,
+    query: `
+      mutation ($tablero: ID!, $nombre: String!, $valores: JSON!) {
+        create_item(board_id: $tablero, item_name: $nombre, column_values: $valores) { id name }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.contactos,
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_CONTACTO, 'el alta de un contacto'),
+    }),
+  },
+}
+
 /** Escribir el Estado Pedido de UN tractor del Inventario. Nada más que eso. */
 const CONSULTA_ESTADO_PEDIDO = `
   mutation ($tablero: ID!, $item: ID!, $valores: JSON!) {
@@ -531,6 +693,8 @@ const validarTablero = (v: Record<string, unknown>) => ({
  * ------------------------------------------------------------------ */
 
 export const OPERACIONES: Record<NombreOperacion, Operacion> = {
+  ...OPS_CRM,
+
   /**
    * Las combinaciones del tablero de Contenedores: qué modelos viajan juntos y cuántos entran.
    *

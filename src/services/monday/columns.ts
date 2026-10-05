@@ -36,8 +36,12 @@ export const TABLEROS = {
   despachanteSubitems: '18431188087',
   /** 🚚Contenedores: los que arma el despachante, con los tractores que van en cada uno. */
   contenedoresDespacho: '18431711942',
-  /** Contactos: de ahí salen los transportistas. */
+  /** 🚹Contactos del CRM: de ahí salen los transportistas, y ahí se dan de alta los contactos. */
   contactos: '18428421093',
+  /** 🌐Cuentas del CRM: una por cliente, proveedor o transporte. */
+  cuentas: '18428421094',
+  /** Concesionarios: a quién se le asigna una cuenta. */
+  concesionarios: '18428606865',
   /**
    * 🔒Lista Blanca — quién entra a la app y a qué.
    *
@@ -897,4 +901,66 @@ export const RUEDAS_CONTENEDOR = {
   CON: 'Con Ruedas',
   SIN: 'Sin Ruedas',
   AMBAS: 'Con y Sin Ruedas',
+} as const
+
+/* ------------------------------------------------------------------ *
+ * VENTA · el CRM: cuentas y contactos
+ * ------------------------------------------------------------------ */
+
+/**
+ * 🌐Cuentas (18428421094) — una fila por cliente, proveedor o transporte.
+ *
+ * El alta vive en la app y no en el tablero por un motivo concreto: es el único lugar donde se
+ * controla que el CUIT esté bien formado y que no haya dos cuentas con el mismo. En el tablero,
+ * cargar una fila a mano no comprueba nada.
+ */
+export const COL_CUENTA = {
+  tipoPersona: 'color_mm7az0tv',
+  /** Toda cuenta nace Activa. La baja se hace en monday, donde queda quién la hizo. */
+  estado: 'color_mm7ak3fa',
+  clasificacion: 'color_mm7v72pp',
+  /** Admite más de una: una misma empresa puede ser cliente y transporte. */
+  categoria: 'dropdown_mm7acwp4',
+  cuit: 'text_mm7arwz2',
+  condicionFiscal: 'color_mm7a82b7',
+  /** Dirección como ubicación de monday: necesita `{lat, lng, address}`. */
+  direccion: 'location_mm7ak2f4',
+  /** La misma dirección en texto plano: es la que se carga si no se pudo geocodificar. */
+  direccionTexto: 'text_mm7an434',
+  ciudad: 'text_mm7v1gjt',
+  provincia: 'text_mm7vr4t2',
+  pais: 'country_mm7v20qg',
+  descripcion: 'company_description',
+  /** Contactos de la cuenta. Es de doble vía con `COL_CONTACTO.cuenta`. */
+  contactos: 'account_contact',
+  concesionario: 'board_relation_mm7vab3s',
+  fechaAlta: 'date_mm7a6c3b',
+} as const
+
+/**
+ * 🚹Contactos (18428421093) — una fila por persona.
+ *
+ * El `name` del item se arma con nombre y apellido: monday no acepta items sin nombre, y dejar que
+ * cada uno lo escriba a mano termina en "Juan", "juan perez" y "PEREZ, Juan" para la misma persona.
+ */
+export const COL_CONTACTO = {
+  nombres: 'text_mm7a5rkb',
+  apellidos: 'text_mm7a4dqr',
+  /** Todo contacto nace Activo. */
+  estado: 'color_mm7aa66j',
+  categoria: 'dropdown_mm7acm6r',
+  email: 'contact_email',
+  /** País del teléfono: de ahí sale el prefijo del WhatsApp. */
+  pais: 'country_mm7v9ta7',
+  whatsapp: 'phone_mm7ah51c',
+  comentarios: 'long_text4',
+  /** Cuenta a la que pertenece. De doble vía con `COL_CUENTA.contactos`. */
+  cuenta: 'contact_account',
+  fechaAlta: 'date_mm7atktf',
+} as const
+
+/** Etiquetas del CRM que la app fija al crear. Las demás se leen del tablero. */
+export const CRM = {
+  CUENTA_ACTIVA: 'Activa',
+  CONTACTO_ACTIVO: 'Activo',
 } as const

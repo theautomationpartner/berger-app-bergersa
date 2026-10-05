@@ -205,12 +205,11 @@
    Fija entre la marca y el contenido: es el único camino para volver de un nivel al anterior,
    porque dentro del iframe de monday el "atrás" del navegador no sirve. */
 .migas {
-  flex: 0 0 auto;
-  padding: 8px var(--gutter);
-  background: #fff;
-  border-bottom: 1px solid var(--border-soft);
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .migas-in {
+  padding: 0;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -487,4 +486,174 @@
 }
 .panel-grupo .panel-opcion:hover .panel-opcion-flecha {
   color: var(--grupo-color);
+}
+
+/* ===== Barra de navegación ===== */
+
+/*
+ * Atrás, Inicio y el menú, al lado de la miga de pan.
+ *
+ * La miga sola decía dónde estaba parado el usuario, pero para volver había que apuntarle a un
+ * renglón de texto chico. Dentro del iframe de monday el "atrás" del navegador no funciona y en el
+ * celular no existe: sin estos botones, la única salida era recargar la app entera.
+ */
+.navbar {
+  flex: 0 0 auto;
+  padding: 7px var(--gutter);
+  background: #fff;
+  border-bottom: 1px solid var(--border-soft);
+}
+.navbar-in {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.navbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--tint-neutral);
+  color: var(--text-mid);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.navbar-btn:hover {
+  background: #eef1f6;
+  color: var(--text-dark);
+  border-color: var(--text-gray);
+}
+.navbar-btn:focus-visible {
+  outline: 2px solid var(--primary-blue);
+  outline-offset: 2px;
+}
+
+/* En pantallas angostas quedan los íconos solos: tres botones con texto y la miga no entran, y la
+   miga es la que dice dónde está parado. */
+@media (max-width: 640px) {
+  .navbar-btn-txt {
+    display: none;
+  }
+}
+
+/* ===== Panel lateral ===== */
+
+.lateral-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: none;
+  padding: 0;
+  background: rgba(16, 24, 40, 0.35);
+  cursor: pointer;
+}
+.lateral {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 41;
+  width: min(360px, 88vw);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-right: 1px solid var(--border);
+  box-shadow: 4px 0 24px rgba(16, 24, 40, 0.14);
+}
+.lateral-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.lateral-tit {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+.lateral-cerrar {
+  border: none;
+  background: none;
+  color: var(--text-gray);
+  font-size: 17px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.lateral-cerrar:hover {
+  background: var(--tint-neutral);
+  color: var(--text-dark);
+}
+.lateral-buscador {
+  flex: 0 0 auto;
+  padding: 12px 16px 4px;
+}
+.lateral-arbol {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px 10px 18px;
+}
+.lateral-grupo {
+  margin-top: 10px;
+}
+.lateral-grupo-tit {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 8px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+.lateral-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  text-align: left;
+  color: var(--text-dark);
+  cursor: pointer;
+}
+.lateral-item:hover {
+  background: var(--tint-neutral);
+}
+.lateral-item--on {
+  background: #e6f1fd;
+  color: #0b4da2;
+}
+.lateral-item > i {
+  width: 18px;
+  text-align: center;
+  color: var(--berger-red);
+}
+.lateral-item--on > i {
+  color: var(--primary-blue);
+}
+.lateral-item-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.lateral-item-tit {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.lateral-item-donde {
+  font-size: 11px;
+  color: var(--text-gray);
 }
