@@ -490,6 +490,35 @@ const CAMPOS_COLUMNA = `
   ... on LocationValue { lat lng }
 `
 
+/**
+ * Las actividades, con dos campos que el resto de las consultas no pide.
+ *
+ * `value` trae el JSON crudo de la columna, y es de donde sale el **id** del responsable: el
+ * `text` de una columna de personas es el nombre escrito, y filtrar por nombre significaría que
+ * dos personas que se llaman igual comparten la lista de pendientes.
+ *
+ * `display_value` en las conexiones trae el nombre del cliente y de los contactos. Sin eso, la
+ * lista mostraría ids, que no le dicen nada a nadie.
+ */
+const CONSULTA_ACTIVIDADES = `
+  query ($tablero: ID!, $columnas: [String!], $limite: Int!) {
+    boards(ids: [$tablero]) {
+      items_page(limit: $limite) {
+        items {
+          id
+          name
+          column_values(ids: $columnas) {
+            id
+            text
+            value
+            ... on BoardRelationValue { linked_item_ids display_value }
+          }
+        }
+      }
+    }
+  }
+`
+
 /** Los items de un tablero del CRM, con las columnas que pida quien llama. */
 const CONSULTA_ITEMS_CRM = `
   query ($tablero: ID!, $columnas: [String!], $limite: Int!) {
@@ -595,7 +624,7 @@ const OPS_CRM = {
   /** Las actividades del tablero. Quién ve cuáles lo decide el cliente, por el responsable. */
   actividadesDelTablero: {
     modulo: 'ventas' as const,
-    query: CONSULTA_ITEMS_CRM,
+    query: CONSULTA_ACTIVIDADES,
     validar: (v: Record<string, unknown>) => ({
       tablero: TABLEROS.actividades,
       columnas: idsDeColumnas(v.columnas),

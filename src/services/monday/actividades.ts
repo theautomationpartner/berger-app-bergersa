@@ -191,12 +191,17 @@ function personasDe(c: ColumnaDeActividad | undefined): string[] {
  * Si no hay sesión de monday —en desarrollo, fuera del iframe— devuelve la lista vacía en vez de
  * fallar: no hay a quién filtrar.
  */
-export async function misActividadesPendientes(): Promise<ActividadPendiente[]> {
-  let usuarioId = ''
-  try {
-    usuarioId = String((await obtenerDatosSesion()).userId ?? '')
-  } catch {
-    return []
+export async function misActividadesPendientes(
+  /** Sólo para poder probarlo: en la app sale siempre del token de sesión de monday. */
+  usuarioDePrueba?: string,
+): Promise<ActividadPendiente[]> {
+  let usuarioId = usuarioDePrueba ?? ''
+  if (!usuarioId) {
+    try {
+      usuarioId = String((await obtenerDatosSesion()).userId ?? '')
+    } catch {
+      return []
+    }
   }
   if (!usuarioId) return []
 
