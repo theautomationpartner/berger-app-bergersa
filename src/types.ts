@@ -70,6 +70,13 @@ export interface OpcionPanel<T extends string> {
   corto: string
   detalle: string
   icono: string
+  /**
+   * Cuántas pantallas hay adentro.
+   *
+   * Es la diferencia entre entrar a algo que abre otra lista y entrar a algo que ya es la pantalla
+   * final. Sin esto hay que entrar para averiguarlo.
+   */
+  cuantas?: number
 }
 
 export interface DefinicionEtapa {

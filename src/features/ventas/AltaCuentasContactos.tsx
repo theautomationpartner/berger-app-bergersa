@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Desplegable } from '@/components/ui/Desplegable'
 import { DesplegableMulti } from '@/components/ui/DesplegableMulti'
+import { SelectorBuscable, SelectorBuscableMulti } from '@/components/ui/SelectorBuscable'
 import { formatearCuit, problemaDelCuit, soloDigitos, tipoDePersonaSegunCuit } from '@/lib/cuit'
 import { armarWhatsapp, PAIS_POR_DEFECTO, PAISES, paisPorCodigo } from '@/lib/telefono'
 import { condicionFiscalDeArca, consultarArca } from '@/services/arca'
@@ -573,12 +574,11 @@ export function AltaCuentasContactos() {
 
                 <div className="campo">
                   <span className="campo-lbl">Enganchar contactos que ya existen</span>
-                  <DesplegableMulti
+                  <SelectorBuscableMulti
                     valores={cuenta.contactoIds}
                     opciones={opcionesDeContacto}
-                    vacio="Buscá por nombre, mail o WhatsApp"
-                    buscable
-                    soloAlBuscar
+                    vacio="Escribí un nombre, un mail o un WhatsApp"
+                    queSon="contactos"
                     bloqueado={cargando}
                     onCambiar={(ids) => setCuenta({ ...cuenta, contactoIds: ids })}
                   />
@@ -749,16 +749,17 @@ export function AltaCuentasContactos() {
                 <span className="campo-lbl">
                   ¿De qué cuenta es? <span className="campo-req">· obligatorio</span>
                 </span>
-                <Desplegable
+                <SelectorBuscable
                   valor={cuentaElegida}
                   opciones={cuentas.map((c) => ({
                     valor: c.id,
                     rotulo: c.nombre,
-                    detalle: [c.cuit, c.clasificacion].filter(Boolean).join(' · '),
+                    detalle: [c.cuit && `CUIT ${c.cuit}`, c.clasificacion]
+                      .filter(Boolean)
+                      .join(' · '),
                   }))}
-                  vacio={cargando ? 'Cargando cuentas…' : 'Buscá la cuenta por nombre o CUIT'}
-                  buscable
-                  soloAlBuscar
+                  vacio={cargando ? 'Cargando cuentas…' : 'Escribí el nombre o el CUIT'}
+                  queSon="clientes"
                   bloqueado={cargando}
                   onCambiar={setCuentaElegida}
                 />

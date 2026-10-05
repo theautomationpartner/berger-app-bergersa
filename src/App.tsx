@@ -128,6 +128,10 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
   const operacionesAduana = aduanaDeModulos(sesion.modulos)
   const destinos = destinosDe(sesion.modulos)
 
+  /* Cuántas pantallas hay adentro de cada tarjeta, contando sólo las que este perfil puede
+     abrir: a un despachante no le sirve que una diga "5 operaciones" si él entra a dos. */
+  const cuantasEn = (filtro: (d: Destino) => boolean) => destinos.filter(filtro).length
+
   const irA = (d: Destino) => setRuta(d.ruta)
   const irAlArea = (id: AreaApp) => setRuta({ ...RUTA_INICIO, area: id })
   const elegirPrincipal = (id: (typeof OPERACIONES_PRINCIPALES)[number]['id']) =>
@@ -286,7 +290,12 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
                     <i className={a.icono} aria-hidden="true" />
                   </span>
                   <span className="panel-opcion-txt">
-                    <span className="panel-opcion-tit">{a.titulo}</span>
+                    <span className="panel-opcion-tit">
+                      {a.titulo}
+                      <span className="panel-opcion-cuantas">
+                        {cuantasEn((d) => d.ruta.area === a.id)} operaciones
+                      </span>
+                    </span>
                     <span className="panel-opcion-det">{a.detalle}</span>
                   </span>
                   <i className="fa-solid fa-chevron-right panel-opcion-flecha" aria-hidden="true" />
@@ -301,7 +310,10 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
         <PanelOpciones
           titulo={defArea?.titulo ?? ''}
           detalle={defArea?.detalle ?? ''}
-          opciones={principalesDeArea(sesion.modulos, area)}
+          opciones={principalesDeArea(sesion.modulos, area).map((o) => ({
+            ...o,
+            cuantas: cuantasEn((d) => d.ruta.principal === o.id),
+          }))}
           onElegir={elegirPrincipal}
         />
       )}

@@ -33,7 +33,14 @@ export function PanelOpciones<T extends string>({
         <i className={op.icono} aria-hidden="true" />
       </span>
       <span className="panel-opcion-txt">
-        <span className="panel-opcion-tit">{op.titulo}</span>
+        <span className="panel-opcion-tit">
+          {op.titulo}
+          {/* Cuántas hay adentro. Una sola no se dice: "1 operación" ocupa lugar para contar que
+              no hay nada que elegir. */}
+          {op.cuantas != null && op.cuantas > 1 && (
+            <span className="panel-opcion-cuantas">{op.cuantas} operaciones</span>
+          )}
+        </span>
         <span className="panel-opcion-det">{op.detalle}</span>
       </span>
       <i className="fa-solid fa-chevron-right panel-opcion-flecha" aria-hidden="true" />

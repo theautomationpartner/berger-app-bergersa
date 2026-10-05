@@ -98,6 +98,8 @@ export type NombreOperacion =
   | 'contenedoresDelTableroDespachante'
   | 'etiquetasDeColumna'
   | 'crearActividadCrm'
+  | 'actividadesDelTablero'
+  | 'completarActividadCrm'
   | 'etiquetasDeActividad'
   | 'cuentasDelCrm'
   | 'contactosDelCrm'
@@ -590,6 +592,41 @@ const COLUMNAS_DE_ACTIVIDAD = new Set<string>([
 ])
 
 const OPS_CRM = {
+  /** Las actividades del tablero. Quién ve cuáles lo decide el cliente, por el responsable. */
+  actividadesDelTablero: {
+    modulo: 'ventas' as const,
+    query: CONSULTA_ITEMS_CRM,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.actividades,
+      columnas: idsDeColumnas(v.columnas),
+      limite: entero(v.limite, 'limite', 1, 500),
+    }),
+  },
+
+  /**
+   * Dar por hecha una actividad. UNA sola columna escribible.
+   *
+   * Desde acá no se le puede cambiar la fecha, el cliente ni el responsable a una actividad que ya
+   * existe: lo único que esta pantalla hace es cerrarla.
+   */
+  completarActividadCrm: {
+    modulo: 'ventas' as const,
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $valores: JSON!) {
+        change_multiple_column_values(board_id: $tablero, item_id: $item, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.actividades,
+      item: idMonday(v.item, 'item'),
+      valores: valoresAcotados(
+        v.valores,
+        new Set([COL_ACTIVIDAD.estado]),
+        'el cierre de una actividad',
+      ),
+    }),
+  },
+
   /** Una actividad: una llamada, un WhatsApp, una visita. */
   crearActividadCrm: {
     modulo: 'ventas' as const,

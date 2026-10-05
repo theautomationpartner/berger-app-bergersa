@@ -11,6 +11,7 @@
  */
 import { aFechaHoraMonday } from '@/lib/format'
 import { COL_ACTIVIDAD, ESTADO_ACTIVIDAD } from './columns'
+import { porId, texto, type ColumnaCruda } from './parse'
 import { mondayApi } from './sdk'
 import { obtenerDatosSesion } from './sesion'
 
@@ -136,4 +137,125 @@ export async function etiquetasDeActividad(): Promise<{ tipos: string[]; estados
   }
 
   return { tipos: etiquetas(COL_ACTIVIDAD.tipo), estados: etiquetas(COL_ACTIVIDAD.estado) }
+}
+
+/* ------------------------------------------------------------------ *
+ * Lo que cada uno tiene pendiente
+ * ------------------------------------------------------------------ */
+
+/** Los estados que la app considera "todavía hay que hacerlo". */
+export const PENDIENTES = ['Pendiente', 'Vencida', 'Abierto'] as const
+
+export interface ActividadPendiente {
+  id: string
+  nombre: string
+  tipo: string
+  /** `AAAA-MM-DD`, o `''` si no tiene fecha cargada. */
+  fecha: string
+  hora: string
+  estado: string
+  descripcion: string
+  cuenta: string
+  contactos: string
+  /** La fecha ya pasó: es lo que separa "lo que viene" de "lo que quedó colgado". */
+  atrasada: boolean
+}
+
+type ColumnaDeActividad = ColumnaCruda & {
+  linked_item_ids?: string[] | null
+  display_value?: string | null
+}
+
+/** Los ids de persona de una columna `people`. */
+function personasDe(c: ColumnaDeActividad | undefined): string[] {
+  try {
+    const v = JSON.parse(c?.value ?? '') as {
+      personsAndTeams?: { id: number | string; kind?: string }[]
+    }
+    return (v.personsAndTeams ?? [])
+      .filter((p) => !p.kind || p.kind === 'person')
+      .map((p) => String(p.id))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Las actividades que le quedan por hacer a quien está usando la app.
+ *
+ * Filtra por el responsable y no por "todas las pendientes" a propósito: el tablero es de todo el
+ * equipo, y una lista con las de los demás convierte "lo que me queda" en algo que hay que leer
+ * entero para encontrar lo propio. Además, dar por hecha la actividad de otro no es algo que esta
+ * pantalla tenga por qué permitir.
+ *
+ * Si no hay sesión de monday —en desarrollo, fuera del iframe— devuelve la lista vacía en vez de
+ * fallar: no hay a quién filtrar.
+ */
+export async function misActividadesPendientes(): Promise<ActividadPendiente[]> {
+  let usuarioId = ''
+  try {
+    usuarioId = String((await obtenerDatosSesion()).userId ?? '')
+  } catch {
+    return []
+  }
+  if (!usuarioId) return []
+
+  const r = await mondayApi<{
+    boards: {
+      items_page: { items: { id: string; name: string; column_values: ColumnaDeActividad[] }[] }
+    }[]
+  }>('actividadesDelTablero', {
+    columnas: [
+      COL_ACTIVIDAD.tipo,
+      COL_ACTIVIDAD.fecha,
+      COL_ACTIVIDAD.estado,
+      COL_ACTIVIDAD.descripcion,
+      COL_ACTIVIDAD.responsable,
+      COL_ACTIVIDAD.cuenta,
+      COL_ACTIVIDAD.contactos,
+    ],
+    limite: 500,
+  })
+
+  const hoy = hoyEnArgentina()
+
+  return (
+    (r.boards?.[0]?.items_page.items ?? [])
+      .map((i) => {
+        const c = porId(i.column_values) as Record<string, ColumnaDeActividad>
+        const crudo = texto(c[COL_ACTIVIDAD.fecha])
+        return {
+          item: i,
+          responsables: personasDe(c[COL_ACTIVIDAD.responsable]),
+          datos: {
+            id: i.id,
+            nombre: i.name.trim(),
+            tipo: texto(c[COL_ACTIVIDAD.tipo]),
+            /* Una columna de fecha CON hora devuelve "2026-10-06 16:45". */
+            fecha: crudo.slice(0, 10),
+            hora: crudo.length > 10 ? crudo.slice(11, 16) : '',
+            estado: texto(c[COL_ACTIVIDAD.estado]),
+            descripcion: texto(c[COL_ACTIVIDAD.descripcion]),
+            cuenta: c[COL_ACTIVIDAD.cuenta]?.display_value ?? '',
+            contactos: c[COL_ACTIVIDAD.contactos]?.display_value ?? '',
+            atrasada: Boolean(crudo) && crudo.slice(0, 10) < hoy,
+          },
+        }
+      })
+      .filter((x) => x.responsables.includes(usuarioId))
+      .filter((x) => (PENDIENTES as readonly string[]).includes(x.datos.estado))
+      .map((x) => x.datos)
+      /* Lo más viejo primero: lo que está atrasado es lo que hay que resolver antes. */
+      .sort((a, b) => (a.fecha || '9999').localeCompare(b.fecha || '9999'))
+  )
+}
+
+/** La da por hecha. Es lo ÚNICO que esta pantalla le cambia a una actividad que ya existe. */
+export async function completarActividad(id: string): Promise<void> {
+  await mondayApi('completarActividadCrm', {
+    item: id,
+    valores: JSON.stringify({
+      [COL_ACTIVIDAD.estado]: { label: ESTADO_ACTIVIDAD.COMPLETADA },
+    }),
+  })
 }

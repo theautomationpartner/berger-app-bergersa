@@ -1554,3 +1554,267 @@
   font-weight: 600;
   color: var(--text-gray);
 }
+
+/* ===== Buscador de listas largas ===== */
+
+.buscable {
+  position: relative;
+}
+.buscable-barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: #fcfcfd;
+}
+.buscable-barra:focus-within,
+.buscable-barra--abierta {
+  background: #fff;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(0, 115, 234, 0.13);
+}
+.buscable-barra > i {
+  color: var(--text-gray);
+  font-size: 13px;
+}
+.buscable-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 42px;
+  border: none;
+  outline: none;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text-dark);
+}
+.buscable-input::placeholder {
+  color: #9aa4b2;
+}
+/* Cuántos hay para buscar: dice si la lista está cargada sin tener que escribir para averiguarlo. */
+.buscable-cuantas {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--text-gray);
+  white-space: nowrap;
+}
+
+.buscable-lista {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--sombra-alta);
+  max-height: 300px;
+  overflow-y: auto;
+}
+.buscable-op {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 9px 11px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.buscable-op--foco {
+  background: #e6f1fd;
+}
+.buscable-op-rot {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-dark);
+  line-height: 1.3;
+}
+/* El dato que distingue: en un padrón hay tres "Estape" y lo que los separa no es el nombre. */
+.buscable-op-det {
+  font-size: 11.5px;
+  color: var(--text-gray);
+}
+.buscable-vacio {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+/* Lo elegido, en lugar de la barra: un buscador vacío encima de lo que ya se eligió se lee como
+   "todavía falta buscar". */
+.buscable-elegida {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1.5px solid var(--green-bd);
+  border-radius: 10px;
+  background: var(--green-soft);
+}
+.buscable-elegida > i {
+  color: var(--green-dark);
+}
+.buscable-elegida-txt {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.buscable-elegida-rot {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+.buscable-elegida-det {
+  font-size: 11.5px;
+  color: var(--text-mid);
+}
+.buscable-quitar {
+  flex: 0 0 auto;
+  border: 1px solid var(--green-bd);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.buscable-quitar:hover:not(:disabled) {
+  background: var(--green-soft);
+}
+
+.buscable-fichas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.buscable-ficha {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px 5px 11px;
+  border-radius: 999px;
+  background: var(--primary-blue);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.buscable-ficha button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+}
+.buscable-ficha button:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* ===== Lo que cada uno tiene pendiente ===== */
+
+.pendientes-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-left: 4px solid var(--orange);
+  border-radius: 10px;
+  background: #fff;
+}
+/* Lo atrasado se distingue del borde, no sólo de la etiqueta: en una lista larga el color del
+   costado se ve de un vistazo y la etiqueta hay que leerla. */
+.pend--atrasada {
+  border-left-color: var(--berger-red);
+  background: var(--berger-red-soft);
+}
+.pend-fecha {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 108px;
+  font-variant-numeric: tabular-nums;
+}
+.pend-fecha b {
+  font-size: 13.5px;
+  color: var(--text-dark);
+}
+.pend-fecha small {
+  font-size: 11.5px;
+  color: var(--text-gray);
+}
+.pend-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pend-tit {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+.pend-tipo {
+  font-weight: 600;
+  color: var(--text-mid);
+}
+.pend-det {
+  font-size: 12px;
+  color: var(--text-gray);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .pend {
+    flex-wrap: wrap;
+  }
+  .pend-txt {
+    flex: 1 1 100%;
+    order: 3;
+  }
+}
+
+/* Cuántas pantallas hay adentro de una tarjeta del panel. En rojo y chico: es un dato de apoyo,
+   no el título, pero decide si entrar a elegir o entrar a trabajar. */
+.panel-opcion-cuantas {
+  display: inline-block;
+  margin-left: 9px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--berger-red-soft);
+  border: 1px solid var(--berger-red-bd);
+  color: var(--berger-red-dark);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
