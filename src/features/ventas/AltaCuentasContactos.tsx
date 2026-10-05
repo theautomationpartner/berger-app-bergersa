@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Desplegable } from '@/components/ui/Desplegable'
+import { DesplegableMulti } from '@/components/ui/DesplegableMulti'
 import { formatearCuit, problemaDelCuit, soloDigitos, tipoDePersonaSegunCuit } from '@/lib/cuit'
 import {
   armarWhatsapp,
@@ -58,7 +59,7 @@ const CUENTA_VACIA = {
   razonSocial: '',
   cuit: '',
   clasificacion: '',
-  categorias: [] as string[],
+  categoria: '',
   condicionFiscal: '',
   direccion: '',
   ciudad: '',
@@ -142,7 +143,7 @@ export function AltaCuentasContactos() {
     cuit: formatearCuit(cuenta.cuit),
     tipoPersona,
     clasificacion: cuenta.clasificacion,
-    categorias: cuenta.categorias,
+    categorias: cuenta.categoria ? [cuenta.categoria] : [],
     condicionFiscal: cuenta.condicionFiscal,
     direccion: cuenta.direccion,
     ciudad: cuenta.ciudad,
@@ -220,30 +221,6 @@ export function AltaCuentasContactos() {
       setEnviando(false)
     }
   }
-
-  const alternar = (lista: string[], valor: string): string[] =>
-    lista.includes(valor) ? lista.filter((x) => x !== valor) : [...lista, valor]
-
-  const chips = (
-    valores: string[],
-    elegidas: string[],
-    onCambiar: (nuevas: string[]) => void,
-    tono?: string,
-  ) => (
-    <div className="opciones-chips">
-      {valores.map((v) => (
-        <button
-          key={v}
-          type="button"
-          aria-pressed={elegidas.includes(v)}
-          className={`chip--opcion${tono ? ` chip--opcion-${tono}` : ''}`}
-          onClick={() => onCambiar(alternar(elegidas, v))}
-        >
-          {v}
-        </button>
-      ))}
-    </div>
-  )
 
   /* ---------------- pantalla ---------------- */
 
@@ -342,7 +319,7 @@ export function AltaCuentasContactos() {
               </span>
             </div>
 
-            <div className="op-editor-cuerpo">
+            <div className="op-editor-cuerpo form-moderno">
               <div className="datos datos--form">
                 <label className="campo">
                   <span className="campo-lbl">
@@ -444,45 +421,43 @@ export function AltaCuentasContactos() {
 
                 <div className="campo">
                   <span className="campo-lbl">Categoría</span>
-                  {chips(opciones.categoriaCuenta, cuenta.categorias, (nuevas) =>
-                    setCuenta({ ...cuenta, categorias: nuevas }),
-                  )}
-                  <span className="campo-ayuda">
-                    Puede tener más de una: la misma empresa puede ser cliente y transporte.
-                  </span>
+                  <Desplegable
+                    valor={cuenta.categoria}
+                    opciones={opciones.categoriaCuenta}
+                    vacio="Elegir…"
+                    bloqueado={cargando}
+                    onCambiar={(v) => setCuenta({ ...cuenta, categoria: v })}
+                  />
                 </div>
 
                 {concesionarios.length > 0 && (
                   <div className="campo">
                     <span className="campo-lbl">Concesionario asignado</span>
-                    {chips(
-                      concesionarios.map((c) => c.nombre),
-                      cuenta.concesionarioIds
-                        .map((id) => concesionarios.find((c) => c.id === id)?.nombre ?? '')
-                        .filter(Boolean),
-                      (nombres) =>
-                        setCuenta({
-                          ...cuenta,
-                          concesionarioIds: concesionarios
-                            .filter((x) => nombres.includes(x.nombre))
-                            .map((x) => x.id),
-                        }),
-                      'violeta',
-                    )}
+                    <DesplegableMulti
+                      valores={cuenta.concesionarioIds}
+                      opciones={concesionarios.map((c) => ({ valor: c.id, rotulo: c.nombre }))}
+                      vacio="Ninguno"
+                      buscable={concesionarios.length > 6}
+                      bloqueado={cargando}
+                      onCambiar={(ids) => setCuenta({ ...cuenta, concesionarioIds: ids })}
+                    />
+                    <span className="campo-ayuda">Puede ser más de uno.</span>
                   </div>
                 )}
-
-                <label className="campo">
-                  <span className="campo-lbl">Descripción</span>
-                  <textarea
-                    className="input"
-                    rows={2}
-                    placeholder="Opcional"
-                    value={cuenta.descripcion}
-                    onChange={(e) => setCuenta({ ...cuenta, descripcion: e.target.value })}
-                  />
-                </label>
               </div>
+
+              {/* La descripción es texto largo y va sola, abajo y a todo el ancho: en la grilla
+                  quedaba del tamaño de un campo de ciudad. */}
+              <label className="campo campo--suelto">
+                <span className="campo-lbl">Descripción</span>
+                <textarea
+                  className="input textarea"
+                  rows={4}
+                  placeholder="Opcional: qué hace la empresa, con quién se habla, lo que convenga recordar."
+                  value={cuenta.descripcion}
+                  onChange={(e) => setCuenta({ ...cuenta, descripcion: e.target.value })}
+                />
+              </label>
 
               {repetida && (
                 <div className="aviso aviso--error" style={{ marginTop: 12 }}>
@@ -540,7 +515,7 @@ export function AltaCuentasContactos() {
               </span>
             </div>
 
-            <div className="op-editor-cuerpo">
+            <div className="op-editor-cuerpo form-moderno">
               <div className="campo">
                 <span className="campo-lbl">
                   ¿De qué cuenta es? <span className="campo-req">· obligatorio</span>
@@ -632,71 +607,74 @@ export function AltaCuentasContactos() {
                 </label>
 
                 <div className="campo">
-                  <span className="campo-lbl">País del teléfono</span>
-                  <Desplegable
-                    valor={contacto.paisCodigo}
-                    opciones={PAISES.map((p) => ({
-                      valor: p.codigo,
-                      rotulo: p.nombre,
-                      detalle: `+${p.prefijo}`,
-                    }))}
-                    buscable
-                    onCambiar={(v) => setContacto({ ...contacto, paisCodigo: v })}
+                  <span className="campo-lbl">Categoría</span>
+                  <DesplegableMulti
+                    valores={contacto.categorias}
+                    opciones={opciones.categoriaContacto}
+                    vacio="Elegir…"
+                    bloqueado={cargando}
+                    onCambiar={(v) => setContacto({ ...contacto, categorias: v })}
                   />
+                  <span className="campo-ayuda">Puede tener más de una.</span>
                 </div>
+              </div>
 
-                {/* En tres partes: es lo que hace que todos los números queden escritos igual y se
-                    les pueda mandar un WhatsApp sin revisarlos a ojo. */}
-                <div className="campo">
-                  <span className="campo-lbl">WhatsApp</span>
-                  <div className="tel-partes">
-                    <span className="tel-prefijo">+{prefijoDe(contacto.paisCodigo)}</span>
-                    <input
-                      className="input tel-area"
-                      placeholder="Área"
-                      inputMode="numeric"
-                      value={contacto.area}
-                      onChange={(e) => setContacto({ ...contacto, area: e.target.value })}
-                    />
-                    <input
-                      className="input"
-                      placeholder="Número"
-                      inputMode="numeric"
-                      value={contacto.abonado}
-                      onChange={(e) => setContacto({ ...contacto, abonado: e.target.value })}
+              {/* El teléfono ocupa su propia fila: son cuatro casilleros, y metidos en la grilla
+                  junto a los demás campos quedaban de dos centímetros. */}
+              <div className="campo campo--suelto">
+                <span className="campo-lbl">WhatsApp</span>
+                <div className="tel-partes">
+                  <div className="tel-pais">
+                    <Desplegable
+                      valor={contacto.paisCodigo}
+                      opciones={PAISES.map((p) => ({
+                        valor: p.codigo,
+                        rotulo: p.nombre,
+                        detalle: `+${p.prefijo}`,
+                      }))}
+                      buscable
+                      onCambiar={(v) => setContacto({ ...contacto, paisCodigo: v })}
                     />
                   </div>
-                  <span className="campo-ayuda campo-ayuda--ejemplo">
-                    El área sin el 0 y el número sin el 15.
-                  </span>
-                  {whatsapp && (
-                    <span className="campo-ayuda campo-ayuda--ok">
-                      Se guarda como <b>{whatsapp}</b>.
-                    </span>
-                  )}
-                  {problemaTel && (
-                    <span className="campo-ayuda campo-ayuda--falta">{problemaTel}</span>
-                  )}
-                </div>
-
-                <div className="campo">
-                  <span className="campo-lbl">Categoría</span>
-                  {chips(opciones.categoriaContacto, contacto.categorias, (nuevas) =>
-                    setContacto({ ...contacto, categorias: nuevas }),
-                  )}
-                </div>
-
-                <label className="campo">
-                  <span className="campo-lbl">Comentarios</span>
-                  <textarea
-                    className="input"
-                    rows={2}
-                    placeholder="Opcional"
-                    value={contacto.comentarios}
-                    onChange={(e) => setContacto({ ...contacto, comentarios: e.target.value })}
+                  <span className="tel-prefijo">+{prefijoDe(contacto.paisCodigo)}</span>
+                  <input
+                    className="input tel-area"
+                    placeholder="Característica"
+                    inputMode="numeric"
+                    value={contacto.area}
+                    onChange={(e) => setContacto({ ...contacto, area: e.target.value })}
                   />
-                </label>
+                  <input
+                    className="input tel-numero"
+                    placeholder="Número"
+                    inputMode="numeric"
+                    value={contacto.abonado}
+                    onChange={(e) => setContacto({ ...contacto, abonado: e.target.value })}
+                  />
+                </div>
+                <span className="campo-ayuda campo-ayuda--ejemplo">
+                  La característica sin el 0 y el número sin el 15.
+                </span>
+                {whatsapp && (
+                  <span className="campo-ayuda campo-ayuda--ok">
+                    Se guarda como <b>{whatsapp}</b>.
+                  </span>
+                )}
+                {problemaTel && (
+                  <span className="campo-ayuda campo-ayuda--falta">{problemaTel}</span>
+                )}
               </div>
+
+              <label className="campo campo--suelto">
+                <span className="campo-lbl">Comentarios</span>
+                <textarea
+                  className="input textarea"
+                  rows={4}
+                  placeholder="Opcional: de qué se habló, qué conviene recordar la próxima vez."
+                  value={contacto.comentarios}
+                  onChange={(e) => setContacto({ ...contacto, comentarios: e.target.value })}
+                />
+              </label>
 
               {choque && (
                 <div className="aviso aviso--error" style={{ marginTop: 12 }}>

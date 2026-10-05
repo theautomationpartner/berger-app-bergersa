@@ -1036,29 +1036,67 @@
 .tel-partes {
   display: flex;
   align-items: stretch;
-  gap: 6px;
+  gap: 8px;
 }
+/* El país es un desplegable entero, así que necesita ancho propio o el nombre queda cortado. */
+.tel-pais {
+  flex: 0 0 170px;
+  min-width: 0;
+}
+/*
+ * El prefijo no es un campo: es lo que la app ya sabe por el país elegido. Va como etiqueta —no
+ * como casillero gris— para que nadie intente escribirlo de nuevo, y con el tono de un dato
+ * resuelto en vez del de un campo deshabilitado.
+ */
 .tel-prefijo {
   display: inline-flex;
   align-items: center;
-  padding: 0 10px;
+  flex: 0 0 auto;
+  padding: 0 12px;
   border-radius: 8px;
-  background: var(--tint-neutral);
-  border: 1px solid var(--border);
-  color: var(--text-mid);
-  font-weight: 700;
+  background: #e6f1fd;
+  border: 1px solid #c9e0fa;
+  color: #0b4da2;
+  font-weight: 800;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-/* El área es corta y el abonado largo: darles el mismo ancho haría escribir cuatro dígitos en un
-   campo de veinte. */
+/* La característica es corta y el abonado largo: con el mismo ancho se escriben cuatro dígitos en
+   un campo de veinte, y el número —que es el que más se tipea— queda apretado. */
 .tel-area {
-  flex: 0 0 90px;
+  flex: 0 0 130px;
 }
-.tel-partes .input {
+.tel-numero {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* En el celular los cuatro no entran en una línea: el país arriba, el resto abajo. */
+@media (max-width: 560px) {
+  .tel-partes {
+    flex-wrap: wrap;
+  }
+  .tel-pais {
+    flex: 1 1 100%;
+  }
+  .tel-area {
+    flex: 0 0 110px;
+  }
+}
+
+/*
+ * Un campo que no entra en la grilla del formulario.
+ *
+ * La grilla arma columnas de 190px, que es lo correcto para un nombre o una ciudad y lo
+ * equivocado para un texto largo o para cuatro casilleros de teléfono: quedaban del ancho de un
+ * campo de provincia.
+ */
+.campo--suelto {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 14px;
 }
 
 /* ===== Buscador de operaciones ===== */
@@ -1188,4 +1226,144 @@
 .panel-opcion--area .panel-opcion-tit {
   font-size: 17px;
   letter-spacing: 0.02em;
+}
+
+/* ===== Desplegable de varias opciones ===== */
+
+/* Cuántas van elegidas. Con el rótulo cortado por el ancho —"Cliente, Transp…"— el número es lo
+   único que dice que hay más de las que se leen. */
+.desp-cuenta {
+  flex: 0 0 auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--primary-blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.desp-op--multi {
+  gap: 10px;
+}
+
+/* El cuadradito del tilde. Está siempre y con el mismo tamaño, así que tildar y destildar no
+   mueve el renglón de lugar. */
+.desp-tilde {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  color: transparent;
+  font-size: 10px;
+}
+.desp-tilde--on {
+  background: var(--primary-blue);
+  border-color: var(--primary-blue);
+  color: #fff;
+}
+
+.desp-limpiar-todo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px;
+  border: none;
+  border-top: 1px solid var(--border-soft);
+  background: none;
+  color: var(--text-gray);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.desp-limpiar-todo:hover {
+  color: var(--berger-red);
+}
+
+/* ===== Formularios de carga ===== */
+
+/*
+ * El alta de cuentas y contactos es la primera pantalla de la app que es un formulario largo y
+ * nada más: catorce campos que alguien llena de una sentada. El resto son pantallas de decisión,
+ * con dos o tres datos sueltos dentro de una tarjeta, y por eso sus campos son compactos.
+ *
+ * Acá eso se nota: campos de 40px pegados uno al otro se leen como una planilla. Un poco más de
+ * alto, más aire entre filas y bordes más suaves hacen que se vea dónde empieza y termina cada
+ * cosa sin tener que leer la etiqueta.
+ *
+ * Va acotado con una clase y no cambiando `.input` para todos: las pantallas de decisión están
+ * bien como están, y agrandarles los campos les quitaría lo que tienen a la vista de una.
+ */
+.form-moderno .datos--form {
+  gap: 16px 14px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.form-moderno .input,
+.form-moderno .desp-btn {
+  height: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  border-color: var(--border-soft);
+  background: #fcfcfd;
+  font-size: 13.5px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.form-moderno .input:hover:not(:focus),
+.form-moderno .desp-btn:hover:not(:disabled):not(.desp-btn--abierto) {
+  border-color: var(--border);
+  background: #fff;
+}
+.form-moderno .input:focus,
+.form-moderno .desp-btn--abierto,
+.form-moderno .desp-btn:focus-visible {
+  background: #fff;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(0, 115, 234, 0.13);
+}
+.form-moderno .input::placeholder {
+  color: #9aa4b2;
+}
+
+/* El textarea no tiene alto fijo: es el campo donde se escribe de verdad. */
+.form-moderno .textarea {
+  height: auto;
+  min-height: 96px;
+  padding: 12px 14px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+/* La etiqueta, más arriba y más chica: con catorce campos, lo que se lee rápido es el texto que
+   uno escribió, no el rótulo. */
+.form-moderno .campo-lbl {
+  font-size: 11.5px;
+  letter-spacing: 0.03em;
+  margin-bottom: 5px;
+}
+.form-moderno .campo-ayuda {
+  margin-top: 5px;
+  line-height: 1.45;
+}
+
+/* El panel del desplegable acompaña el redondeo de los campos. */
+.form-moderno .desp-panel {
+  border-radius: 12px;
+  border-color: var(--border-soft);
+  padding: 6px;
+}
+.form-moderno .desp-op {
+  border-radius: 8px;
+  padding: 9px 10px;
 }
