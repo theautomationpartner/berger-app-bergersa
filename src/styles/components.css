@@ -1367,3 +1367,92 @@
   border-radius: 8px;
   padding: 9px 10px;
 }
+
+/* ===== Bloques dentro de un formulario ===== */
+
+/* Los contactos de una cuenta son otro asunto dentro del mismo alta: una caja aparte los separa
+   de los datos fiscales sin mandarlos a otra pantalla. */
+.sub-bloque {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--tint-neutral);
+}
+.sub-bloque-tit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+
+/* El formulario de un contacto que se arma sin salir del alta de la cuenta. Va en blanco sobre el
+   gris del bloque: es un formulario adentro de otro y tiene que notarse. */
+.sub-form {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.sub-form-tit {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+/*
+ * Lo que se agregó y todavía no existe en monday.
+ *
+ * Se crean junto con la cuenta, no al agregarlos: si el alta se abandona a mitad, no quedan
+ * contactos sueltos colgando de una cuenta que nunca existió.
+ */
+.pendientes {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pendiente {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 9px;
+  background: #fff;
+  font-size: 13px;
+}
+.pendiente > i {
+  color: var(--green-dark);
+}
+.pendiente-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-mid);
+}
+.pendiente-quitar {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  color: var(--text-gray);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.pendiente-quitar:hover {
+  background: var(--berger-red-soft);
+  color: var(--berger-red);
+}

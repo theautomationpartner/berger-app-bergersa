@@ -22,6 +22,7 @@ import {
   COL_CATALOGO,
   COL_CONFIRMACION,
   COL_CONT_DESPACHO,
+  COL_ACTIVIDAD,
   COL_CONTACTO,
   COL_CUENTA,
   COL_DESPACHANTE,
@@ -96,6 +97,8 @@ export type NombreOperacion =
   | 'contenedoresDelTablero'
   | 'contenedoresDelTableroDespachante'
   | 'etiquetasDeColumna'
+  | 'crearActividadCrm'
+  | 'etiquetasDeActividad'
   | 'cuentasDelCrm'
   | 'contactosDelCrm'
   | 'concesionariosDelCrm'
@@ -569,7 +572,53 @@ const COLUMNAS_DE_USUARIO = new Set<string>([
  * Módulo de ventas: el CRM
  * ------------------------------------------------------------------ */
 
+/**
+ * Lo único que la app escribe al crear una actividad.
+ *
+ * No está el responsable como dato libre: lo pone la app con el usuario de monday que tiene la
+ * pantalla abierta. Dejar escribirlo sería permitir cargar una actividad a nombre de otro, y lo
+ * que importa de una actividad es quién la hizo de verdad.
+ */
+const COLUMNAS_DE_ACTIVIDAD = new Set<string>([
+  COL_ACTIVIDAD.tipo,
+  COL_ACTIVIDAD.cuenta,
+  COL_ACTIVIDAD.contactos,
+  COL_ACTIVIDAD.responsable,
+  COL_ACTIVIDAD.fecha,
+  COL_ACTIVIDAD.estado,
+  COL_ACTIVIDAD.descripcion,
+])
+
 const OPS_CRM = {
+  /** Una actividad: una llamada, un WhatsApp, una visita. */
+  crearActividadCrm: {
+    modulo: 'ventas' as const,
+    query: `
+      mutation ($tablero: ID!, $nombre: String!, $valores: JSON!) {
+        create_item(board_id: $tablero, item_name: $nombre, column_values: $valores) { id name }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.actividades,
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_ACTIVIDAD, 'una actividad'),
+    }),
+  },
+
+  /** Las etiquetas del tipo y el estado de una actividad. */
+  etiquetasDeActividad: {
+    modulo: 'ventas' as const,
+    query: `
+      query ($tablero: ID!, $columnas: [String!]) {
+        boards(ids: [$tablero]) { columns(ids: $columnas) { id settings_str } }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.actividades,
+      columnas: idsDeColumnas(v.columnas),
+    }),
+  },
+
   /** Las cuentas, para buscarlas y para controlar que un CUIT no esté repetido. */
   cuentasDelCrm: {
     modulo: 'ventas' as const,

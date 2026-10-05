@@ -18,6 +18,14 @@ interface Props {
   bloqueado?: boolean
   /** Si la lista es larga, aparece un buscador arriba. */
   buscable?: boolean
+  /**
+   * No muestra nada hasta que se escribe.
+   *
+   * Para listas que crecen sin techo —las cuentas del CRM— desplegar las primeras doscientas no
+   * ayuda a nadie: la que se busca nunca está entre las que se ven, y la lista tapa el formulario.
+   * Con esto el panel arranca invitando a escribir.
+   */
+  soloAlBuscar?: boolean
   id?: string
 }
 
@@ -43,6 +51,7 @@ export function Desplegable({
   vacio = '(sin definir)',
   bloqueado,
   buscable,
+  soloAlBuscar,
   id,
 }: Props) {
   const lista = useMemo(() => opciones.map(normalizar), [opciones])
@@ -60,12 +69,12 @@ export function Desplegable({
 
   const visibles = useMemo(() => {
     const texto = busqueda.trim().toLowerCase()
-    if (!texto) return lista
+    if (!texto) return soloAlBuscar ? [] : lista
     return lista.filter(
       (o) =>
         o.rotulo.toLowerCase().includes(texto) || (o.detalle ?? '').toLowerCase().includes(texto),
     )
-  }, [lista, busqueda])
+  }, [lista, busqueda, soloAlBuscar])
 
   const elegida = lista.find((o) => o.valor === valor)
 
@@ -165,7 +174,13 @@ export function Desplegable({
               </li>
             ))}
 
-            {visibles.length === 0 && <li className="desp-vacio">Nada coincide</li>}
+            {visibles.length === 0 && (
+              <li className="desp-vacio">
+                {soloAlBuscar && !busqueda.trim()
+                  ? `Escribí para buscar entre ${lista.length}.`
+                  : 'Nada coincide'}
+              </li>
+            )}
 
             {/* Volver a "sin definir" tiene que ser posible: una opción elegida por error queda
                 pegada si la única forma de sacarla es desde monday. */}

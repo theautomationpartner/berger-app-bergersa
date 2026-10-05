@@ -82,7 +82,10 @@ export function useSeleccionTractores(tractores: Tractor[]) {
     () => tractores.filter((t) => seleccionados.has(t.id)),
     [tractores, seleccionados],
   )
-  const total = useMemo(() => elegidos.reduce((suma, t) => suma + (t.valorNeto ?? 0), 0), [elegidos])
+  const total = useMemo(
+    () => elegidos.reduce((suma, t) => suma + (t.valorNeto ?? 0), 0),
+    [elegidos],
+  )
 
   return { seleccionados, alternar, marcar, desmarcar, limpiar, elegidos, total }
 }

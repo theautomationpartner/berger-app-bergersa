@@ -13,14 +13,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Desplegable } from '@/components/ui/Desplegable'
 import { DesplegableMulti } from '@/components/ui/DesplegableMulti'
 import { formatearCuit, problemaDelCuit, soloDigitos, tipoDePersonaSegunCuit } from '@/lib/cuit'
-import {
-  armarWhatsapp,
-  PAIS_POR_DEFECTO,
-  PAISES,
-  paisPorCodigo,
-  prefijoDe,
-  problemaDelTelefono,
-} from '@/lib/telefono'
+import { armarWhatsapp, PAIS_POR_DEFECTO, PAISES, paisPorCodigo } from '@/lib/telefono'
+import { condicionFiscalDeArca, consultarArca } from '@/services/arca'
 import {
   concesionariosDelCrm,
   contactoRepetido,
@@ -38,22 +32,12 @@ import {
   type CuentaCrm,
 } from '@/services/monday/crm'
 import { SinAcceso } from '@/services/monday/sdk'
+import { CamposContacto, CONTACTO_VACIO, type DatosContacto } from './CamposContacto'
 
 const mensaje = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
 /** Los dos trabajos de la pantalla. */
 type Trabajo = 'cuenta' | 'contacto'
-
-const CONTACTO_VACIO = {
-  nombres: '',
-  apellidos: '',
-  categorias: [] as string[],
-  email: '',
-  paisCodigo: PAIS_POR_DEFECTO,
-  area: '',
-  abonado: '',
-  comentarios: '',
-}
 
 const CUENTA_VACIA = {
   razonSocial: '',
@@ -67,6 +51,8 @@ const CUENTA_VACIA = {
   paisCodigo: PAIS_POR_DEFECTO,
   descripcion: '',
   concesionarioIds: [] as string[],
+  /** Contactos que ya existen y se enganchan a la cuenta nueva. */
+  contactoIds: [] as string[],
 }
 
 export function AltaCuentasContactos() {
@@ -90,9 +76,22 @@ export function AltaCuentasContactos() {
   const [hecho, setHecho] = useState<string | null>(null)
 
   const [cuenta, setCuenta] = useState(CUENTA_VACIA)
-  const [contacto, setContacto] = useState(CONTACTO_VACIO)
-  /** La cuenta a la que se le cuelga el contacto. */
+  const [contacto, setContacto] = useState<DatosContacto>(CONTACTO_VACIO)
   const [cuentaElegida, setCuentaElegida] = useState('')
+
+  /* ARCA: lo que devolvió el padrón para el CUIT que se está cargando. */
+  const [consultando, setConsultando] = useState(false)
+  const [arca, setArca] = useState<{ ok: boolean; mensaje: string; viejo?: boolean } | null>(null)
+
+  /**
+   * Los contactos nuevos que se crean desde el alta de la cuenta.
+   *
+   * Quedan en memoria y se crean DESPUÉS de la cuenta, no al tocar "Agregar". Si se crearan en el
+   * momento, abandonar el alta a mitad dejaría contactos sueltos en el tablero, colgando de una
+   * cuenta que nunca existió, y nadie los iría a buscar.
+   */
+  const [nuevos, setNuevos] = useState<DatosContacto[]>([])
+  const [armando, setArmando] = useState<DatosContacto | null>(null)
 
   const recargar = useCallback(async () => {
     setCargando(true)
@@ -138,6 +137,48 @@ export function AltaCuentasContactos() {
   /* El prefijo del CUIT ya dice si es una persona o una empresa, así que no se pregunta. */
   const tipoPersona = tipoDePersonaSegunCuit(cuenta.cuit) ?? ''
 
+  /**
+   * Trae del padrón lo que ARCA sabe.
+   *
+   * Se dispara sola al terminar de escribir un CUIT válido. Lo que vuelve se carga sólo en los
+   * campos **vacíos**: si alguien ya escribió la razón social, no se le pisa lo que puso.
+   */
+  const traerDeArca = useCallback(
+    async (cuit: string) => {
+      const digitos = soloDigitos(cuit)
+      if (digitos.length !== 11 || problemaDelCuit(digitos)) return
+      setConsultando(true)
+      setArca(null)
+      try {
+        const r = await consultarArca(digitos)
+        if (!r.ok) {
+          setArca({ ok: false, mensaje: r.mensaje })
+          return
+        }
+        const d = r.datos
+        setCuenta((c) => ({
+          ...c,
+          razonSocial: c.razonSocial.trim() || d.razonSocial,
+          condicionFiscal:
+            c.condicionFiscal || condicionFiscalDeArca(d.condicionIva, opciones.condicionFiscal),
+          direccion: c.direccion.trim() || d.domicilio,
+          ciudad: c.ciudad.trim() || d.localidad,
+          provincia: c.provincia.trim() || d.provincia,
+        }))
+        setArca({
+          ok: true,
+          mensaje: d.razonSocial
+            ? `ARCA dice que es ${d.razonSocial}${d.condicionIvaTexto ? ` · ${d.condicionIvaTexto}` : ''}.`
+            : 'ARCA respondió, pero sin razón social.',
+          viejo: d.datoViejo,
+        })
+      } finally {
+        setConsultando(false)
+      }
+    },
+    [opciones.condicionFiscal],
+  )
+
   const datosDeCuenta = {
     razonSocial: cuenta.razonSocial,
     cuit: formatearCuit(cuenta.cuit),
@@ -152,7 +193,7 @@ export function AltaCuentasContactos() {
     paisNombre: paisPorCodigo(cuenta.paisCodigo)?.nombre ?? '',
     descripcion: cuenta.descripcion,
     concesionarioIds: cuenta.concesionarioIds,
-    contactoIds: [],
+    contactoIds: cuenta.contactoIds,
   }
 
   const faltanCuenta = [
@@ -160,42 +201,71 @@ export function AltaCuentasContactos() {
     ...(problemaCuit ? ['un CUIT válido'] : []),
   ]
 
-  /* ---------------- el contacto ---------------- */
+  /* ---------------- los contactos ---------------- */
 
-  const whatsapp = armarWhatsapp(contacto.paisCodigo, contacto.area, contacto.abonado)
-  const problemaTel = problemaDelTelefono(contacto.paisCodigo, contacto.area, contacto.abonado)
-
-  const datosDeContacto = {
-    nombres: contacto.nombres,
-    apellidos: contacto.apellidos,
-    categorias: contacto.categorias,
-    email: contacto.email,
-    whatsapp,
-    paisCodigo: contacto.paisCodigo,
-    paisNombre: paisPorCodigo(contacto.paisCodigo)?.nombre ?? '',
-    comentarios: contacto.comentarios,
-    cuentaId: cuentaElegida,
-  }
+  const datosDeContacto = (d: DatosContacto, cuentaId: string) => ({
+    nombres: d.nombres,
+    apellidos: d.apellidos,
+    categorias: d.categorias,
+    email: d.email,
+    whatsapp: armarWhatsapp(d.paisCodigo, d.area, d.abonado),
+    paisCodigo: d.paisCodigo,
+    paisNombre: paisPorCodigo(d.paisCodigo)?.nombre ?? '',
+    comentarios: d.comentarios,
+    cuentaId,
+  })
 
   /* La regla: dentro de UNA cuenta no puede haber dos contactos con el mismo mail o el mismo
      WhatsApp —sería la misma persona dos veces—. Entre cuentas distintas sí: el mismo señor puede
      comprar para dos empresas, y son dos contactos legítimos. */
   const choque = useMemo(
-    () => contactoRepetido(contactos, cuentaElegida, contacto.email, whatsapp),
-    [contactos, cuentaElegida, contacto.email, whatsapp],
+    () =>
+      contactoRepetido(
+        contactos,
+        cuentaElegida,
+        contacto.email,
+        armarWhatsapp(contacto.paisCodigo, contacto.area, contacto.abonado),
+      ),
+    [contactos, cuentaElegida, contacto],
   )
 
   const faltanContacto = [
     ...(cuentaElegida ? [] : ['la cuenta']),
-    ...faltaParaElContacto(datosDeContacto),
-    ...(problemaTel ? ['el teléfono completo'] : []),
+    ...faltaParaElContacto(datosDeContacto(contacto, cuentaElegida)),
   ]
 
-  /** Los contactos que ya tiene la cuenta elegida. */
   const contactosDeLaCuenta = useMemo(
     () => contactos.filter((c) => cuentaElegida && c.cuentaIds.includes(cuentaElegida)),
     [contactos, cuentaElegida],
   )
+
+  /* ---------------- el contacto que se arma desde la cuenta ---------------- */
+
+  const faltanDelArmado = armando ? faltaParaElContacto(datosDeContacto(armando, 'x')) : []
+
+  /** La misma regla, pero contra una cuenta que todavía no existe: los que ya se agregaron. */
+  const choqueEnLaCuenta = useMemo(() => {
+    if (!armando) return null
+    const mail = armando.email.trim().toLowerCase()
+    const wa = armarWhatsapp(armando.paisCodigo, armando.area, armando.abonado).replace(/\D/g, '')
+    const yaEsta = (c: DatosContacto) =>
+      (mail && c.email.trim().toLowerCase() === mail) ||
+      (wa && armarWhatsapp(c.paisCodigo, c.area, c.abonado).replace(/\D/g, '') === wa)
+    if (nuevos.some(yaEsta)) return 'Ya agregaste a alguien con ese mail o ese WhatsApp.'
+    const enganchado = contactos.find(
+      (c) =>
+        cuenta.contactoIds.includes(c.id) &&
+        ((mail && c.email.trim().toLowerCase() === mail) ||
+          (wa && c.whatsapp.replace(/\D/g, '') === wa)),
+    )
+    return enganchado ? `${enganchado.nombre} ya está enganchado a esta cuenta.` : null
+  }, [armando, nuevos, contactos, cuenta.contactoIds])
+
+  const agregarArmado = () => {
+    if (!armando || faltanDelArmado.length > 0 || choqueEnLaCuenta) return
+    setNuevos((n) => [...n, armando])
+    setArmando(null)
+  }
 
   /* ---------------- envío ---------------- */
 
@@ -206,10 +276,30 @@ export function AltaCuentasContactos() {
     try {
       if (trabajo === 'cuenta') {
         const r = await crearCuenta(datosDeCuenta)
-        setHecho(`${r.nombre} quedó creada.`)
+
+        /* Los contactos nuevos se crean recién ahora, ya con la cuenta a la que pertenecen. Si
+           alguno falla, la cuenta ya está: se dice cuál y se sigue, en vez de hacer creer que no
+           se creó nada. */
+        const fallados: string[] = []
+        for (const n of nuevos) {
+          try {
+            await crearContacto(datosDeContacto(n, r.id))
+          } catch {
+            fallados.push(nombreDeContacto(n.nombres, n.apellidos))
+          }
+        }
+
+        const cuantos = nuevos.length - fallados.length + cuenta.contactoIds.length
+        setHecho(
+          `${r.nombre} quedó creada${cuantos > 0 ? ` con ${cuantos} contacto${cuantos === 1 ? '' : 's'}` : ''}.` +
+            (fallados.length > 0 ? ` No se pudieron crear: ${fallados.join(', ')}.` : ''),
+        )
         setCuenta(CUENTA_VACIA)
+        setNuevos([])
+        setArmando(null)
+        setArca(null)
       } else {
-        const r = await crearContacto(datosDeContacto)
+        const r = await crearContacto(datosDeContacto(contacto, cuentaElegida))
         const nombreCuenta = cuentas.find((c) => c.id === cuentaElegida)?.nombre ?? 'la cuenta'
         setHecho(`${r.nombre} quedó creado en ${nombreCuenta}.`)
         setContacto(CONTACTO_VACIO)
@@ -223,6 +313,12 @@ export function AltaCuentasContactos() {
   }
 
   /* ---------------- pantalla ---------------- */
+
+  const opcionesDeContacto = contactos.map((c) => ({
+    valor: c.id,
+    rotulo: c.nombre,
+    detalle: [c.email, c.whatsapp].filter(Boolean).join(' · '),
+  }))
 
   return (
     <div className="scroll">
@@ -240,7 +336,7 @@ export function AltaCuentasContactos() {
           </span>
         </div>
 
-        <div className="decision decision--grande">
+        <div className="decision decision--grande decision--elige">
           <button
             type="button"
             aria-pressed={trabajo === 'cuenta'}
@@ -256,7 +352,10 @@ export function AltaCuentasContactos() {
             </span>
             <span className="opcion-txt">
               <span className="opcion-tit">Una cuenta nueva</span>
-              <span className="opcion-det">El cliente, con su CUIT y su condición fiscal.</span>
+              <span className="opcion-det">
+                El cliente, con su CUIT y su condición fiscal. Se le pueden enganchar contactos acá
+                mismo.
+              </span>
             </span>
           </button>
 
@@ -329,8 +428,14 @@ export function AltaCuentasContactos() {
                     className="input"
                     placeholder="Ej: 20-12345678-6"
                     value={cuenta.cuit}
-                    onChange={(e) => setCuenta({ ...cuenta, cuit: e.target.value })}
-                    onBlur={() => setCuenta((c) => ({ ...c, cuit: formatearCuit(c.cuit) }))}
+                    onChange={(e) => {
+                      setCuenta({ ...cuenta, cuit: e.target.value })
+                      setArca(null)
+                    }}
+                    onBlur={() => {
+                      setCuenta((c) => ({ ...c, cuit: formatearCuit(c.cuit) }))
+                      void traerDeArca(cuenta.cuit)
+                    }}
                   />
                   {/* El motivo, y no un "CUIT inválido": decir qué está mal es lo que permite
                       corregirlo sin adivinar. */}
@@ -340,6 +445,20 @@ export function AltaCuentasContactos() {
                   {!problemaCuit && tipoPersona && (
                     <span className="campo-ayuda campo-ayuda--ok">
                       Es una <b>{tipoPersona}</b>, por el prefijo del CUIT.
+                    </span>
+                  )}
+                  {consultando && (
+                    <span className="campo-ayuda">
+                      <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Preguntándole
+                      a ARCA…
+                    </span>
+                  )}
+                  {arca && !consultando && (
+                    <span
+                      className={`campo-ayuda ${arca.ok ? 'campo-ayuda--ok' : 'campo-ayuda--aviso'}`}
+                    >
+                      {arca.mensaje}
+                      {arca.viejo && ' (es el último dato que tenía: puede estar desactualizado)'}
                     </span>
                   )}
                 </label>
@@ -446,6 +565,115 @@ export function AltaCuentasContactos() {
                 )}
               </div>
 
+              {/* ---- los contactos de la cuenta ---- */}
+              <div className="sub-bloque">
+                <span className="sub-bloque-tit">
+                  <i className="fa-solid fa-users" aria-hidden="true" /> Contactos de la cuenta
+                </span>
+
+                <div className="campo">
+                  <span className="campo-lbl">Enganchar contactos que ya existen</span>
+                  <DesplegableMulti
+                    valores={cuenta.contactoIds}
+                    opciones={opcionesDeContacto}
+                    vacio="Buscá por nombre, mail o WhatsApp"
+                    buscable
+                    soloAlBuscar
+                    bloqueado={cargando}
+                    onCambiar={(ids) => setCuenta({ ...cuenta, contactoIds: ids })}
+                  />
+                  <span className="campo-ayuda">
+                    Una persona puede estar en más de una cuenta: si compra para dos empresas, es el
+                    mismo contacto.
+                  </span>
+                </div>
+
+                {nuevos.length > 0 && (
+                  <ul className="pendientes">
+                    {nuevos.map((n, i) => (
+                      <li key={`${n.email}-${n.abonado}-${i}`} className="pendiente">
+                        <i className="fa-solid fa-user-plus" aria-hidden="true" />
+                        <span className="pendiente-txt">
+                          <b>{nombreDeContacto(n.nombres, n.apellidos)}</b>
+                          {n.email && <span> · {n.email}</span>}
+                          {armarWhatsapp(n.paisCodigo, n.area, n.abonado) && (
+                            <span> · {armarWhatsapp(n.paisCodigo, n.area, n.abonado)}</span>
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          className="pendiente-quitar"
+                          aria-label="Quitar"
+                          onClick={() => setNuevos((v) => v.filter((_, j) => j !== i))}
+                        >
+                          <i className="fa-solid fa-xmark" aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {armando === null ? (
+                  <button
+                    type="button"
+                    className="btn btn--borde btn--chico"
+                    onClick={() => setArmando(CONTACTO_VACIO)}
+                  >
+                    <i className="fa-solid fa-plus" aria-hidden="true" /> Crear un contacto nuevo
+                  </button>
+                ) : (
+                  <div className="sub-form">
+                    <span className="sub-form-tit">Un contacto nuevo para esta cuenta</span>
+
+                    <CamposContacto
+                      datos={armando}
+                      onCambiar={setArmando}
+                      categorias={opciones.categoriaContacto}
+                      cargando={cargando}
+                      conComentarios={false}
+                    />
+
+                    {choqueEnLaCuenta && (
+                      <div className="aviso aviso--error" style={{ marginTop: 10 }}>
+                        <i className="fa-solid fa-user-slash" aria-hidden="true" />
+                        <span>{choqueEnLaCuenta}</span>
+                      </div>
+                    )}
+
+                    {faltanDelArmado.length > 0 && (
+                      <span className="campo-ayuda campo-ayuda--falta" style={{ marginTop: 8 }}>
+                        <i className="fa-solid fa-lock" aria-hidden="true" /> Falta{' '}
+                        {faltanDelArmado.join(', ')}.
+                      </span>
+                    )}
+
+                    <div className="op-editor-acciones">
+                      <button
+                        type="button"
+                        className="btn btn--texto btn--chico"
+                        onClick={() => setArmando(null)}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--marca btn--chico"
+                        disabled={faltanDelArmado.length > 0 || Boolean(choqueEnLaCuenta)}
+                        onClick={agregarArmado}
+                      >
+                        <i className="fa-solid fa-user-check" aria-hidden="true" /> Agregar a la
+                        cuenta
+                      </button>
+                    </div>
+
+                    <span className="campo-ayuda">
+                      Se crea junto con la cuenta, no ahora: así no quedan contactos sueltos si el
+                      alta se abandona a mitad.
+                    </span>
+                  </div>
+                )}
+              </div>
+
               {/* La descripción es texto largo y va sola, abajo y a todo el ancho: en la grilla
                   quedaba del tamaño de un campo de ciudad. */}
               <label className="campo campo--suelto">
@@ -469,10 +697,6 @@ export function AltaCuentasContactos() {
                 </div>
               )}
 
-              <span className="campo-ayuda" style={{ marginTop: 10, display: 'block' }}>
-                El teléfono y el mail van en cada contacto, no en la cuenta.
-              </span>
-
               {faltanCuenta.length > 0 && (
                 <span className="campo-ayuda campo-ayuda--falta" style={{ marginTop: 8 }}>
                   <i className="fa-solid fa-lock" aria-hidden="true" /> Falta{' '}
@@ -485,7 +709,12 @@ export function AltaCuentasContactos() {
                   type="button"
                   className="btn btn--texto btn--chico"
                   disabled={enviando}
-                  onClick={() => setCuenta(CUENTA_VACIA)}
+                  onClick={() => {
+                    setCuenta(CUENTA_VACIA)
+                    setNuevos([])
+                    setArmando(null)
+                    setArca(null)
+                  }}
                 >
                   <i className="fa-solid fa-eraser" aria-hidden="true" /> Vaciar el formulario
                 </button>
@@ -529,6 +758,7 @@ export function AltaCuentasContactos() {
                   }))}
                   vacio={cargando ? 'Cargando cuentas…' : 'Buscá la cuenta por nombre o CUIT'}
                   buscable
+                  soloAlBuscar
                   bloqueado={cargando}
                   onCambiar={setCuentaElegida}
                 />
@@ -566,115 +796,14 @@ export function AltaCuentasContactos() {
                 </div>
               )}
 
-              <div className="datos datos--form" style={{ marginTop: 12 }}>
-                <label className="campo">
-                  <span className="campo-lbl">
-                    Nombre/s <span className="campo-req">· obligatorio</span>
-                  </span>
-                  <input
-                    className="input"
-                    placeholder="Ej: Ricardo"
-                    value={contacto.nombres}
-                    onChange={(e) => setContacto({ ...contacto, nombres: e.target.value })}
-                  />
-                </label>
-
-                <label className="campo">
-                  <span className="campo-lbl">
-                    Apellido/s <span className="campo-req">· obligatorio</span>
-                  </span>
-                  <input
-                    className="input"
-                    placeholder="Ej: Gutiérrez"
-                    value={contacto.apellidos}
-                    onChange={(e) => setContacto({ ...contacto, apellidos: e.target.value })}
-                  />
-                </label>
-
-                <label className="campo">
-                  <span className="campo-lbl">E-mail</span>
-                  <input
-                    className="input"
-                    type="email"
-                    placeholder="nombre@empresa.com"
-                    value={contacto.email}
-                    onChange={(e) => setContacto({ ...contacto, email: e.target.value })}
-                  />
-                  <span className="campo-ayuda">
-                    Con el mail o el WhatsApp alcanza, pero alguno de los dos tiene que estar: son
-                    los que identifican a la persona.
-                  </span>
-                </label>
-
-                <div className="campo">
-                  <span className="campo-lbl">Categoría</span>
-                  <DesplegableMulti
-                    valores={contacto.categorias}
-                    opciones={opciones.categoriaContacto}
-                    vacio="Elegir…"
-                    bloqueado={cargando}
-                    onCambiar={(v) => setContacto({ ...contacto, categorias: v })}
-                  />
-                  <span className="campo-ayuda">Puede tener más de una.</span>
-                </div>
-              </div>
-
-              {/* El teléfono ocupa su propia fila: son cuatro casilleros, y metidos en la grilla
-                  junto a los demás campos quedaban de dos centímetros. */}
-              <div className="campo campo--suelto">
-                <span className="campo-lbl">WhatsApp</span>
-                <div className="tel-partes">
-                  <div className="tel-pais">
-                    <Desplegable
-                      valor={contacto.paisCodigo}
-                      opciones={PAISES.map((p) => ({
-                        valor: p.codigo,
-                        rotulo: p.nombre,
-                        detalle: `+${p.prefijo}`,
-                      }))}
-                      buscable
-                      onCambiar={(v) => setContacto({ ...contacto, paisCodigo: v })}
-                    />
-                  </div>
-                  <span className="tel-prefijo">+{prefijoDe(contacto.paisCodigo)}</span>
-                  <input
-                    className="input tel-area"
-                    placeholder="Característica"
-                    inputMode="numeric"
-                    value={contacto.area}
-                    onChange={(e) => setContacto({ ...contacto, area: e.target.value })}
-                  />
-                  <input
-                    className="input tel-numero"
-                    placeholder="Número"
-                    inputMode="numeric"
-                    value={contacto.abonado}
-                    onChange={(e) => setContacto({ ...contacto, abonado: e.target.value })}
-                  />
-                </div>
-                <span className="campo-ayuda campo-ayuda--ejemplo">
-                  La característica sin el 0 y el número sin el 15.
-                </span>
-                {whatsapp && (
-                  <span className="campo-ayuda campo-ayuda--ok">
-                    Se guarda como <b>{whatsapp}</b>.
-                  </span>
-                )}
-                {problemaTel && (
-                  <span className="campo-ayuda campo-ayuda--falta">{problemaTel}</span>
-                )}
-              </div>
-
-              <label className="campo campo--suelto">
-                <span className="campo-lbl">Comentarios</span>
-                <textarea
-                  className="input textarea"
-                  rows={4}
-                  placeholder="Opcional: de qué se habló, qué conviene recordar la próxima vez."
-                  value={contacto.comentarios}
-                  onChange={(e) => setContacto({ ...contacto, comentarios: e.target.value })}
+              <div style={{ marginTop: 12 }}>
+                <CamposContacto
+                  datos={contacto}
+                  onCambiar={setContacto}
+                  categorias={opciones.categoriaContacto}
+                  cargando={cargando}
                 />
-              </label>
+              </div>
 
               {choque && (
                 <div className="aviso aviso--error" style={{ marginTop: 12 }}>

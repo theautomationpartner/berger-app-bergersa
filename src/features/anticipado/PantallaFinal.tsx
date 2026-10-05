@@ -36,7 +36,10 @@ export function PantallaFinal({ resultado, monto, onNuevaOperacion }: Props) {
 
       <div className="final">
         <span className="final-ic">
-          <i className={`fa-solid ${hayProblemas ? 'fa-circle-exclamation' : 'fa-check'}`} aria-hidden="true" />
+          <i
+            className={`fa-solid ${hayProblemas ? 'fa-circle-exclamation' : 'fa-check'}`}
+            aria-hidden="true"
+          />
         </span>
         <span className="final-tit">
           {hayProblemas ? 'Pago cargado con observaciones' : 'Transferencia cargada'}

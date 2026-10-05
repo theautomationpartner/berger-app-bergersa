@@ -80,7 +80,10 @@ export const clienteIngreso: ClienteIngreso = {
     if (res.status === 429) return { estado: 'bloqueado' }
     if (cuerpo.error === 'clave_invalida') return { estado: 'clave_invalida' }
     if (cuerpo.error === 'codigo_incorrecto') {
-      return { estado: 'codigo_incorrecto', intentosRestantes: cuerpo.intentosRestantes as number | undefined }
+      return {
+        estado: 'codigo_incorrecto',
+        intentosRestantes: cuerpo.intentosRestantes as number | undefined,
+      }
     }
     // 409: el estado cambió entre dos pasos (por ejemplo, ya estaba configurado). La respuesta
     // trae el estado correcto, así que se sigue desde ahí.

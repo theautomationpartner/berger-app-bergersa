@@ -19,6 +19,7 @@ import { Migas, type Miga } from '@/features/inicio/Migas'
 import { Buscador } from '@/features/inicio/Buscador'
 import { PanelLateral } from '@/features/inicio/PanelLateral'
 import { AltaCuentasContactos } from '@/features/ventas/AltaCuentasContactos'
+import { Actividades } from '@/features/ventas/Actividades'
 import { PanelOpciones } from '@/features/inicio/PanelOpciones'
 import { DespachoVista } from '@/features/vista/DespachoVista'
 import { useAccesoMonday } from '@/hooks/useAccesoMonday'
@@ -329,6 +330,8 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
       {principal === 'usuarios' && <RegistroUsuario />}
 
       {principal === 'clientes' && <AltaCuentasContactos />}
+
+      {principal === 'actividades' && <Actividades />}
 
       {principal === 'fechas' && operacionFechas === 'confirmar' && <ConfirmarProponerFecha />}
       {principal === 'fechas' && operacionFechas === 'enviar' && <EnviarConfirmacion />}

@@ -36,6 +36,23 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/monday-file/, '/v2/file'),
       },
+      /*
+       * La consulta a ARCA. En producción la hace `api/arca.ts`, que acá no corre —Vite no
+       * ejecuta las funciones de `api/`—, así que en desarrollo se va directo al servicio. La
+       * clave la pone el proxy en la cabecera, leyéndola del entorno: nunca entra al bundle, que
+       * es lo que pasaría con una variable `VITE_…`.
+       */
+      '/arca-api': {
+        target: 'https://arca.theautomationpartner.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/arca-api/, '/api/padron'),
+        configure: (proxy) => {
+          proxy.on('proxyReq', (pedido) => {
+            const clave = process.env.ARCA_API_KEY?.trim()
+            if (clave) pedido.setHeader('x-api-key', clave)
+          })
+        },
+      },
     },
   },
 })

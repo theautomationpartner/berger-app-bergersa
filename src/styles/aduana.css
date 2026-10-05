@@ -1795,3 +1795,90 @@
   font-size: 11.5px;
   color: var(--text-gray);
 }
+
+/*
+ * Una decisión donde hay una elegida.
+ *
+ * `.decision--grande` se usa para dos cosas distintas: tarjetas que LLEVAN a algún lado —ahí cada
+ * una tiene su color y las dos están siempre encendidas— y tarjetas entre las que se ELIGE, que es
+ * este caso. Con las dos pintadas todo el tiempo, la elegida se distinguía sólo por el borde: a un
+ * metro de la pantalla las dos se veían igual, y había que leer para saber dónde estaba parado uno.
+ *
+ * Acá el color pasa a significar algo: la que no está elegida se apaga —fondo blanco, ícono gris—
+ * y la elegida se queda con el color entero, un anillo alrededor y un tilde arriba a la derecha.
+ */
+.decision--elige .opcion {
+  position: relative;
+  background: #fff;
+  border-color: var(--border);
+  box-shadow: none;
+}
+.decision--elige .opcion .opcion-ic {
+  background: #d5d9e3;
+  color: #fff;
+}
+.decision--elige .opcion .opcion-tit {
+  color: var(--text-mid);
+}
+.decision--elige .opcion .opcion-det {
+  color: var(--text-gray);
+}
+.decision--elige .opcion:hover:not(:disabled) {
+  border-color: var(--text-gray);
+  background: #fcfcfd;
+  box-shadow: var(--sombra);
+}
+
+/* El tilde: con dos tarjetas una al lado de la otra, es lo que se ve antes que el color. */
+.decision--elige .opcion--elegida::after {
+  content: '\f00c';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 11px;
+  color: #fff;
+}
+
+.decision--elige .opcion--confirmar.opcion--elegida {
+  background: var(--tint-input);
+  border-color: var(--primary-blue);
+  box-shadow:
+    0 0 0 3px rgba(0, 115, 234, 0.16),
+    var(--sombra-alta);
+}
+.decision--elige .opcion--confirmar.opcion--elegida .opcion-ic,
+.decision--elige .opcion--confirmar.opcion--elegida::after {
+  background: var(--primary-blue);
+  color: #fff;
+}
+.decision--elige .opcion--confirmar.opcion--elegida .opcion-tit {
+  color: #0a4f9e;
+}
+
+.decision--elige .opcion--proponer.opcion--elegida {
+  background: #fff8e6;
+  border-color: var(--orange);
+  box-shadow:
+    0 0 0 3px rgba(253, 171, 61, 0.22),
+    var(--sombra-alta);
+}
+.decision--elige .opcion--proponer.opcion--elegida .opcion-ic,
+.decision--elige .opcion--proponer.opcion--elegida::after {
+  background: var(--orange);
+  color: #fff;
+}
+.decision--elige .opcion--proponer.opcion--elegida .opcion-tit {
+  color: #8a5a00;
+}
+
+.decision--elige .opcion--elegida .opcion-det {
+  color: var(--text-mid);
+}

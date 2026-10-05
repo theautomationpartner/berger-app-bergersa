@@ -48,7 +48,9 @@ export function DetallePago({ pago }: Props) {
           <div className="dato">
             <span className="dato-lbl">Estado del pago</span>
             <span className="dato-val">
-              <span className={`chip ${tonoEstadoPago(pago.estadoPago)}`}>{pago.estadoPago || '—'}</span>
+              <span className={`chip ${tonoEstadoPago(pago.estadoPago)}`}>
+                {pago.estadoPago || '—'}
+              </span>
             </span>
           </div>
           <div className="dato">
@@ -76,13 +78,7 @@ export function DetallePago({ pago }: Props) {
         {adjuntos.length > 0 && (
           <div className="adjuntos">
             {adjuntos.map((a) => (
-              <a
-                key={a.etiqueta}
-                className="adjunto"
-                href={a.url}
-                target="_blank"
-                rel="noreferrer"
-              >
+              <a key={a.etiqueta} className="adjunto" href={a.url} target="_blank" rel="noreferrer">
                 <i className="fa-solid fa-file-pdf" aria-hidden="true" />
                 <span>{a.etiqueta}</span>
                 <i className="fa-solid fa-arrow-up-right-from-square xs" aria-hidden="true" />

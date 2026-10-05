@@ -51,7 +51,11 @@ export function Ingreso({ cliente, usuarioId, children }: Props) {
           titulo="No se pudo verificar el acceso"
           bajada="Hubo un problema de conexión. Probá de nuevo en unos minutos."
         >
-          <button type="button" className="btn btn--marca ingreso-accion" onClick={ingreso.reintentar}>
+          <button
+            type="button"
+            className="btn btn--marca ingreso-accion"
+            onClick={ingreso.reintentar}
+          >
             <i className="fa-solid fa-rotate" aria-hidden="true" /> Reintentar
           </button>
         </MarcoIngreso>

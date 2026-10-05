@@ -1,15 +1,26 @@
 import type { MesAnio } from '@/types'
 
 const NOMBRES = [
-  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
 ]
 
 /** Cuántos meses hacia atrás y hacia adelante del mes actual ofrece el filtro. */
 export const MESES_ALREDEDOR = 12
 
 /** Clave estable de un mes (`2026-09`). Es lo que se guarda en el filtro y lo que se compara. */
-export const claveMes = ({ anio, mes }: MesAnio): string => `${anio}-${String(mes).padStart(2, '0')}`
+export const claveMes = ({ anio, mes }: MesAnio): string =>
+  `${anio}-${String(mes).padStart(2, '0')}`
 
 /** Rótulo de la etiqueta del filtro: "septiembre 2026". */
 export const rotuloMes = ({ anio, mes }: MesAnio): string => `${NOMBRES[mes - 1] ?? ''} ${anio}`

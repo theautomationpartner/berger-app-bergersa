@@ -92,7 +92,8 @@ export function ConfirmarProponerFecha() {
       if (!decision || !tieneConfirmacion(t)) continue
       try {
         await decidirFecha(t, decision)
-        if (decision.tipo === 'confirmar') confirmados.push(`${t.nombre} · ${fechaCorta(t.fechaProd)}`)
+        if (decision.tipo === 'confirmar')
+          confirmados.push(`${t.nombre} · ${fechaCorta(t.fechaProd)}`)
         else propuestos.push(`${t.nombre} · ${fechaCorta(decision.fecha)}`)
       } catch (e) {
         advertencias.push(`No se pudo guardar la decisión de ${t.nombre}: ${mensaje(e)}`)

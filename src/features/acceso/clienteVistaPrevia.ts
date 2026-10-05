@@ -23,7 +23,8 @@ const azar = (n: number) =>
 const pausa = () => new Promise((r) => setTimeout(r, 450))
 
 /** `?vista-previa=verificar` muestra el día a día; sin valor, la primera vez. */
-const yaConfigurado = new URLSearchParams(window.location.search).get('vista-previa') === 'verificar'
+const yaConfigurado =
+  new URLSearchParams(window.location.search).get('vista-previa') === 'verificar'
 
 export const clienteVistaPrevia: ClienteIngreso = {
   async pedir(pedido): Promise<RespuestaIngreso> {

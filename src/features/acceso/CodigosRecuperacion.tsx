@@ -48,11 +48,20 @@ export function CodigosRecuperacion({ codigos, onEntrar }: Props) {
       </button>
 
       <label className="ingreso-check">
-        <input type="checkbox" checked={guardados} onChange={(e) => setGuardados(e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={guardados}
+          onChange={(e) => setGuardados(e.target.checked)}
+        />
         <span>Ya guardé los códigos en un lugar seguro</span>
       </label>
 
-      <button type="button" className="btn btn--marca ingreso-accion" disabled={!guardados} onClick={onEntrar}>
+      <button
+        type="button"
+        className="btn btn--marca ingreso-accion"
+        disabled={!guardados}
+        onClick={onEntrar}
+      >
         Entrar a la app <i className="fa-solid fa-arrow-right" aria-hidden="true" />
       </button>
     </MarcoIngreso>

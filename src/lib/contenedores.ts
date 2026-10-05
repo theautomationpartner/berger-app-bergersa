@@ -1,7 +1,4 @@
-import {
-  CONTENEDOR_CUALQUIERA,
-  RUEDAS_CONTENEDOR,
-} from '@/services/monday/columns'
+import { CONTENEDOR_CUALQUIERA, RUEDAS_CONTENEDOR } from '@/services/monday/columns'
 import type {
   ContenedorArmado,
   OpcionContenedor,
@@ -32,7 +29,10 @@ import { textoOrigen } from './puertos'
  */
 export function tiposDeContenedor(tipo: string): string[] {
   if (!tipo || tipo === CONTENEDOR_CUALQUIERA) return [tipo || 'Contenedor']
-  const partes = tipo.split('+').map((x) => x.trim()).filter(Boolean)
+  const partes = tipo
+    .split('+')
+    .map((x) => x.trim())
+    .filter(Boolean)
   return partes.length > 0 ? partes : [tipo]
 }
 
@@ -60,7 +60,9 @@ export function ruedasCompatibles(ruedasOpcion: string, rodadoTractor: string): 
 const opcionesPara = (tractor: Tractor, opciones: OpcionContenedor[]): OpcionContenedor[] =>
   tractor.catalogoId
     ? opciones.filter(
-        (o) => o.catalogo.includes(tractor.catalogoId!) && ruedasCompatibles(o.ruedas, tractor.estadoRodado),
+        (o) =>
+          o.catalogo.includes(tractor.catalogoId!) &&
+          ruedasCompatibles(o.ruedas, tractor.estadoRodado),
       )
     : []
 
@@ -187,7 +189,13 @@ export const TITULO_DESPACHANTE = 'Informacion para Despachante:'
 
 /** Un tractor, como se lo nombra en el reporte: nombre, número interno y modelo. */
 const lineaTractor = (t: Tractor): string =>
-  [t.nombre, t.numInterno && `N° ${t.numInterno}`, t.modelo, t.estadoRodado, fechaCorta(t.fechaProd)]
+  [
+    t.nombre,
+    t.numInterno && `N° ${t.numInterno}`,
+    t.modelo,
+    t.estadoRodado,
+    fechaCorta(t.fechaProd),
+  ]
     .filter(Boolean)
     .join(' · ')
 
@@ -209,7 +217,8 @@ export function reporteContenedores(
   titulo: string,
   puertos: string[] = [],
 ): string {
-  const tractores = resumen.armados.reduce((n, a) => n + a.tractores.length, 0) + resumen.sinContenedor.length
+  const tractores =
+    resumen.armados.reduce((n, a) => n + a.tractores.length, 0) + resumen.sinContenedor.length
   const desglose = desgloseDeContenedores(resumen)
 
   const lineas: string[] = [titulo, '', TITULO_BERGER, '']

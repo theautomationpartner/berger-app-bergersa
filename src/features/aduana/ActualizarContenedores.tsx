@@ -359,7 +359,7 @@ export function ActualizarContenedores() {
 
         {/* Los dos trabajos, como dos tarjetas grandes: es la primera decisión de la pantalla y
             define todo lo que viene abajo, así que no puede ser un chip perdido entre filtros. */}
-        <div className="decision decision--grande">
+        <div className="decision decision--grande decision--elige">
           <button
             type="button"
             aria-pressed={trabajo === 'entrega'}

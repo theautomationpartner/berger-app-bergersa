@@ -1,9 +1,4 @@
-import {
-  COL_PAGO,
-  INV_ESTADO,
-  PAGO_ESTADO,
-  PAGO_OPERACION,
-} from '@/services/monday/columns'
+import { COL_PAGO, INV_ESTADO, PAGO_ESTADO, PAGO_OPERACION } from '@/services/monday/columns'
 import type { FlujoAvance } from '@/types'
 
 /**

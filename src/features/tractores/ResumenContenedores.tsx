@@ -31,7 +31,13 @@ function LineaTractor({ tractor, sugerido = false }: { tractor: Tractor; sugerid
  *
  * Lo que se ve acá es lo mismo que queda guardado en el pago como reporte para el proveedor.
  */
-export function ResumenContenedores({ resumen, cargando, error, onReintentar, seleccionados }: Props) {
+export function ResumenContenedores({
+  resumen,
+  cargando,
+  error,
+  onReintentar,
+  seleccionados,
+}: Props) {
   if (seleccionados === 0) return null
 
   if (cargando) {
@@ -102,7 +108,9 @@ export function ResumenContenedores({ resumen, cargando, error, onReintentar, se
                 <span className="chip chip--violeta">{armado.opcion.ruedas}</span>
                 <span className={`chip ${completo ? 'chip--verde' : 'chip--ambar'} cont-carga`}>
                   {armado.tractores.length} de {armado.opcion.capacidad}
-                  {completo ? ' · completo' : ` · ${armado.libres} libre${armado.libres === 1 ? '' : 's'}`}
+                  {completo
+                    ? ' · completo'
+                    : ` · ${armado.libres} libre${armado.libres === 1 ? '' : 's'}`}
                 </span>
               </div>
 
@@ -113,8 +121,8 @@ export function ResumenContenedores({ resumen, cargando, error, onReintentar, se
               {armado.sugerencias.length > 0 && (
                 <div className="cont-sugerencia">
                   <span className="cont-sugerencia-tit">
-                    <i className="fa-solid fa-lightbulb" aria-hidden="true" /> Para completarlo podés
-                    sumar:
+                    <i className="fa-solid fa-lightbulb" aria-hidden="true" /> Para completarlo
+                    podés sumar:
                   </span>
                   {armado.sugerencias.map((t) => (
                     <LineaTractor key={t.id} tractor={t} sugerido />

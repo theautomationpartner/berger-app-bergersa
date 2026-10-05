@@ -71,8 +71,8 @@ export function ConfigurarAutenticador({
       titulo="Configurá tu verificación"
       bajada={
         <>
-          Hola <b>{perfil.nombre}</b>. Es la primera vez que entrás: vinculá tu verificación una sola
-          vez y después sólo te vamos a pedir un código de 6 dígitos por día.
+          Hola <b>{perfil.nombre}</b>. Es la primera vez que entrás: vinculá tu verificación una
+          sola vez y después sólo te vamos a pedir un código de 6 dígitos por día.
         </>
       }
     >
@@ -113,7 +113,12 @@ export function ConfigurarAutenticador({
 
           <div className="ingreso-qr">
             {qr ? (
-              <img src={qr} alt="Código QR para vincular el autenticador" width={220} height={220} />
+              <img
+                src={qr}
+                alt="Código QR para vincular el autenticador"
+                width={220}
+                height={220}
+              />
             ) : (
               <span className="spin spin--oscuro" aria-hidden="true" />
             )}
@@ -136,7 +141,10 @@ export function ConfigurarAutenticador({
                   className="btn btn--borde btn--chico"
                   onClick={() => void copiar()}
                 >
-                  <i className={`fa-solid ${copiado ? 'fa-check' : 'fa-copy'}`} aria-hidden="true" />
+                  <i
+                    className={`fa-solid ${copiado ? 'fa-check' : 'fa-copy'}`}
+                    aria-hidden="true"
+                  />
                   {copiado ? 'Copiada' : 'Copiar'}
                 </button>
               </div>

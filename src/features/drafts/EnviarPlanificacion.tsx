@@ -38,7 +38,8 @@ export function EnviarPlanificacion() {
     [listos, busqueda],
   )
   const elegidos = useMemo(
-    () => seleccion.map((id) => listos.find((d) => d.id === id)).filter((d): d is Draft => Boolean(d)),
+    () =>
+      seleccion.map((id) => listos.find((d) => d.id === id)).filter((d): d is Draft => Boolean(d)),
     [seleccion, listos],
   )
 

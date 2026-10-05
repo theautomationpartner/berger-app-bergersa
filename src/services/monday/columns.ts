@@ -42,6 +42,8 @@ export const TABLEROS = {
   cuentas: '18428421094',
   /** Concesionarios: a quién se le asigna una cuenta. */
   concesionarios: '18428606865',
+  /** 🗓️Actividades: cada contacto con un cliente, hecho o por hacer. */
+  actividades: '18428421092',
   /**
    * 🔒Lista Blanca — quién entra a la app y a qué.
    *
@@ -963,4 +965,29 @@ export const COL_CONTACTO = {
 export const CRM = {
   CUENTA_ACTIVA: 'Activa',
   CONTACTO_ACTIVO: 'Activo',
+} as const
+
+/**
+ * 🗓️Actividades (18428421092) — lo que se habló con un cliente y lo que falta hablar.
+ */
+export const COL_ACTIVIDAD = {
+  tipo: 'activity_type',
+  cuenta: 'board_relation_mm7vq21v',
+  contactos: 'board_relation_mm7vg8ee',
+  /** Quién la hizo. Lo pone la app con el usuario de monday que está usando la pantalla. */
+  responsable: 'activity_owner',
+  fecha: 'activity_start_time',
+  estado: 'activity_status',
+  descripcion: 'long_text_mm7vhfe4',
+} as const
+
+/**
+ * Los dos estados que escribe la app.
+ *
+ * El tablero tiene cinco —Done, Pendiente, Vencida, Abierto, Completada— pero la app sólo usa
+ * estos dos: lo que ya pasó y lo que todavía no. Los otros los mueve quien trabaja el tablero.
+ */
+export const ESTADO_ACTIVIDAD = {
+  COMPLETADA: 'Completada',
+  PENDIENTE: 'Pendiente',
 } as const

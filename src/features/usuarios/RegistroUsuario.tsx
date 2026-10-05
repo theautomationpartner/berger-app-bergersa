@@ -166,7 +166,7 @@ export function RegistroUsuario() {
           </span>
         </div>
 
-        <div className="decision decision--grande">
+        <div className="decision decision--grande decision--elige">
           <button
             type="button"
             aria-pressed={trabajo === 'alta'}

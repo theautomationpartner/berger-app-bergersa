@@ -26,6 +26,8 @@ export type OperacionPrincipal =
   | 'fechas'
   /** VENTA · alta de cuentas y contactos en el CRM. */
   | 'clientes'
+  /** VENTA · las actividades con cada cliente. */
+  | 'actividades'
 
 /** Operaciones dentro de "Fechas de Producción Inventario". */
 export type OperacionFechas = 'confirmar' | 'enviar'

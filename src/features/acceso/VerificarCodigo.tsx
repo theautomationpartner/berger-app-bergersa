@@ -25,11 +25,14 @@ export function VerificarCodigo({ perfil, mensaje, enviando, onVerificar }: Prop
       titulo={recuperacion ? 'Código de recuperación' : 'Código de verificación'}
       bajada={
         recuperacion ? (
-          <>Escribí uno de los 10 códigos que guardaste al configurar la verificación. Cada uno sirve una sola vez.</>
+          <>
+            Escribí uno de los 10 códigos que guardaste al configurar la verificación. Cada uno
+            sirve una sola vez.
+          </>
         ) : (
           <>
-            Hola <b>{perfil.nombre}</b>. Abrí la app de autenticación en tu celular y escribí el código
-            de 6 dígitos de <b>BERGER S.A.</b>
+            Hola <b>{perfil.nombre}</b>. Abrí la app de autenticación en tu celular y escribí el
+            código de 6 dígitos de <b>BERGER S.A.</b>
           </>
         )
       }
@@ -54,7 +57,11 @@ export function VerificarCodigo({ perfil, mensaje, enviando, onVerificar }: Prop
             value={codigoRecuperacion}
             onChange={(e) => setCodigoRecuperacion(e.target.value.toUpperCase())}
           />
-          <button type="submit" className="btn btn--marca ingreso-accion" disabled={enviando || !codigoRecuperacion.trim()}>
+          <button
+            type="submit"
+            className="btn btn--marca ingreso-accion"
+            disabled={enviando || !codigoRecuperacion.trim()}
+          >
             {enviando ? <span className="spin" aria-hidden="true" /> : 'Ingresar'}
           </button>
         </form>
@@ -83,8 +90,13 @@ export function VerificarCodigo({ perfil, mensaje, enviando, onVerificar }: Prop
             setCodigoRecuperacion('')
           }}
         >
-          <i className={`fa-solid ${recuperacion ? 'fa-mobile-screen' : 'fa-life-ring'}`} aria-hidden="true" />
-          {recuperacion ? 'Usar el código del celular' : '¿Perdiste el celular? Usá un código de recuperación'}
+          <i
+            className={`fa-solid ${recuperacion ? 'fa-mobile-screen' : 'fa-life-ring'}`}
+            aria-hidden="true"
+          />
+          {recuperacion
+            ? 'Usar el código del celular'
+            : '¿Perdiste el celular? Usá un código de recuperación'}
         </button>
       </div>
     </MarcoIngreso>

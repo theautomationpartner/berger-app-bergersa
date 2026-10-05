@@ -116,6 +116,17 @@ export const OPERACIONES_PRINCIPALES: (OpcionPanel<OperacionPrincipal> & {
       'lugar donde se controla que el CUIT esté bien y que no haya duplicados.',
     icono: 'fa-solid fa-address-book',
   },
+  {
+    id: 'actividades',
+    area: 'venta',
+    modulo: 'ventas',
+    titulo: 'ACTIVIDADES',
+    corto: 'Actividades',
+    detalle:
+      'Lo que se habló con un cliente y lo que falta hablar: llamadas, WhatsApp, visitas y ' +
+      'reuniones, con quién y cuándo.',
+    icono: 'fa-solid fa-calendar-check',
+  },
 ]
 
 /** Las operaciones principales de un área que puede ver este perfil. */

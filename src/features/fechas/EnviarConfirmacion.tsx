@@ -261,7 +261,9 @@ export function EnviarConfirmacion() {
                   <span className="tarjeta-rot">Fechas que se proponen</span>
                   <span className="tarjeta-det">Tienen una fecha propuesta distinta</span>
                 </div>
-                <div className={`tarjeta ${resumen.inventarioActualizado ? 'tarjeta--verde' : 'tarjeta--rojo'}`}>
+                <div
+                  className={`tarjeta ${resumen.inventarioActualizado ? 'tarjeta--verde' : 'tarjeta--rojo'}`}
+                >
                   <span className="tarjeta-ic">
                     <i className="fa-solid fa-boxes-stacked" aria-hidden="true" />
                   </span>
@@ -270,7 +272,9 @@ export function EnviarConfirmacion() {
                   </span>
                   <span className="tarjeta-rot">Inventario</span>
                 </div>
-                <div className={`tarjeta ${resumen.planillaCreada ? 'tarjeta--verde' : 'tarjeta--rojo'}`}>
+                <div
+                  className={`tarjeta ${resumen.planillaCreada ? 'tarjeta--verde' : 'tarjeta--rojo'}`}
+                >
                   <span className="tarjeta-ic">
                     <i className="fa-solid fa-table" aria-hidden="true" />
                   </span>
@@ -285,8 +289,8 @@ export function EnviarConfirmacion() {
                 <div className="aviso aviso--info">
                   <i className="fa-solid fa-paper-plane" aria-hidden="true" />
                   <span>
-                    El envío de esta confirmación ya está en <b>{elegida.estadoPropuesta}</b>. Volver
-                    a mandarla no agrega nada: esperá a que la automatización termine.
+                    El envío de esta confirmación ya está en <b>{elegida.estadoPropuesta}</b>.
+                    Volver a mandarla no agrega nada: esperá a que la automatización termine.
                   </span>
                 </div>
               )}
@@ -296,8 +300,8 @@ export function EnviarConfirmacion() {
                   <i className="fa-solid fa-hourglass-half" aria-hidden="true" />
                   <span>
                     <b>Todavía no se puede mandar.</b> Hace falta que el Inventario esté{' '}
-                    <b>Actualizado</b> y que la planilla esté <b>Creada</b>. Son dos automatizaciones
-                    del tablero: esperá a que terminen y volvé a actualizar.
+                    <b>Actualizado</b> y que la planilla esté <b>Creada</b>. Son dos
+                    automatizaciones del tablero: esperá a que terminen y volvé a actualizar.
                   </span>
                 </div>
               )}
@@ -374,12 +378,16 @@ export function EnviarConfirmacion() {
 
                 {incrustable ? (
                   <>
-                    <iframe className="planilla" src={incrustable} title="Planilla de la confirmación" />
+                    <iframe
+                      className="planilla"
+                      src={incrustable}
+                      title="Planilla de la confirmación"
+                    />
                     <div className="aviso aviso--info" style={{ margin: 12 }}>
                       <i className="fa-solid fa-circle-info" aria-hidden="true" />
                       <span>
-                        Si el recuadro aparece vacío, es porque Google pide iniciar sesión dentro del
-                        iframe. Abrí la planilla con el botón de arriba y revisala ahí.
+                        Si el recuadro aparece vacío, es porque Google pide iniciar sesión dentro
+                        del iframe. Abrí la planilla con el botón de arriba y revisala ahí.
                       </span>
                     </div>
                   </>
@@ -413,7 +421,9 @@ export function EnviarConfirmacion() {
 
       <footer className="pie">
         <div className="pie-info">
-          <span className="font-b">{elegida ? elegida.nombre : 'Ninguna confirmación elegida'}</span>
+          <span className="font-b">
+            {elegida ? elegida.nombre : 'Ninguna confirmación elegida'}
+          </span>
           <span className="xs">
             {resumen
               ? `${resumen.confirmados.length} a confirmar · ${resumen.propuestos.length} a proponer`

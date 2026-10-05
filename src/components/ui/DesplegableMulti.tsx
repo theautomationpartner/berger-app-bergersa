@@ -11,6 +11,13 @@ interface Props {
   bloqueado?: boolean
   /** Si la lista es larga, aparece un buscador arriba. */
   buscable?: boolean
+  /**
+   * No muestra nada hasta que se escribe.
+   *
+   * Para listas que crecen sin techo —los contactos del CRM— desplegar las primeras doscientas no
+   * ayuda: la que se busca nunca está entre las que se ven.
+   */
+  soloAlBuscar?: boolean
   id?: string
 }
 
@@ -36,6 +43,7 @@ export function DesplegableMulti({
   vacio = 'Elegir…',
   bloqueado,
   buscable,
+  soloAlBuscar,
   id,
 }: Props) {
   const lista = useMemo(() => opciones.map(normalizar), [opciones])
@@ -52,12 +60,14 @@ export function DesplegableMulti({
 
   const visibles = useMemo(() => {
     const texto = busqueda.trim().toLowerCase()
-    if (!texto) return lista
+    /* Las ya tildadas se muestran igual: si no, lo elegido desaparece de la lista al cerrar el
+       buscador y parece que se perdió. */
+    if (!texto) return soloAlBuscar ? lista.filter((o) => valores.includes(o.valor)) : lista
     return lista.filter(
       (o) =>
         o.rotulo.toLowerCase().includes(texto) || (o.detalle ?? '').toLowerCase().includes(texto),
     )
-  }, [lista, busqueda])
+  }, [lista, busqueda, soloAlBuscar, valores])
 
   const elegidas = lista.filter((o) => valores.includes(o.valor))
   const rotulo = elegidas.map((o) => o.rotulo).join(', ')
@@ -156,7 +166,13 @@ export function DesplegableMulti({
               )
             })}
 
-            {visibles.length === 0 && <li className="desp-vacio">Nada coincide</li>}
+            {visibles.length === 0 && (
+              <li className="desp-vacio">
+                {soloAlBuscar && !busqueda.trim()
+                  ? `Escribí para buscar entre ${lista.length}.`
+                  : 'Nada coincide'}
+              </li>
+            )}
           </ul>
 
           {/* Vaciar de una: destildar seis categorías de a una es seis clics. */}
