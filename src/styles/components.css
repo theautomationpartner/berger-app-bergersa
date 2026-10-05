@@ -1456,3 +1456,101 @@
   background: var(--berger-red-soft);
   color: var(--berger-red);
 }
+
+/* ===== Interruptor ===== */
+
+/*
+ * Un sí/no que ABRE algo, no un campo más.
+ *
+ * El caso es "¿querés dejar agendada la próxima?": la mayoría de las veces la respuesta es no, y
+ * mostrar los cuatro campos de la actividad futura siempre haría parecer que hay que llenarlos.
+ * Con el interruptor apagado la pantalla termina donde terminaba antes.
+ */
+.interruptor {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+.interruptor:hover {
+  border-color: var(--border);
+  background: #fcfcfd;
+}
+.interruptor:focus-visible {
+  outline: 2px solid var(--primary-blue);
+  outline-offset: 2px;
+}
+.interruptor-palanca {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  width: 40px;
+  height: 23px;
+  padding: 3px;
+  border-radius: 999px;
+  background: #c8cdd9;
+  transition: background 0.16s ease;
+}
+.interruptor-palanca--on {
+  background: var(--primary-blue);
+}
+.interruptor-bolita {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.3);
+  transition: transform 0.16s ease;
+}
+.interruptor-palanca--on .interruptor-bolita {
+  transform: translateX(17px);
+}
+.interruptor-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.interruptor-tit {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+.interruptor-det {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-gray);
+}
+
+/* La actividad que queda agendada: en azul y con borde punteado, porque todavía no existe. */
+.proyectada {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+.proyectada-caja {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1.5px dashed #a9cff6;
+  border-radius: 12px;
+  background: #f4f9ff;
+}
+.proyectada-tit {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0a4f9e;
+}
+.proyectada-tit small {
+  font-weight: 600;
+  color: var(--text-gray);
+}

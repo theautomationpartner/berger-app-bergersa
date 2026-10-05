@@ -19,6 +19,7 @@ import {
   etiquetasDeActividad,
   faltaParaLaActividad,
   hoyEnArgentina,
+  nombreDeActividad,
 } from '@/services/monday/actividades'
 import { ESTADO_ACTIVIDAD } from '@/services/monday/columns'
 import {
@@ -40,6 +41,9 @@ const VACIA = {
   contactoIds: [] as string[],
 }
 
+/** La actividad futura arranca sin fecha: la de hoy no le serviría, tiene que ser posterior. */
+const PROYECTADA_VACIA = { tipo: '', fecha: '', hora: '', descripcion: '' }
+
 export function Actividades() {
   const [cuentas, setCuentas] = useState<CuentaCrm[]>([])
   const [contactos, setContactos] = useState<ContactoCrm[]>([])
@@ -54,6 +58,17 @@ export function Actividades() {
   const [datos, setDatos] = useState(VACIA)
   /** El estado elegido a mano. Vacío = el que corresponde por la fecha. */
   const [estadoElegido, setEstadoElegido] = useState('')
+
+  /**
+   * La actividad que queda agendada a partir de ésta.
+   *
+   * De una llamada que ya se hizo casi siempre sale un "lo vuelvo a llamar el martes". Si eso hay
+   * que cargarlo en una segunda vuelta por la misma pantalla, no se carga: se anota en un papel.
+   * Acá sale junto con la que se está cerrando, y queda como una actividad aparte —pendiente— en
+   * el mismo cliente y con los mismos contactos.
+   */
+  const [proyectar, setProyectar] = useState(false)
+  const [proyectada, setProyectada] = useState(PROYECTADA_VACIA)
 
   const recargar = useCallback(async () => {
     setCargando(true)
@@ -88,6 +103,9 @@ export function Actividades() {
     [contactos, datos.cuentaId],
   )
 
+  /* El primer día que acepta la actividad proyectada. */
+  const manana = new Date(Date.now() + 864e5).toISOString().slice(0, 10)
+
   const futura = esFutura(datos.fecha)
   const sugerido = estadoSegunFecha(datos.fecha)
 
@@ -100,8 +118,26 @@ export function Actividades() {
     if (esFutura(fecha) && estadoElegido === ESTADO_ACTIVIDAD.COMPLETADA) setEstadoElegido('')
   }
 
-  const paraMonday = { ...datos, estado }
+  const nombreCuenta = cuentas.find((c) => c.id === datos.cuentaId)?.nombre ?? ''
+  const paraMonday = { ...datos, estado, cuentaNombre: nombreCuenta }
   const faltan = faltaParaLaActividad(paraMonday)
+
+  /* ---------------- la actividad proyectada ---------------- */
+
+  /* Sólo tiene sentido después de algo que ya pasó: de una llamada hecha sale "lo vuelvo a llamar
+     el martes". Si la de arriba todavía no ocurrió, agendar su continuación es adivinar. */
+  const puedeProyectar = estado === ESTADO_ACTIVIDAD.COMPLETADA
+
+  const faltanProyectada = !proyectar
+    ? []
+    : [
+        ...(proyectada.tipo ? [] : ['el tipo de la actividad futura']),
+        ...(proyectada.fecha ? [] : ['la fecha de la actividad futura']),
+        ...(proyectada.hora ? [] : ['la hora de la actividad futura']),
+        ...(proyectada.fecha && !esFutura(proyectada.fecha)
+          ? ['que la actividad futura sea posterior a hoy']
+          : []),
+      ]
 
   const guardar = async () => {
     setEnviando(true)
@@ -109,10 +145,34 @@ export function Actividades() {
     setHecho(null)
     try {
       const r = await crearActividad(paraMonday)
-      const cuenta = cuentas.find((c) => c.id === datos.cuentaId)?.nombre ?? 'la cuenta'
-      setHecho(`${r.nombre} quedó cargada en ${cuenta} como ${estado}.`)
+      const donde = nombreCuenta || 'la cuenta'
+
+      /* La proyectada se crea después y por separado: es otra actividad, con su propia fecha y su
+         propio estado. Si falla, la de arriba ya quedó: se dice y no se finge que no se creó nada. */
+      if (proyectar && faltanProyectada.length === 0) {
+        try {
+          const p = await crearActividad({
+            ...proyectada,
+            estado: ESTADO_ACTIVIDAD.PENDIENTE,
+            cuentaId: datos.cuentaId,
+            cuentaNombre: nombreCuenta,
+            contactoIds: datos.contactoIds,
+          })
+          setHecho(
+            `${r.nombre} quedó ${estado.toLowerCase()} en ${donde}, y ${p.nombre} quedó agendada como ${ESTADO_ACTIVIDAD.PENDIENTE}.`,
+          )
+        } catch (e) {
+          setHecho(`${r.nombre} quedó ${estado.toLowerCase()} en ${donde}.`)
+          setErrorEnvio(`La actividad futura no se pudo crear: ${mensaje(e)}`)
+        }
+      } else {
+        setHecho(`${r.nombre} quedó ${estado.toLowerCase()} en ${donde}.`)
+      }
+
       setDatos({ ...VACIA, cuentaId: datos.cuentaId })
       setEstadoElegido('')
+      setProyectar(false)
+      setProyectada(PROYECTADA_VACIA)
     } catch (e) {
       setErrorEnvio(mensaje(e))
     } finally {
@@ -292,9 +352,116 @@ export function Actividades() {
               />
             </label>
 
-            {faltan.length > 0 && (
+            {/* ---- la actividad que queda agendada ---- */}
+            {puedeProyectar && (
+              <div className="proyectada">
+                <button
+                  type="button"
+                  className="interruptor"
+                  role="switch"
+                  aria-checked={proyectar}
+                  onClick={() => setProyectar((v) => !v)}
+                >
+                  <span
+                    className={`interruptor-palanca${proyectar ? ' interruptor-palanca--on' : ''}`}
+                  >
+                    <span className="interruptor-bolita" />
+                  </span>
+                  <span className="interruptor-txt">
+                    <span className="interruptor-tit">¿Querés dejar agendada la próxima?</span>
+                    <span className="interruptor-det">
+                      Se crea como una actividad <b>aparte</b>, pendiente, en el mismo cliente y con
+                      los mismos contactos.
+                    </span>
+                  </span>
+                </button>
+
+                {proyectar && (
+                  <div className="proyectada-caja">
+                    <span className="proyectada-tit">
+                      <i className="fa-solid fa-calendar-plus" aria-hidden="true" /> Actividad
+                      proyectada
+                      <small> · tiene que ser posterior a hoy</small>
+                    </span>
+
+                    <div className="datos datos--form">
+                      <div className="campo">
+                        <span className="campo-lbl">
+                          Tipo de actividad <span className="campo-req">· obligatorio</span>
+                        </span>
+                        <Desplegable
+                          valor={proyectada.tipo}
+                          opciones={opciones.tipos}
+                          vacio="Elegir…"
+                          bloqueado={cargando}
+                          onCambiar={(v) => setProyectada({ ...proyectada, tipo: v })}
+                        />
+                      </div>
+
+                      <label className="campo">
+                        <span className="campo-lbl">
+                          Fecha <span className="campo-req">· obligatorio</span>
+                        </span>
+                        <input
+                          className="input"
+                          type="date"
+                          /* El navegador no deja elegir una fecha pasada: es más rápido que
+                             dejarlo elegir y después decirle que no. */
+                          min={manana}
+                          value={proyectada.fecha}
+                          onChange={(e) => setProyectada({ ...proyectada, fecha: e.target.value })}
+                        />
+                      </label>
+
+                      <label className="campo">
+                        <span className="campo-lbl">
+                          Hora <span className="campo-req">· obligatorio</span>
+                        </span>
+                        <input
+                          className="input"
+                          type="time"
+                          value={proyectada.hora}
+                          onChange={(e) => setProyectada({ ...proyectada, hora: e.target.value })}
+                        />
+                      </label>
+                    </div>
+
+                    <label className="campo campo--suelto">
+                      <span className="campo-lbl">Resolución / observaciones</span>
+                      <textarea
+                        className="input textarea"
+                        rows={3}
+                        placeholder="Qué hay que resolver, qué se acordó, qué quedó pendiente."
+                        value={proyectada.descripcion}
+                        onChange={(e) =>
+                          setProyectada({ ...proyectada, descripcion: e.target.value })
+                        }
+                      />
+                    </label>
+
+                    {nombreCuenta && proyectada.tipo && proyectada.fecha && (
+                      <span className="campo-ayuda campo-ayuda--ok">
+                        Va a quedar como{' '}
+                        <b>
+                          {nombreDeActividad(
+                            nombreCuenta,
+                            proyectada.tipo,
+                            proyectada.fecha,
+                            proyectada.hora,
+                          )}
+                        </b>
+                        .
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {[...faltan, ...faltanProyectada].length > 0 && (
               <span className="campo-ayuda campo-ayuda--falta" style={{ marginTop: 8 }}>
-                <i className="fa-solid fa-lock" aria-hidden="true" /> Falta {faltan.join(', ')}.
+                <i className="fa-solid fa-lock" aria-hidden="true" /> Falta{' '}
+                {[...faltan, ...faltanProyectada].join(', ')}.
               </span>
             )}
 
@@ -313,7 +480,7 @@ export function Actividades() {
               <button
                 type="button"
                 className="btn btn--primario"
-                disabled={enviando || cargando || faltan.length > 0}
+                disabled={enviando || cargando || faltan.length + faltanProyectada.length > 0}
                 onClick={() => void guardar()}
               >
                 <i className="fa-solid fa-calendar-check" aria-hidden="true" />{' '}

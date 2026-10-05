@@ -39,6 +39,8 @@ export const esFutura = (fecha: string, hoy = hoyEnArgentina()): boolean =>
 
 export interface AltaActividad {
   tipo: string
+  /** Nombre de la cuenta. Va adelante del nombre del item; no se escribe en ninguna columna. */
+  cuentaNombre: string
   /** `AAAA-MM-DD`. */
   fecha: string
   /** `HH:MM`. Vacío = sin hora. */
@@ -58,15 +60,23 @@ export function faltaParaLaActividad(d: AltaActividad): string[] {
   return faltan
 }
 
+/** `2026-10-06` → `06/10/2026`. Es como se lee una fecha acá, y el nombre es para leer. */
+export function aFechaCorta(iso: string): string {
+  const [a, m, d] = iso.split('-')
+  return a && m && d ? `${d}/${m}/${a}` : iso
+}
+
 /**
- * El nombre del item.
+ * El nombre del item: **cuenta - tipo - fecha**, con la hora si la tiene.
  *
  * monday no acepta items sin nombre, y dejar que cada uno lo escriba termina en "llamada",
- * "Llamada Juan" y "LLAMADO" para lo mismo. Se arma con el tipo y la fecha, que es lo que
- * identifica a una actividad en una lista.
+ * "Llamada Juan" y "LLAMADO" para lo mismo. Con la cuenta adelante, la lista del tablero se puede
+ * ordenar por nombre y queda agrupada por cliente, que es como se la mira.
  */
-export const nombreDeActividad = (tipo: string, fecha: string): string =>
-  [tipo || 'Actividad', fecha].filter(Boolean).join(' · ')
+export const nombreDeActividad = (cuenta: string, tipo: string, fecha: string, hora = ''): string =>
+  [cuenta.trim(), tipo || 'Actividad', [aFechaCorta(fecha), hora].filter(Boolean).join(' ')]
+    .filter(Boolean)
+    .join(' - ')
 
 export async function crearActividad(d: AltaActividad): Promise<{ id: string; nombre: string }> {
   const valores: Record<string, unknown> = {
@@ -96,7 +106,7 @@ export async function crearActividad(d: AltaActividad): Promise<{ id: string; no
   }
 
   const r = await mondayApi<{ create_item: { id: string; name: string } }>('crearActividadCrm', {
-    nombre: nombreDeActividad(d.tipo, d.fecha),
+    nombre: nombreDeActividad(d.cuentaNombre, d.tipo, d.fecha, d.hora),
     valores: JSON.stringify(valores),
   })
   return { id: r.create_item.id, nombre: r.create_item.name }
