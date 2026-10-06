@@ -289,8 +289,16 @@ export interface AltaContacto {
   paisCodigo: string
   paisNombre: string
   comentarios: string
-  /** Cuenta a la que se conecta. Vacío = contacto suelto. */
+  /** Cuenta a la que se conecta al crearlo. Vacío = contacto suelto. */
   cuentaId: string
+  /**
+   * Todas las cuentas a las que pertenece. Lo usa la edición.
+   *
+   * Una misma persona puede comprar para dos empresas: es un solo contacto con dos cuentas, no dos
+   * contactos iguales. Al crearlo se elige una —es lo normal— y al corregirlo se pueden sumar las
+   * demás.
+   */
+  cuentaIds?: string[]
 }
 
 /** El nombre del item: "Nombre Apellido". Monday no acepta items sin nombre. */
@@ -463,7 +471,9 @@ export async function actualizarContacto(id: string, d: AltaContacto): Promise<v
     ? { countryCode: d.paisCodigo, countryName: d.paisNombre }
     : {}
   valores[COL_CONTACTO.categoria] = d.categorias.length > 0 ? { labels: d.categorias } : {}
-  valores[COL_CONTACTO.cuenta] = { item_ids: d.cuentaId ? [d.cuentaId] : [] }
+  valores[COL_CONTACTO.cuenta] = {
+    item_ids: d.cuentaIds ?? (d.cuentaId ? [d.cuentaId] : []),
+  }
 
   await mondayApi('actualizarContactoCrm', {
     item: id,

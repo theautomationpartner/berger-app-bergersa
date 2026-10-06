@@ -119,7 +119,9 @@ export function CuentasYContactos() {
   const [editandoContacto, setEditandoContacto] = useState('')
   const [formCuenta, setFormCuenta] = useState<DatosCuenta>(CUENTA_VACIA)
   const [formContacto, setFormContacto] = useState<DatosContacto>(CONTACTO_VACIO)
-  const [cuentaDelContacto, setCuentaDelContacto] = useState('')
+  /* Las cuentas del contacto que se está modificando. Son varias porque una misma persona puede
+     comprar para dos empresas: es un contacto con dos cuentas, no dos contactos iguales. */
+  const [cuentasDelContacto, setCuentasDelContacto] = useState<string[]>([])
 
   /** Contactos nuevos que se crean desde el alta de una cuenta, y nacen con ella. */
   const [nuevos, setNuevos] = useState<DatosContacto[]>([])
@@ -252,13 +254,13 @@ export function CuentasYContactos() {
     const c = contactos.find((x) => x.id === id)
     if (c) {
       setFormContacto(aFormularioContacto(c))
-      setCuentaDelContacto(c.cuentaIds[0] ?? '')
+      setCuentasDelContacto(c.cuentaIds)
     }
   }
 
   const faltanEnEdicionCuenta = editandoCuenta ? faltaParaLaCuenta(paraMonday(formCuenta)) : []
   const faltanEnEdicionContacto = editandoContacto
-    ? faltaParaElContacto(datosDeContacto(formContacto, cuentaDelContacto))
+    ? faltaParaElContacto(datosDeContacto(formContacto, cuentasDelContacto[0] ?? ''))
     : []
 
   /* ---------------- guardar ---------------- */
@@ -296,7 +298,10 @@ export function CuentasYContactos() {
         await actualizarCuenta(editandoCuenta, paraMonday(formCuenta))
         setHecho(`Los cambios de ${formCuenta.razonSocial.trim()} quedaron guardados.`)
       } else if (editandoContacto) {
-        await actualizarContacto(editandoContacto, datosDeContacto(formContacto, cuentaDelContacto))
+        await actualizarContacto(editandoContacto, {
+          ...datosDeContacto(formContacto, cuentasDelContacto[0] ?? ''),
+          cuentaIds: cuentasDelContacto,
+        })
         setHecho(
           `Los cambios de ${nombreDeContacto(formContacto.nombres, formContacto.apellidos)} quedaron guardados.`,
         )
@@ -396,7 +401,7 @@ export function CuentasYContactos() {
             'editar',
             'opcion--editar',
             'fa-solid fa-pen-to-square',
-            'Corregir una cuenta o un contacto',
+            'Modificar una cuenta o un contacto',
             'Buscar lo que ya está cargado y cambiarle los datos.',
           )}
         </div>
@@ -777,7 +782,7 @@ export function CuentasYContactos() {
           <div className="card card--flush op-editor" style={{ marginTop: 14 }}>
             <div className="ctitle op-editor-head">
               <span className="op-editor-nom">
-                <i className="fa-solid fa-pen-to-square" aria-hidden="true" /> Corregir datos
+                <i className="fa-solid fa-pen-to-square" aria-hidden="true" /> Modificar datos
               </span>
             </div>
 
@@ -810,7 +815,7 @@ export function CuentasYContactos() {
               {queEditar === 'cuenta' ? (
                 <>
                   <div className="campo">
-                    <span className="campo-lbl">¿Qué cuenta querés corregir?</span>
+                    <span className="campo-lbl">¿Qué cuenta querés modificar?</span>
                     <SelectorBuscable
                       valor={editandoCuenta}
                       opciones={opcionesDeCuenta}
@@ -893,7 +898,7 @@ export function CuentasYContactos() {
               ) : (
                 <>
                   <div className="campo">
-                    <span className="campo-lbl">¿Qué contacto querés corregir?</span>
+                    <span className="campo-lbl">¿Qué contacto querés modificar?</span>
                     <SelectorBuscable
                       valor={editandoContacto}
                       opciones={opcionesDeContacto}
@@ -911,15 +916,28 @@ export function CuentasYContactos() {
                   {editandoContacto && (
                     <>
                       <div className="campo" style={{ marginTop: 14 }}>
-                        <span className="campo-lbl">Cuenta a la que pertenece</span>
-                        <SelectorBuscable
-                          valor={cuentaDelContacto}
+                        <span className="campo-lbl">
+                          {cuentasDelContacto.length === 1
+                            ? 'Cuenta a la que pertenece'
+                            : 'Cuentas a las que pertenece'}
+                        </span>
+                        {/* Primero las que ya tiene, con su CUIT a la vista, y abajo el buscador
+                            para sumar otra: sin el CUIT, "Transporte EVANS" y "Transporte EVANS
+                            S.R.L." se leen igual. */}
+                        <SelectorBuscableMulti
+                          valores={cuentasDelContacto}
                           opciones={opcionesDeCuenta}
-                          vacio="Escribí el nombre o el CUIT"
+                          vacio="Escribí el nombre o el CUIT para sumar otra cuenta"
                           queSon="clientes"
+                          fichasGrandes
                           bloqueado={cargando}
-                          onCambiar={setCuentaDelContacto}
+                          onCambiar={setCuentasDelContacto}
                         />
+                        {cuentasDelContacto.length === 0 && (
+                          <span className="campo-ayuda campo-ayuda--aviso">
+                            Este contacto no está en ninguna cuenta.
+                          </span>
+                        )}
                       </div>
 
                       <div style={{ marginTop: 14 }}>

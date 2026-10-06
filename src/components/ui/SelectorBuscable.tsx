@@ -208,6 +208,14 @@ export function SelectorBuscable({
 interface PropsVarios extends Comun {
   valores: string[]
   onCambiar: (valores: string[]) => void
+  /**
+   * Fichas grandes, con el dato que distingue adentro.
+   *
+   * Para listas de dos o tres —las cuentas de un contacto— la pastilla chica deja afuera
+   * justamente lo que hace falta para estar seguro de cuál es: el CUIT. Para listas largas la
+   * pastilla sigue siendo lo correcto, porque ocho fichas grandes tapan el formulario.
+   */
+  fichasGrandes?: boolean
 }
 
 /**
@@ -224,6 +232,7 @@ export function SelectorBuscableMulti({
   vacio = 'Escribí para buscar',
   queSon,
   limite = 8,
+  fichasGrandes,
   id,
 }: PropsVarios) {
   const [texto, setTexto] = useState('')
@@ -274,10 +283,20 @@ export function SelectorBuscableMulti({
   return (
     <div className="buscable" ref={caja}>
       {elegidas.length > 0 && (
-        <div className="buscable-fichas">
+        <div className={`buscable-fichas${fichasGrandes ? ' buscable-fichas--grandes' : ''}`}>
           {elegidas.map((o) => (
-            <span key={o.valor} className="buscable-ficha">
-              {o.rotulo}
+            <span
+              key={o.valor}
+              className={`buscable-ficha${fichasGrandes ? ' buscable-ficha--grande' : ''}`}
+            >
+              {fichasGrandes ? (
+                <span className="buscable-ficha-txt">
+                  <span className="buscable-ficha-rot">{o.rotulo}</span>
+                  {o.detalle && <span className="buscable-ficha-det">{o.detalle}</span>}
+                </span>
+              ) : (
+                o.rotulo
+              )}
               <button
                 type="button"
                 aria-label={`Quitar ${o.rotulo}`}

@@ -2068,3 +2068,55 @@
 .interruptor--chico .interruptor-tit {
   font-size: 13px;
 }
+
+/*
+ * Fichas grandes: para listas de dos o tres, donde lo que hace falta para estar seguro de cuál es
+ * no entra en una pastilla. La cuenta de un contacto es el caso: sin el CUIT, "Transporte EVANS"
+ * y "Transporte EVANS S.R.L." se leen igual.
+ */
+.buscable-fichas--grandes {
+  flex-direction: column;
+  gap: 8px;
+}
+.buscable-ficha--grande {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px 11px 14px;
+  border-radius: 10px;
+  background: #e6f1fd;
+  border: 1.5px solid #a9cff6;
+  color: var(--text-dark);
+  font-weight: 600;
+}
+.buscable-ficha-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.buscable-ficha-rot {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0a4f9e;
+}
+.buscable-ficha-det {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-mid);
+}
+.buscable-ficha--grande button {
+  width: 26px;
+  height: 26px;
+  background: #fff;
+  border: 1px solid #a9cff6;
+  color: #0a4f9e;
+  font-size: 12px;
+}
+.buscable-ficha--grande button:hover {
+  background: var(--berger-red-soft);
+  border-color: var(--berger-red-bd);
+  color: var(--berger-red);
+}
