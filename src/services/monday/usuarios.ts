@@ -244,12 +244,19 @@ async function estaSuscripto(tablero: string, usuarioId: string): Promise<boolea
  * que salió bien.
  */
 async function buscarConPaciencia(email: string): Promise<string> {
+  const buscado = email.trim().toLowerCase()
   const esperas = [0, 1500, 3000]
   for (const espera of esperas) {
     if (espera > 0) await esperar(espera)
-    const r = await mondayApi<{ users: { id: string }[] | null }>('usuarioPorEmail', { email })
-    const id = r.users?.[0]?.id
-    if (id) return String(id)
+    const r = await mondayApi<{ users: { id: string; email: string }[] | null }>(
+      'usuarioPorEmail',
+      { email },
+    )
+    /* Se comprueba el email del que vuelve, no se toma el primero de la lista. Es barato y cierra
+       la puerta a la peor falla posible de esta pantalla: tocarle el equipo, los tableros o el
+       acceso a OTRA persona porque monday devolvió algo inesperado. */
+    const encontrado = (r.users ?? []).find((u) => u.email?.trim().toLowerCase() === buscado)
+    if (encontrado?.id) return String(encontrado.id)
   }
   return ''
 }
@@ -269,7 +276,10 @@ async function buscarConPaciencia(email: string): Promise<string> {
  * Devuelve el motivo si no se pudo, o `''` si quedó.
  */
 async function suscribirConPaciencia(tablero: string, usuarioId: string): Promise<string> {
-  const esperas = [0, 1500, 4000]
+  /* Hasta medio minuto. Parece mucho para una pantalla, pero el alta de un usuario se hace una
+     vez y lo que está en juego es que entre o no entre: esperar es más barato que descubrir
+     después que el despachante está en su equipo y no ve ningún tablero. */
+  const esperas = [0, 2000, 5000, 10000, 15000]
   let ultimo = ''
   for (const espera of esperas) {
     if (espera > 0) await esperar(espera)
@@ -395,7 +405,14 @@ export async function altaCompleta(
         continue
       }
       const problema = await suscribirConPaciencia(tablero, usuarioId)
-      if (problema) advertencias.push(`No se lo pudo suscribir a ${etiqueta}: ${problema}`)
+      if (problema) {
+        advertencias.push(
+          `No se lo pudo suscribir a ${etiqueta}. monday contestó "${problema}", que a un invitado ` +
+            'recién creado le pasa por unos segundos. Dale de baja y volvé a darlo de alta, o ' +
+            `sumalo a mano al tablero desde monday. El resto del alta de ${d.nombreCompleto.trim()} ` +
+            'quedó hecho.',
+        )
+      }
     }
   }
 

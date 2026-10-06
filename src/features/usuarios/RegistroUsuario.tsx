@@ -282,8 +282,11 @@ export function RegistroUsuario() {
               <div className="aviso aviso--ok" style={{ marginTop: 14 }}>
                 <i className="fa-solid fa-circle-check" aria-hidden="true" />
                 <span>
-                  <b>{creado}</b> quedó creado en la Lista Blanca. La invitación y los permisos en
-                  monday los manda la automatización; puede tardar un momento.
+                  {/* Lo que dice tiene que ser lo que pasó: antes esto avisaba que la
+                      automatización iba a hacer el resto, y ya no hay automatización. Si algo no
+                      salió, aparece arriba en "Quedó algo sin hacer". */}
+                  <b>{creado}</b> quedó creado en la Lista Blanca, invitado a monday y agregado a su
+                  equipo y a sus tableros.
                 </span>
               </div>
             )}
