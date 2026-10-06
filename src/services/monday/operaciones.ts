@@ -33,6 +33,8 @@ import {
   COL_PAGO,
   COL_PAGO_SUB,
   COL_PLANIF,
+  TABLERO_DE_ETIQUETA,
+  TEAM_DE_ETIQUETA,
   TABLEROS,
   TEAM_DESPACHANTES,
 } from './columns'
@@ -110,6 +112,12 @@ export type NombreOperacion =
   | 'actualizarContactoCrm'
   | 'crearContactoCrm'
   | 'usuariosDeListaBlanca'
+  | 'invitarUsuarioAMonday'
+  | 'usuarioPorEmail'
+  | 'sumarUsuarioATeam'
+  | 'sumarUsuarioATablero'
+  | 'suscriptosDelTablero'
+  | 'desactivarUsuarioDeMonday'
   | 'crearUsuarioListaBlanca'
   | 'estadoUsuarioListaBlanca'
   | 'etiquetasDeListaBlanca'
@@ -464,6 +472,38 @@ function nombre(valor: unknown): string {
 /** Lista de ids de columnas a LEER. No hace falta acotarla: leer una columna de estos tableros
     es exactamente lo que la app hace, y restringirla obligaría a tocar dos archivos por cada
     columna nueva sin cerrar ningún riesgo que no cierre ya la lista de tableros. */
+/** Un email con forma de email. Lo que viaja a `invite_users` no puede ser cualquier cosa. */
+function email(valor: unknown): string {
+  const texto = String(valor ?? '').trim()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(texto)) {
+    throw new OperacionInvalida('El email no es válido.')
+  }
+  return texto
+}
+
+/**
+ * Un equipo de los que la app conoce.
+ *
+ * El id del equipo NO puede venir libre del cliente: con un id cualquiera, esta operación sumaría
+ * a alguien al equipo de gerencia. Se acepta sólo lo que está en el mapa de etiquetas.
+ */
+function teamConocido(valor: unknown): string {
+  const id = String(valor ?? '').trim()
+  if (!Object.values(TEAM_DE_ETIQUETA).includes(id)) {
+    throw new OperacionInvalida('Ese equipo no se puede asignar desde la app.')
+  }
+  return id
+}
+
+/** Lo mismo con los tableros: sólo aquellos a los que el alta puede dar acceso. */
+function tableroConocido(valor: unknown): string {
+  const id = String(valor ?? '').trim()
+  if (!Object.values(TABLERO_DE_ETIQUETA).includes(id)) {
+    throw new OperacionInvalida('A ese tablero no se puede dar acceso desde la app.')
+  }
+  return id
+}
+
 function idsDeColumnas(valor: unknown): string[] {
   if (!Array.isArray(valor)) throw new OperacionInvalida('Faltan las columnas a leer.')
   return valor.map((c) => {
@@ -615,6 +655,9 @@ const COLUMNAS_DE_USUARIO = new Set<string>([
   COL_LISTA_BLANCA.email,
   COL_LISTA_BLANCA.telefono,
   COL_LISTA_BLANCA.apps,
+  COL_LISTA_BLANCA.appsIds,
+  COL_LISTA_BLANCA.idTeam,
+  COL_LISTA_BLANCA.idTableros,
   COL_LISTA_BLANCA.team,
   COL_LISTA_BLANCA.tipoUsuario,
   COL_LISTA_BLANCA.tablerosDespachante,
@@ -1686,6 +1729,109 @@ export const OPERACIONES: Record<NombreOperacion, Operacion> = {
     }),
   },
 
+  /* ------------------------------------------------------------------ *
+   * La cuenta de monday: invitar, habilitar y desactivar
+   * ------------------------------------------------------------------ *
+   *
+   * Son las operaciones más delicadas del catálogo: no tocan un tablero, tocan QUIÉN ENTRA a la
+   * cuenta de BERGER. Por eso todas viven en el módulo `usuarios`, que sólo tiene Administración y
+   * exige el equipo de monday comprobado, y por eso el servidor fija todo lo que puede fijar: el
+   * rol es siempre GUEST y el producto siempre work_management.
+   */
+
+  /**
+   * La invitación a la cuenta. Siempre como INVITADO.
+   *
+   * El rol no es un parámetro: dejarlo entrar desde el cliente convertiría esta operación en "dar
+   * de alta a cualquiera como administrador". Si algún día hace falta invitar a un MIEMBRO, se
+   * hace en monday, que es donde queda registrado quién lo hizo.
+   */
+  invitarUsuarioAMonday: {
+    modulo: 'usuarios',
+    query: `
+      mutation ($emails: [String!]!) {
+        invite_users(emails: $emails, product: work_management, user_role: GUEST) {
+          invited_users { id email }
+          errors { message code email }
+        }
+      }
+    `,
+    validar: (v) => ({ emails: [email(v.email)] }),
+  },
+
+  /**
+   * El id de monday de un email.
+   *
+   * Se pregunta por separado y no se usa lo que devuelve la invitación porque cubre los dos casos:
+   * el recién invitado y el que ya existía en la cuenta. Sin esto, invitar a alguien que ya estaba
+   * dejaría el alta a medias.
+   */
+  usuarioPorEmail: {
+    modulo: 'usuarios',
+    query: `query ($emails: [String!]) { users(emails: $emails) { id name email } }`,
+    validar: (v) => ({ emails: [email(v.email)] }),
+  },
+
+  /** Sumarlo al equipo. El id del equipo se valida contra los que la app conoce. */
+  sumarUsuarioATeam: {
+    modulo: 'usuarios',
+    query: `
+      mutation ($team: ID!, $usuarios: [ID!]!) {
+        add_users_to_team(team_id: $team, user_ids: $usuarios) {
+          successful_users { id }
+          failed_users { id }
+        }
+      }
+    `,
+    validar: (v) => ({ team: teamConocido(v.team), usuarios: [idMonday(v.usuario, 'usuario')] }),
+  },
+
+  /** Suscribirlo a un tablero. El tablero también sale de la lista que la app conoce. */
+  sumarUsuarioATablero: {
+    modulo: 'usuarios',
+    query: `
+      mutation ($tablero: ID!, $usuarios: [ID!]!) {
+        add_users_to_board(board_id: $tablero, user_ids: $usuarios, kind: subscriber) { id }
+      }
+    `,
+    validar: (v) => ({
+      tablero: tableroConocido(v.tablero),
+      usuarios: [idMonday(v.usuario, 'usuario')],
+    }),
+  },
+
+  /**
+   * Quién está suscripto a un tablero.
+   *
+   * Hace falta porque `add_users_to_board` contesta 403 —"User unauthorized"— cuando la persona YA
+   * está suscripta, que es indistinguible de un problema de permisos de verdad. Mirando la lista
+   * se sabe cuál de las dos cosas pasó.
+   */
+  suscriptosDelTablero: {
+    modulo: 'usuarios',
+    query: `query ($tablero: [ID!]) { boards(ids: $tablero) { subscribers { id } } }`,
+    validar: (v) => ({ tablero: [tableroConocido(v.tablero)] }),
+  },
+
+  /**
+   * Desactivarlo en la cuenta de monday.
+   *
+   * Es el otro lado de pasar la fila a Inactivo: sin esto, alguien dado de baja en la Lista Blanca
+   * sigue siendo usuario de la cuenta y ve los tableros a los que esté suscripto.
+   */
+  desactivarUsuarioDeMonday: {
+    modulo: 'usuarios',
+    query: `
+      mutation ($usuarios: [ID!]!) {
+        deactivate_users(user_ids: $usuarios) {
+          deactivated_users { id name }
+          errors { message code user_id }
+        }
+      }
+    `,
+    validar: (v) => ({ usuarios: [idMonday(v.usuario, 'usuario')] }),
+  },
+
   /**
    * El estado de una fila: lo único que se puede cambiar de alguien ya creado.
    *
@@ -1702,9 +1848,12 @@ export const OPERACIONES: Record<NombreOperacion, Operacion> = {
     validar: (v) => ({
       tablero: TABLEROS.listaBlanca,
       item: idMonday(v.item, 'item'),
+      /* Dos columnas y nada más: el estado —dar de baja— y el ID de usuario, que el alta guarda
+         apenas monday devuelve el id. Ni el equipo, ni las apps, ni el tipo: eso se corrige en
+         monday, donde queda registrado quién lo hizo. */
       valores: valoresAcotados(
         v.valores,
-        new Set([COL_LISTA_BLANCA.estado]),
+        new Set([COL_LISTA_BLANCA.estado, COL_LISTA_BLANCA.usuarioId]),
         'el estado del usuario',
       ),
     }),

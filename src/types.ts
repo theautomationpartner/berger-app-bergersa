@@ -437,6 +437,8 @@ export interface UsuarioListaBlanca {
   tipoUsuario: string
   /** Los tableros del despachante, como los devuelve el dropdown. */
   tableros: string
+  /** Id del usuario en monday. Vacío si todavía no aceptó la invitación. */
+  usuarioId: string
 }
 
 /** Un contacto del tablero de Contactos: de ahí salen los transportistas. */

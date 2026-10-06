@@ -3,8 +3,8 @@ import { Desplegable } from '@/components/ui/Desplegable'
 import { TEAM_LISTA, USUARIO } from '@/services/monday/columns'
 import { SinAcceso } from '@/services/monday/sdk'
 import {
-  crearUsuario,
-  desactivarUsuario,
+  altaCompleta,
+  bajaCompleta,
   etiquetasDeListaBlanca,
   faltaParaElAlta,
   usuariosDeListaBlanca,
@@ -47,7 +47,17 @@ export function RegistroUsuario() {
     apps: [] as string[],
     teams: [] as string[],
     tableros: [] as string[],
+    idsPorApp: {} as Record<string, string>,
   })
+
+  /**
+   * Los usuarios que se están dando de alta.
+   *
+   * Dar de alta a cuatro despachantes de una tanda era entrar cuatro veces a la misma pantalla y
+   * volver a elegir el mismo equipo y los mismos tableros cada vez. Acá se cargan todos y se
+   * mandan juntos.
+   */
+  const [enCola, setEnCola] = useState<AltaUsuario[]>([])
 
   const [usuarios, setUsuarios] = useState<UsuarioListaBlanca[]>([])
   const [cargando, setCargando] = useState(true)
@@ -56,6 +66,8 @@ export function RegistroUsuario() {
   const [enviando, setEnviando] = useState(false)
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
   const [creado, setCreado] = useState<string | null>(null)
+  /** Lo que no salió del todo: la fila se creó igual y hay que decir qué quedó pendiente. */
+  const [advertencias, setAdvertencias] = useState<string[]>([])
   const [desactivando, setDesactivando] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
 
@@ -83,7 +95,7 @@ export function RegistroUsuario() {
   useEffect(() => {
     etiquetasDeListaBlanca()
       .then(setOpciones)
-      .catch(() => setOpciones({ apps: [], teams: [], tableros: [] }))
+      .catch(() => setOpciones({ apps: [], teams: [], tableros: [], idsPorApp: {} }))
   }, [])
 
   const esDespachante = datos.team === TEAM_LISTA.DESPACHANTES
@@ -118,17 +130,42 @@ export function RegistroUsuario() {
       tableros: d.tableros.includes(t) ? d.tableros.filter((x) => x !== t) : [...d.tableros, t],
     }))
 
+  /** Pasa el formulario a la cola y lo deja listo para el siguiente. */
+  const agregarALaCola = () => {
+    if (faltan.length > 0) return
+    setEnCola((c) => [...c, datos])
+    /* El equipo y los tableros se conservan: dando de alta a varios despachantes de una tanda, son
+       los mismos para todos y volver a elegirlos cada vez es el trabajo que esta pantalla evita. */
+    setDatos({ ...VACIO, team: datos.team, tableros: datos.tableros, apps: datos.apps })
+  }
+
   const guardar = async () => {
     setEnviando(true)
     setErrorEnvio(null)
     setCreado(null)
+    setAdvertencias([])
+
+    /* El del formulario va al final de la cola si está completo: haber llenado los campos y no
+       haber tocado "Agregar otro" no puede significar que esa persona no se dé de alta. */
+    const todos = faltan.length === 0 ? [...enCola, datos] : enCola
+
+    const hechos: string[] = []
+    const problemas: string[] = []
     try {
-      const r = await crearUsuario(datos)
-      setCreado(r.nombre)
-      setDatos(VACIO)
+      for (const uno of todos) {
+        try {
+          const r = await altaCompleta(uno, opciones.idsPorApp)
+          hechos.push(r.nombre)
+          problemas.push(...r.advertencias)
+        } catch (e) {
+          problemas.push(`${uno.nombreCompleto || uno.email}: ${mensaje(e)}`)
+        }
+      }
+      setCreado(hechos.join(', '))
+      setAdvertencias(problemas)
+      setEnCola([])
+      if (hechos.length > 0) setDatos(VACIO)
       await recargar()
-    } catch (e) {
-      setErrorEnvio(mensaje(e))
     } finally {
       setEnviando(false)
     }
@@ -138,7 +175,8 @@ export function RegistroUsuario() {
     setDesactivando(u.id)
     setErrorEnvio(null)
     try {
-      await desactivarUsuario(u.id)
+      const { advertencias: avisos } = await bajaCompleta(u.id, u.usuarioId)
+      setAdvertencias(avisos)
       /* Se actualiza la fila en memoria: recargar entero haría desaparecer de golpe al que se
          acaba de desactivar, sin que se vea que la acción salió bien. */
       setUsuarios((a) => a.map((x) => (x.id === u.id ? { ...x, estado: USUARIO.INACTIVO } : x)))
@@ -160,8 +198,8 @@ export function RegistroUsuario() {
             <span className="sec-tit">Registro de Usuario</span>
             <span className="sec-det">
               Quién entra a la app y a qué. Se da de alta siempre como <b>{USUARIO.INVITADO}</b> y{' '}
-              <b>{USUARIO.ACTIVO}</b>; la invitación y los permisos en monday los manda una
-              automatización apenas se crea la fila.
+              <b>{USUARIO.ACTIVO}</b>, y la app hace todo: crea la fila, manda la invitación a
+              monday y lo suma a su equipo y a sus tableros.
             </span>
           </span>
         </div>
@@ -218,6 +256,22 @@ export function RegistroUsuario() {
           <div className="aviso aviso--error" style={{ marginTop: 14 }}>
             <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
             <span>{errorEnvio}</span>
+          </div>
+        )}
+
+        {/* Lo que no salió. La fila ya está creada, así que no se puede fingir que no pasó nada:
+            se dice qué quedó pendiente y se sigue. */}
+        {advertencias.length > 0 && (
+          <div className="aviso aviso--alerta" style={{ marginTop: 14 }}>
+            <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+            <span>
+              Quedó algo sin hacer:
+              <ul className="lista-compacta">
+                {advertencias.map((a) => (
+                  <li key={a}>{a}</li>
+                ))}
+              </ul>
+            </span>
           </div>
         )}
 
@@ -371,6 +425,33 @@ export function RegistroUsuario() {
                   </span>
                 )}
 
+                {/* Los que ya se cargaron y esperan. Se crean recién al confirmar, todos juntos:
+                    así cargar cuatro no son cuatro idas y vueltas a monday a ciegas. */}
+                {enCola.length > 0 && (
+                  <ul className="pendientes">
+                    {enCola.map((u, i) => (
+                      <li key={`${u.email}-${i}`} className="pendiente">
+                        <i className="fa-solid fa-user-plus" aria-hidden="true" />
+                        <span className="pendiente-txt">
+                          <b>{u.nombreCompleto}</b>
+                          <span> · {u.email}</span>
+                          <span> · {u.team}</span>
+                          {u.tableros.length > 0 && <span> · {u.tableros.join(', ')}</span>}
+                        </span>
+                        <button
+                          type="button"
+                          className="pendiente-quitar"
+                          aria-label="Quitar"
+                          disabled={enviando}
+                          onClick={() => setEnCola((c) => c.filter((_, j) => j !== i))}
+                        >
+                          <i className="fa-solid fa-xmark" aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
                 <div className="op-editor-acciones">
                   <button
                     type="button"
@@ -382,8 +463,16 @@ export function RegistroUsuario() {
                   </button>
                   <button
                     type="button"
-                    className="btn btn--primario"
+                    className="btn btn--borde btn--chico"
                     disabled={faltan.length > 0 || enviando}
+                    onClick={agregarALaCola}
+                  >
+                    <i className="fa-solid fa-plus" aria-hidden="true" /> Agregar otro usuario
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--primario"
+                    disabled={(faltan.length > 0 && enCola.length === 0) || enviando}
                     onClick={() => void guardar()}
                   >
                     {enviando ? (
@@ -392,7 +481,10 @@ export function RegistroUsuario() {
                       </>
                     ) : (
                       <>
-                        <i className="fa-solid fa-user-plus" aria-hidden="true" /> Crear el usuario
+                        <i className="fa-solid fa-user-plus" aria-hidden="true" />{' '}
+                        {enCola.length + (faltan.length === 0 ? 1 : 0) > 1
+                          ? `Dar de alta a los ${enCola.length + (faltan.length === 0 ? 1 : 0)}`
+                          : 'Dar de alta'}
                       </>
                     )}
                   </button>

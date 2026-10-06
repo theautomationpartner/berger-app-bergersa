@@ -526,7 +526,36 @@ export const COL_LISTA_BLANCA = {
   tipoUsuario: 'color_mm728j0d',
   /** Sólo para el team Despachantes: a qué tableros se lo suma. */
   tablerosDespachante: 'dropdown_mm7m1kj4',
+  /** Ids de esos tableros. Los escribe la app, con los de las etiquetas elegidas. */
+  idTableros: 'text_mm7wyfq',
+  /** Id del equipo de monday al que se lo sumó. */
+  idTeam: 'text_mm7w9a21',
+  /** Id del usuario en monday. Lo escribe la app apenas lo invita. */
+  usuarioId: 'text_mm72j4e6',
 } as const
+
+/**
+ * El equipo de monday que le corresponde a cada etiqueta de la columna Team.
+ *
+ * El "Concesionario" existe en el tablero pero no se ofrece en el alta: todavía no está definido
+ * qué ve un concesionario dentro de la app, y dar de alta a alguien con un acceso que nadie
+ * terminó de decidir es peor que no poder darlo de alta.
+ */
+export const TEAM_DE_ETIQUETA: Record<string, string> = {
+  Administracion: '1509236',
+  Despachantes: '1504184',
+}
+
+/**
+ * El tablero de monday que le corresponde a cada etiqueta de "Tableros para Despachantes".
+ *
+ * Va escrito y no se busca por nombre: la etiqueta dice "Despachante de Aduana" y el tablero se
+ * llama "👮Despachante de aduana". Emparejarlos por texto funcionaría hasta que alguien le cambie
+ * el emoji, y ahí el despachante nuevo se quedaría sin acceso sin que nadie entienda por qué.
+ */
+export const TABLERO_DE_ETIQUETA: Record<string, string> = {
+  'Despachante de Aduana': '18430575903',
+}
 
 /** Las etiquetas de la Lista Blanca que usa el alta. */
 export const USUARIO = {
