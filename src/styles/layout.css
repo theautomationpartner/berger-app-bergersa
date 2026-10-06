@@ -201,57 +201,6 @@
   }
 }
 
-/* ===== Miga de pan =====
-   Fija entre la marca y el contenido: es el único camino para volver de un nivel al anterior,
-   porque dentro del iframe de monday el "atrás" del navegador no sirve. */
-.migas {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.migas-in {
-  padding: 0;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  font-size: 13px;
-}
-.migas-paso {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.migas-sep {
-  font-size: 9px;
-  color: #b3b9c6;
-  margin: 0 2px;
-}
-.migas-link,
-.migas-actual {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.migas-link {
-  border: none;
-  background: none;
-  color: var(--primary-blue);
-  cursor: pointer;
-}
-.migas-link:hover {
-  background: #eaf2fd;
-}
-/* El lugar actual lleva el rojo de la marca: es lo mismo que marca la operación activa. */
-.migas-actual {
-  color: var(--berger-red-dark);
-  background: var(--berger-red-soft);
-}
-
 /* ===== Paneles de elección (operación principal y modalidad) ===== */
 .panel-head {
   margin: 8px 0 20px;
@@ -355,14 +304,6 @@
 }
 
 @media (max-width: 640px) {
-  .migas {
-    padding: 6px var(--gutter);
-  }
-  .migas-link,
-  .migas-actual {
-    min-height: 34px;
-    font-size: 13px;
-  }
   .panel-head {
     margin: 4px 0 14px;
   }
@@ -488,58 +429,6 @@
   color: var(--grupo-color);
 }
 
-/* ===== Barra de navegación ===== */
-
-/*
- * Atrás, Inicio y el menú, al lado de la miga de pan.
- *
- * La miga sola decía dónde estaba parado el usuario, pero para volver había que apuntarle a un
- * renglón de texto chico. Dentro del iframe de monday el "atrás" del navegador no funciona y en el
- * celular no existe: sin estos botones, la única salida era recargar la app entera.
- */
-.navbar {
-  flex: 0 0 auto;
-  padding: 7px var(--gutter);
-  background: #fff;
-  border-bottom: 1px solid var(--border-soft);
-}
-.navbar-in {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.navbar-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-  padding: 6px 11px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--tint-neutral);
-  color: var(--text-mid);
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.navbar-btn:hover {
-  background: #eef1f6;
-  color: var(--text-dark);
-  border-color: var(--text-gray);
-}
-.navbar-btn:focus-visible {
-  outline: 2px solid var(--primary-blue);
-  outline-offset: 2px;
-}
-
-/* En pantallas angostas quedan los íconos solos: tres botones con texto y la miga no entran, y la
-   miga es la que dice dónde está parado. */
-@media (max-width: 640px) {
-  .navbar-btn-txt {
-    display: none;
-  }
-}
 
 /* ===== Panel lateral ===== */
 

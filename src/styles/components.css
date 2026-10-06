@@ -13,44 +13,6 @@
   background: #fff;
   border-bottom: 1px solid var(--border-soft);
 }
-/* La caja del logo se mide por ALTO y deja el ancho suelto hasta un tope generoso.
-   `max-width` es el que decide si un logo acostado entra entero: con 180px, un lockup de
-   proporción 3:1 a 52px de alto necesita 156px y pasa raspando; a 4:1 ya no entra y `contain`
-   lo achica hasta que el nombre deja de leerse. Por eso hay lugar de sobra (260px): el logo
-   toma el ancho que su archivo pida y el que sobra simplemente no se usa. */
-.marca-logo {
-  height: 52px;
-  width: auto;
-  max-width: 260px;
-  object-fit: contain;
-  object-position: left center;
-  user-select: none;
-  flex: 0 0 auto;
-}
-.marca-sep {
-  align-self: stretch;
-  width: 1px;
-  background: var(--border-soft);
-  flex: 0 0 auto;
-  margin: 2px 0;
-}
-.marca-txt {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.marca-tit {
-  font-size: 17px;
-  font-weight: 800;
-  letter-spacing: -0.2px;
-  color: var(--text-dark);
-  line-height: 1.2;
-}
-.marca-sub {
-  font-size: 12px;
-  color: var(--text-gray);
-}
 /* Sello de versión: dice qué build está corriendo. Sin esto, saber si un deploy tomó el último
    commit es adivinar mirando la interfaz. */
 /* Lado derecho de la barra: con qué perfil se entró, cómo salir y el build. */
@@ -646,18 +608,8 @@
     gap: 10px;
     padding: 8px var(--gutter);
   }
-  .marca-logo {
-    height: 40px;
-    max-width: 168px;
-  }
-  .marca-tit {
-    font-size: 15px;
-  }
-  .marca-sub {
-    font-size: 11px;
-  }
-  /* El sello de build es información de diagnóstico: en una pantalla chica compite con el
-     nombre de la app por el poco ancho que hay. Sigue en el DOM para inspeccionarlo. */
+  /* El sello de build es información de diagnóstico: en una pantalla chica compite con la
+     navegación por el poco ancho que hay. Sigue en el DOM para inspeccionarlo. */
   .marca-build {
     display: none;
   }
@@ -1817,4 +1769,222 @@
   letter-spacing: 0.02em;
   vertical-align: middle;
   white-space: nowrap;
+}
+
+/* ===== Navegación, en el renglón del logo ===== */
+
+/*
+ * Antes había dos renglones: el de la marca y, debajo, uno con «Atrás», «Inicio» y la miga de pan.
+ * La miga decía dónde estaba parado uno pero no servía para ir a otro lado. Acá cada nivel es un
+ * desplegable con todo lo de ese nivel, así que moverse es elegir en vez de retroceder, y dónde
+ * está parado uno se lee igual —en los propios selectores— sin gastar un renglón entero.
+ */
+.topnav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Los dos atajos sueltos: el menú de todas las operaciones y el inicio. Van como íconos grandes y
+   no como botones con texto porque se usan todo el tiempo y el texto no agrega nada. */
+.topnav-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text-mid);
+  font-size: 16px;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease,
+    border-color 0.14s ease;
+}
+.topnav-icono:hover {
+  background: var(--tint-neutral);
+  color: var(--text-dark);
+  border-color: var(--text-gray);
+}
+.topnav-icono:focus-visible {
+  outline: 2px solid var(--primary-blue);
+  outline-offset: 2px;
+}
+/* La casita, con el color de la marca: es el movimiento más repetido de la app. */
+.topnav-icono--casa {
+  background: var(--berger-red-soft);
+  border-color: var(--berger-red-bd);
+  color: var(--berger-red);
+}
+.topnav-icono--casa:hover {
+  background: var(--berger-red);
+  border-color: var(--berger-red);
+  color: #fff;
+}
+
+.topnav-logo {
+  height: 38px;
+  width: auto;
+  max-width: 150px;
+  object-fit: contain;
+  flex: 0 0 auto;
+  margin-right: 4px;
+  user-select: none;
+}
+
+.topnav-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.topnav-lbl {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-gray);
+}
+.topnav-sel {
+  position: relative;
+}
+.topnav-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 180px;
+  max-width: 300px;
+  height: 38px;
+  padding: 0 11px;
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  cursor: pointer;
+}
+.topnav-btn:hover {
+  border-color: var(--text-gray);
+}
+.topnav-btn--abierto,
+.topnav-btn:focus-visible {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(0, 115, 234, 0.14);
+}
+.topnav-btn-ic {
+  flex: 0 0 auto;
+  color: var(--berger-red);
+  font-size: 13px;
+}
+.topnav-btn-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.topnav-btn-txt--vacio {
+  color: var(--text-gray);
+  font-weight: 500;
+}
+.topnav-btn-flecha {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--text-gray);
+}
+.topnav-flecha {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--border);
+  margin-top: 16px;
+}
+
+.topnav-panel {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 45;
+  min-width: 100%;
+  width: max-content;
+  max-width: 340px;
+  list-style: none;
+  margin: 0;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  box-shadow: var(--sombra-alta);
+}
+.topnav-op {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+  cursor: pointer;
+}
+.topnav-op > i {
+  width: 16px;
+  text-align: center;
+  color: var(--berger-red);
+}
+.topnav-op:hover {
+  background: var(--tint-neutral);
+}
+.topnav-op--elegida {
+  background: #e6f1fd;
+  color: #0b4da2;
+  font-weight: 800;
+}
+.topnav-op--elegida > i {
+  color: var(--primary-blue);
+}
+/* «Inicio» no es un área más: va separada del resto. */
+.topnav-op-aparte {
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+}
+
+/*
+ * En el celular la barra se parte en dos líneas en vez de achicar los selectores hasta que no se
+ * lea ninguno: los atajos y el logo arriba, los desplegables abajo y a todo el ancho.
+ */
+@media (max-width: 760px) {
+  .topnav {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .topnav-logo {
+    height: 30px;
+    margin-right: auto;
+  }
+  .topnav-item {
+    flex: 1 1 160px;
+  }
+  .topnav-btn {
+    min-width: 0;
+    max-width: none;
+  }
+  /* Las flechas entre selectores sobran cuando están uno debajo del otro. */
+  .topnav-flecha {
+    display: none;
+  }
 }

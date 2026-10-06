@@ -15,9 +15,9 @@ import { EnviarConfirmacion } from '@/features/fechas/EnviarConfirmacion'
 import { DashboardDrafts } from '@/features/drafts/DashboardDrafts'
 import { EnviarPlanificacion } from '@/features/drafts/EnviarPlanificacion'
 import { PlanificarPeriodo } from '@/features/drafts/PlanificarPeriodo'
-import { Migas, type Miga } from '@/features/inicio/Migas'
 import { Buscador } from '@/features/inicio/Buscador'
 import { PanelLateral } from '@/features/inicio/PanelLateral'
+import { BarraNavegacion } from '@/features/inicio/BarraNavegacion'
 import { AltaCuentasContactos } from '@/features/ventas/AltaCuentasContactos'
 import { Actividades } from '@/features/ventas/Actividades'
 import { PanelOpciones } from '@/features/inicio/PanelOpciones'
@@ -28,7 +28,6 @@ import {
   areasDeModulos,
   AREAS,
   MODALIDADES_DESPACHO,
-  OPERACIONES_ADUANA,
   OPERACIONES_DRAFTS,
   OPERACIONES_FECHAS,
   OPERACIONES_PRINCIPALES,
@@ -41,9 +40,6 @@ import { clienteIngreso } from '@/services/acceso/cliente'
 import { MODULOS_APP } from '@/services/monday/operaciones'
 import { mondayHabilitado } from '@/services/monday/sdk'
 import type { AreaApp } from '@/types'
-
-const TITULO = 'Importación Berger S.A.'
-const SUBTITULO = 'Tractores · BERGER S.A.'
 
 /**
  * En desarrollo, `?vista-previa` en la URL recorre las pantallas del ingreso con un servidor
@@ -139,8 +135,14 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
 
   const barra = (
     <BarraMarca
-      titulo={TITULO}
-      subtitulo={SUBTITULO}
+      navegacion={
+        <BarraNavegacion
+          ruta={ruta}
+          modulos={sesion.modulos}
+          onIr={setRuta}
+          onAbrirPanel={() => setLateralAbierto(true)}
+        />
+      }
       perfil={sesion.perfil.nombre}
       onSalir={import.meta.env.DEV && !VISTA_PREVIA_INGRESO ? undefined : sesion.salir}
     />
@@ -166,37 +168,7 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
     )
   }
 
-  const irAlInicio = () => setRuta(RUTA_INICIO)
-  const volverAlArea = () => setRuta((v) => ({ ...RUTA_INICIO, area: v.area }))
-  const volverAlPrincipal = () =>
-    setRuta((v) => ({ ...RUTA_INICIO, area: v.area, principal: v.principal }))
-
-  /**
-   * Un paso atrás: al panel del nivel anterior.
-   *
-   * La miga de pan ya decía dónde estaba parado el usuario, pero para volver había que apuntarle a
-   * un renglón de texto chico. Dentro del iframe de monday el "atrás" del navegador no sirve, y en
-   * el celular directamente no existe, así que sin un botón la única salida era recargar la app.
-   */
-  const volverAtras = () => {
-    if (operacionAduana || operacionDrafts || operacionFechas || modalidad)
-      return volverAlPrincipal()
-    if (principal) return volverAlArea()
-    irAlInicio()
-  }
-
   const defArea = AREAS.find((a) => a.id === area)
-  const defPrincipal = OPERACIONES_PRINCIPALES.find((o) => o.id === principal)
-  const defSegundo =
-    MODALIDADES_DESPACHO.find((m) => m.id === modalidad) ??
-    OPERACIONES_ADUANA.find((o) => o.id === operacionAduana) ??
-    OPERACIONES_DRAFTS.find((o) => o.id === operacionDrafts) ??
-    OPERACIONES_FECHAS.find((o) => o.id === operacionFechas)
-
-  const migas: Miga[] = [{ rotulo: 'Operaciones', onIr: irAlInicio }]
-  if (defArea) migas.push({ rotulo: defArea.corto, onIr: volverAlArea })
-  if (defPrincipal) migas.push({ rotulo: defPrincipal.corto, onIr: volverAlPrincipal })
-  if (defSegundo) migas.push({ rotulo: defSegundo.corto })
 
   /* El destino actual, para marcarlo en el panel lateral. */
   const idActual = destinos.find(
@@ -226,37 +198,6 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
           </span>
         </div>
       )}
-
-      <div className="navbar">
-        <div className="view navbar-in">
-          <button
-            type="button"
-            className="navbar-btn"
-            aria-label="Abrir el menú de operaciones"
-            onClick={() => setLateralAbierto(true)}
-          >
-            <i className="fa-solid fa-bars" aria-hidden="true" />
-            <span className="navbar-btn-txt">Operaciones</span>
-          </button>
-
-          {/* "Atrás" sólo existe si hay a dónde volver: un botón que no hace nada es peor que no
-              tenerlo, porque hay que probarlo para descubrirlo. */}
-          {area && (
-            <button type="button" className="navbar-btn" onClick={volverAtras}>
-              <i className="fa-solid fa-arrow-left" aria-hidden="true" />
-              <span className="navbar-btn-txt">Atrás</span>
-            </button>
-          )}
-          {area && (
-            <button type="button" className="navbar-btn" onClick={irAlInicio}>
-              <i className="fa-solid fa-house" aria-hidden="true" />
-              <span className="navbar-btn-txt">Inicio</span>
-            </button>
-          )}
-
-          <Migas migas={migas} />
-        </div>
-      </div>
 
       <PanelLateral
         abierto={lateralAbierto}

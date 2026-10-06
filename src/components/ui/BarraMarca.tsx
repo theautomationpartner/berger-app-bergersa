@@ -1,32 +1,28 @@
+import type { ReactNode } from 'react'
+
 interface Props {
-  titulo: string
-  subtitulo: string
+  /** La navegación, que vive en este mismo renglón: ver `BarraNavegacion`. */
+  navegacion?: ReactNode
   /** Perfil con el que se entró. Se muestra junto a la acción de salir. */
   perfil?: string
   onSalir?: () => void
 }
 
 /**
- * Barra superior de la app: la marca abre el bloque contra el margen izquierdo, como en el resto
- * de las apps del equipo.
+ * Barra superior de la app.
  *
- * El logo se referencia por URL (`/logo-berger.svg`, servido desde `public/`) en vez de importarse
- * como módulo: así se reemplaza el archivo por el oficial de BERGER —un PNG, un SVG, el que sea—
- * sin recompilar ni tocar una línea de código.
+ * El nombre de la app y el subtítulo que había al lado del logo se fueron: decían siempre lo
+ * mismo y ocupaban el lugar donde ahora está la navegación, que cambia según dónde esté parado
+ * uno. Que la app es la de BERGER ya lo dice el logo, y en qué cuenta de monday está, monday.
  *
  * A la derecha, quién está adentro y cómo salir. Con la cuenta de monday compartida entre varios
  * administradores, ver con qué perfil se entró evita cargar algo a nombre de otro, y "Salir" es la
  * forma de que otra persona entre desde la misma computadora sin esperar al día siguiente.
  */
-export function BarraMarca({ titulo, subtitulo, perfil, onSalir }: Props) {
+export function BarraMarca({ navegacion, perfil, onSalir }: Props) {
   return (
     <header className="marca">
-      <img className="marca-logo" src="/logo-berger.svg" alt="BERGER S.A." />
-      <span className="marca-sep" aria-hidden="true" />
-      <div className="marca-txt">
-        <span className="marca-tit">{titulo}</span>
-        <span className="marca-sub">{subtitulo}</span>
-      </div>
+      {navegacion}
       <div className="marca-derecha">
         {perfil && (
           <span className="chip chip--indigo marca-perfil" title="Perfil con el que entraste">
