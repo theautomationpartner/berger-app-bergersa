@@ -45,6 +45,7 @@ const COLUMNAS = [
   COL_LISTA_BLANCA.tipoUsuario,
   COL_LISTA_BLANCA.tablerosDespachante,
   COL_LISTA_BLANCA.usuarioId,
+  COL_LISTA_BLANCA.claseDeFila,
 ]
 
 /** Qué falta para poder dar de alta. Vacío = se puede. */
@@ -93,6 +94,9 @@ export async function crearUsuario(
     [COL_LISTA_BLANCA.apps]: { labels: d.apps },
     [COL_LISTA_BLANCA.team]: { labels: [d.team] },
     [COL_LISTA_BLANCA.tipoUsuario]: { label: USUARIO.INVITADO },
+    /* El alta de la app crea personas. Las filas de TEAM las carga BERGER a mano, no tienen email
+       ni usuario de monday, y nada de este circuito les corresponde. */
+    [COL_LISTA_BLANCA.claseDeFila]: { label: USUARIO.PERSONA },
   }
   /* Los ids: la app elige por NOMBRE —"APP Berger SA", "Despachantes"— y guarda al lado el id que
      le corresponde, que es con lo que después se compara el acceso. Antes esto lo completaba una
@@ -216,6 +220,8 @@ export async function etiquetasDeListaBlanca(): Promise<{
 
 const motivo = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
+const esperar = (ms: number) => new Promise((listo) => setTimeout(listo, ms))
+
 /** ¿Ya está suscripto a ese tablero? */
 async function estaSuscripto(tablero: string, usuarioId: string): Promise<boolean> {
   try {
@@ -227,6 +233,55 @@ async function estaSuscripto(tablero: string, usuarioId: string): Promise<boolea
   } catch {
     return false
   }
+}
+
+/**
+ * El id del usuario, dándole tiempo a monday.
+ *
+ * A alguien recién invitado monday no lo devuelve en `users` enseguida: tarda un par de segundos
+ * en existir para la API. Sin esperarlo, el alta terminaba sin id y por lo tanto sin equipo y sin
+ * tableros —con la fila creada y la invitación mandada—, que es la peor forma de fallar: parece
+ * que salió bien.
+ */
+async function buscarConPaciencia(email: string): Promise<string> {
+  const esperas = [0, 1500, 3000]
+  for (const espera of esperas) {
+    if (espera > 0) await esperar(espera)
+    const r = await mondayApi<{ users: { id: string }[] | null }>('usuarioPorEmail', { email })
+    const id = r.users?.[0]?.id
+    if (id) return String(id)
+  }
+  return ''
+}
+
+/**
+ * Lo suscribe al tablero, dándole tiempo a monday.
+ *
+ * A un invitado recién creado monday lo devuelve en `users` enseguida, pero tarda un momento en
+ * dejarlo suscribir a un tablero: la mutación contesta 403 —el mismo error que da un problema de
+ * permisos— y un rato después funciona sin tocar nada. Por eso se reintenta en vez de avisar que
+ * no se pudo: el primer despachante que se dio de alta con esto quedó en su equipo y afuera del
+ * tablero, y nadie lo iba a notar hasta que la persona entrara y no viera nada.
+ *
+ * Entre intento e intento se mira si quedó suscripto, porque el 403 también aparece cuando YA lo
+ * está: si lo está, no hay nada que reintentar ni que avisar.
+ *
+ * Devuelve el motivo si no se pudo, o `''` si quedó.
+ */
+async function suscribirConPaciencia(tablero: string, usuarioId: string): Promise<string> {
+  const esperas = [0, 1500, 4000]
+  let ultimo = ''
+  for (const espera of esperas) {
+    if (espera > 0) await esperar(espera)
+    try {
+      await mondayApi('sumarUsuarioATablero', { tablero, usuario: usuarioId })
+      return ''
+    } catch (e) {
+      ultimo = motivo(e)
+      if (await estaSuscripto(tablero, usuarioId)) return ''
+    }
+  }
+  return ultimo
 }
 
 export interface ResultadoDeAlta {
@@ -265,20 +320,43 @@ export async function altaCompleta(
   const fila = await crearUsuario(d, idsPorApp)
   const email = d.email.trim()
 
-  /* La invitación puede "fallar" porque la persona YA está en la cuenta, que no es un error: es el
-     caso de alguien que ya trabaja con BERGER en otra app. Por eso el id se pregunta aparte. */
+  /*
+   * La invitación.
+   *
+   * OJO: monday NO tira un error cuando la invitación falla. Contesta 200 con la lista de
+   * invitados vacía y el motivo adentro de `errors`. Mirando sólo la excepción, un alta fallida
+   * se veía igual que una exitosa.
+   *
+   * Que falle no siempre es un problema: si la persona YA está en la cuenta —alguien que ya
+   * trabaja con BERGER en otra app— el id se consigue igual preguntando por su email.
+   */
+  let usuarioId = ''
+  let falloLaInvitacion = ''
   try {
-    await mondayApi('invitarUsuarioAMonday', { email })
+    const r = await mondayApi<{
+      invite_users: {
+        invited_users: { id: string }[] | null
+        errors: { message: string; code: string }[] | null
+      }
+    }>('invitarUsuarioAMonday', { email })
+    usuarioId = String(r.invite_users?.invited_users?.[0]?.id ?? '')
+    const problemas = r.invite_users?.errors ?? []
+    if (!usuarioId && problemas.length > 0) falloLaInvitacion = problemas[0].message
   } catch (e) {
-    advertencias.push(`No se pudo mandar la invitación a ${email}: ${motivo(e)}`)
+    falloLaInvitacion = motivo(e)
   }
 
-  let usuarioId = ''
-  try {
-    const r = await mondayApi<{ users: { id: string }[] | null }>('usuarioPorEmail', { email })
-    usuarioId = r.users?.[0]?.id ?? ''
-  } catch (e) {
-    advertencias.push(`No se pudo leer el usuario de ${email} en monday: ${motivo(e)}`)
+  /* Si la invitación no devolvió id, se pregunta por email: cubre al que ya estaba en la cuenta. */
+  if (!usuarioId) {
+    try {
+      usuarioId = await buscarConPaciencia(email)
+    } catch (e) {
+      advertencias.push(`No se pudo leer el usuario de ${email} en monday: ${motivo(e)}`)
+    }
+  }
+
+  if (!usuarioId && falloLaInvitacion) {
+    advertencias.push(`monday no aceptó la invitación de ${email}: ${falloLaInvitacion}`)
   }
 
   if (!usuarioId) {
@@ -316,15 +394,8 @@ export async function altaCompleta(
         advertencias.push(`No sé qué tablero es "${etiqueta}", así que no se lo pudo suscribir.`)
         continue
       }
-      try {
-        await mondayApi('sumarUsuarioATablero', { tablero, usuario: usuarioId })
-      } catch (e) {
-        /* monday contesta 403 cuando la persona YA está suscripta, que es indistinguible de un
-           problema de permisos. Se mira la lista: si ya estaba, no hay nada que avisar. */
-        if (!(await estaSuscripto(tablero, usuarioId))) {
-          advertencias.push(`No se lo pudo suscribir a ${etiqueta}: ${motivo(e)}`)
-        }
-      }
+      const problema = await suscribirConPaciencia(tablero, usuarioId)
+      if (problema) advertencias.push(`No se lo pudo suscribir a ${etiqueta}: ${problema}`)
     }
   }
 

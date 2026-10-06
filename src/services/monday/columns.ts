@@ -532,6 +532,13 @@ export const COL_LISTA_BLANCA = {
   idTeam: 'text_mm7w9a21',
   /** Id del usuario en monday. Lo escribe la app apenas lo invita. */
   usuarioId: 'text_mm72j4e6',
+  /**
+   * Si la fila es una PERSONA o un TEAM.
+   *
+   * El tablero tiene filas de las dos clases: las de un equipo entero —"TEAM Concesionario 1"— no
+   * tienen email ni usuario de monday. El alta de la app siempre crea personas.
+   */
+  claseDeFila: 'color_mm7wwrk1',
 } as const
 
 /**
@@ -559,6 +566,8 @@ export const TABLERO_DE_ETIQUETA: Record<string, string> = {
 
 /** Las etiquetas de la Lista Blanca que usa el alta. */
 export const USUARIO = {
+  /** Toda fila que crea la app es de una persona, no de un equipo. */
+  PERSONA: 'PERSONA',
   ACTIVO: 'Activo',
   INACTIVO: 'Inactivo',
   /** Todo usuario que se crea desde la app entra como INVITADO. */

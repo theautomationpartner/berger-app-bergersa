@@ -661,6 +661,7 @@ const COLUMNAS_DE_USUARIO = new Set<string>([
   COL_LISTA_BLANCA.team,
   COL_LISTA_BLANCA.tipoUsuario,
   COL_LISTA_BLANCA.tablerosDespachante,
+  COL_LISTA_BLANCA.claseDeFila,
 ])
 
 /* ------------------------------------------------------------------ *
