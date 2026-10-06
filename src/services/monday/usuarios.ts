@@ -222,19 +222,6 @@ const motivo = (e: unknown): string => (e instanceof Error ? e.message : String(
 
 const esperar = (ms: number) => new Promise((listo) => setTimeout(listo, ms))
 
-/** ¿Ya está suscripto a ese tablero? */
-async function estaSuscripto(tablero: string, usuarioId: string): Promise<boolean> {
-  try {
-    const r = await mondayApi<{ boards: { subscribers: { id: string }[] }[] }>(
-      'suscriptosDelTablero',
-      { tablero },
-    )
-    return (r.boards?.[0]?.subscribers ?? []).some((u) => String(u.id) === usuarioId)
-  } catch {
-    return false
-  }
-}
-
 /**
  * El id del usuario, dándole tiempo a monday.
  *
@@ -259,39 +246,6 @@ async function buscarConPaciencia(email: string): Promise<string> {
     if (encontrado?.id) return String(encontrado.id)
   }
   return ''
-}
-
-/**
- * Lo suscribe al tablero, dándole tiempo a monday.
- *
- * A un invitado recién creado monday lo devuelve en `users` enseguida, pero tarda un momento en
- * dejarlo suscribir a un tablero: la mutación contesta 403 —el mismo error que da un problema de
- * permisos— y un rato después funciona sin tocar nada. Por eso se reintenta en vez de avisar que
- * no se pudo: el primer despachante que se dio de alta con esto quedó en su equipo y afuera del
- * tablero, y nadie lo iba a notar hasta que la persona entrara y no viera nada.
- *
- * Entre intento e intento se mira si quedó suscripto, porque el 403 también aparece cuando YA lo
- * está: si lo está, no hay nada que reintentar ni que avisar.
- *
- * Devuelve el motivo si no se pudo, o `''` si quedó.
- */
-async function suscribirConPaciencia(tablero: string, usuarioId: string): Promise<string> {
-  /* Hasta medio minuto. Parece mucho para una pantalla, pero el alta de un usuario se hace una
-     vez y lo que está en juego es que entre o no entre: esperar es más barato que descubrir
-     después que el despachante está en su equipo y no ve ningún tablero. */
-  const esperas = [0, 2000, 5000, 10000, 15000]
-  let ultimo = ''
-  for (const espera of esperas) {
-    if (espera > 0) await esperar(espera)
-    try {
-      await mondayApi('sumarUsuarioATablero', { tablero, usuario: usuarioId })
-      return ''
-    } catch (e) {
-      ultimo = motivo(e)
-      if (await estaSuscripto(tablero, usuarioId)) return ''
-    }
-  }
-  return ultimo
 }
 
 export interface ResultadoDeAlta {
@@ -397,23 +351,20 @@ export async function altaCompleta(
     }
   }
 
-  if (d.team === TEAM_LISTA.DESPACHANTES) {
-    for (const etiqueta of d.tableros) {
-      const tablero = TABLERO_DE_ETIQUETA[etiqueta]
-      if (!tablero) {
-        advertencias.push(`No sé qué tablero es "${etiqueta}", así que no se lo pudo suscribir.`)
-        continue
-      }
-      const problema = await suscribirConPaciencia(tablero, usuarioId)
-      if (problema) {
-        advertencias.push(
-          `No se lo pudo suscribir a ${etiqueta}. monday contestó "${problema}", que a un invitado ` +
-            'recién creado le pasa por unos segundos. Dale de baja y volvé a darlo de alta, o ' +
-            `sumalo a mano al tablero desde monday. El resto del alta de ${d.nombreCompleto.trim()} ` +
-            'quedó hecho.',
-        )
-      }
-    }
+  /* La suscripción a los tableros NO la hace la app: la fila queda con el nombre y el id de cada
+     tablero, y de ahí en adelante es trabajo de la automatización de monday.
+
+     Se delegó a propósito. A un invitado recién creado monday le rechaza la suscripción durante
+     unos segundos con "User unauthorized", que es el mismo error que un problema de permisos de
+     verdad: la app tenía que esperar y reintentar sin saber cuál de las dos cosas estaba pasando,
+     y aun así a veces no alcanzaba. La automatización corre después, cuando el invitado ya existe
+     del todo, y no tiene que adivinar nada. */
+  const sinId = d.tableros.filter((t) => !TABLERO_DE_ETIQUETA[t])
+  if (sinId.length > 0) {
+    advertencias.push(
+      `No sé el id de ${sinId.join(', ')}, así que la fila quedó sin ese dato y la automatización ` +
+        'no va a poder suscribirlo. Cargalo a mano en el tablero.',
+    )
   }
 
   return { filaId: fila.id, nombre: fila.nombre, usuarioId, advertencias }

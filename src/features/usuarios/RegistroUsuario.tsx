@@ -198,8 +198,9 @@ export function RegistroUsuario() {
             <span className="sec-tit">Registro de Usuario</span>
             <span className="sec-det">
               Quién entra a la app y a qué. Se da de alta siempre como <b>{USUARIO.INVITADO}</b> y{' '}
-              <b>{USUARIO.ACTIVO}</b>, y la app hace todo: crea la fila, manda la invitación a
-              monday y lo suma a su equipo y a sus tableros.
+              <b>{USUARIO.ACTIVO}</b>: la app crea la fila, manda la invitación a monday y lo suma a
+              su equipo. Los tableros los deja cargados con su id, y de ahí en adelante es la
+              automatización la que lo suscribe.
             </span>
           </span>
         </div>
@@ -286,7 +287,8 @@ export function RegistroUsuario() {
                       automatización iba a hacer el resto, y ya no hay automatización. Si algo no
                       salió, aparece arriba en "Quedó algo sin hacer". */}
                   <b>{creado}</b> quedó creado en la Lista Blanca, invitado a monday y agregado a su
-                  equipo y a sus tableros.
+                  equipo. La suscripción a los tableros la hace la automatización con el id que
+                  quedó cargado en la fila; puede tardar un momento.
                 </span>
               </div>
             )}

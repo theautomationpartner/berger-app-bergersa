@@ -33,7 +33,6 @@ import {
   COL_PAGO,
   COL_PAGO_SUB,
   COL_PLANIF,
-  TABLERO_DE_ETIQUETA,
   TEAM_DE_ETIQUETA,
   TABLEROS,
   TEAM_DESPACHANTES,
@@ -115,8 +114,6 @@ export type NombreOperacion =
   | 'invitarUsuarioAMonday'
   | 'usuarioPorEmail'
   | 'sumarUsuarioATeam'
-  | 'sumarUsuarioATablero'
-  | 'suscriptosDelTablero'
   | 'desactivarUsuarioDeMonday'
   | 'crearUsuarioListaBlanca'
   | 'estadoUsuarioListaBlanca'
@@ -491,15 +488,6 @@ function teamConocido(valor: unknown): string {
   const id = String(valor ?? '').trim()
   if (!Object.values(TEAM_DE_ETIQUETA).includes(id)) {
     throw new OperacionInvalida('Ese equipo no se puede asignar desde la app.')
-  }
-  return id
-}
-
-/** Lo mismo con los tableros: sólo aquellos a los que el alta puede dar acceso. */
-function tableroConocido(valor: unknown): string {
-  const id = String(valor ?? '').trim()
-  if (!Object.values(TABLERO_DE_ETIQUETA).includes(id)) {
-    throw new OperacionInvalida('A ese tablero no se puede dar acceso desde la app.')
   }
   return id
 }
@@ -1785,33 +1773,6 @@ export const OPERACIONES: Record<NombreOperacion, Operacion> = {
       }
     `,
     validar: (v) => ({ team: teamConocido(v.team), usuarios: [idMonday(v.usuario, 'usuario')] }),
-  },
-
-  /** Suscribirlo a un tablero. El tablero también sale de la lista que la app conoce. */
-  sumarUsuarioATablero: {
-    modulo: 'usuarios',
-    query: `
-      mutation ($tablero: ID!, $usuarios: [ID!]!) {
-        add_users_to_board(board_id: $tablero, user_ids: $usuarios, kind: subscriber) { id }
-      }
-    `,
-    validar: (v) => ({
-      tablero: tableroConocido(v.tablero),
-      usuarios: [idMonday(v.usuario, 'usuario')],
-    }),
-  },
-
-  /**
-   * Quién está suscripto a un tablero.
-   *
-   * Hace falta porque `add_users_to_board` contesta 403 —"User unauthorized"— cuando la persona YA
-   * está suscripta, que es indistinguible de un problema de permisos de verdad. Mirando la lista
-   * se sabe cuál de las dos cosas pasó.
-   */
-  suscriptosDelTablero: {
-    modulo: 'usuarios',
-    query: `query ($tablero: [ID!]) { boards(ids: $tablero) { subscribers { id } } }`,
-    validar: (v) => ({ tablero: [tableroConocido(v.tablero)] }),
   },
 
   /**
