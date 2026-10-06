@@ -2006,3 +2006,65 @@
   border-top: 1px solid var(--border-soft);
   padding-top: 9px;
 }
+
+/* ===== Un CUIT que ya está cargado ===== */
+
+/*
+ * No se prohíbe crear la segunda: dos razones sociales del mismo titular es un caso real, y una
+ * app que lo impide termina con la cuenta cargada a mano en el tablero, sin ningún control. Lo
+ * que no puede pasar es que alguien la cree sin enterarse, así que se muestra cuál es la que ya
+ * existe y hace falta decir que sí a propósito.
+ */
+.duplicado {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1.5px solid #f2d795;
+  border-radius: 12px;
+  background: #fff8e6;
+}
+.duplicado-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #7a4e00;
+}
+.duplicado-aviso > i {
+  margin-top: 2px;
+  color: var(--orange);
+}
+.duplicado-ficha {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: #fff;
+}
+.duplicado-ficha-tit {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+.duplicado-ficha-det {
+  font-size: 12.5px;
+  color: var(--text-mid);
+}
+.duplicado-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+/* El interruptor del "sí, crearla igual" va al lado del botón de copiar, no ocupando el ancho. */
+.interruptor--chico {
+  width: auto;
+  padding: 8px 12px;
+}
+.interruptor--chico .interruptor-tit {
+  font-size: 13px;
+}

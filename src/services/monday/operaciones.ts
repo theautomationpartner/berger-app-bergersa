@@ -106,6 +106,8 @@ export type NombreOperacion =
   | 'concesionariosDelCrm'
   | 'etiquetasDelCrm'
   | 'crearCuentaCrm'
+  | 'actualizarCuentaCrm'
+  | 'actualizarContactoCrm'
   | 'crearContactoCrm'
   | 'usuariosDeListaBlanca'
   | 'crearUsuarioListaBlanca'
@@ -555,6 +557,18 @@ const COLUMNAS_DE_CUENTA = new Set<string>([
   COL_CUENTA.fechaAlta,
 ])
 
+/**
+ * Lo que la EDICIÓN de una cuenta puede escribir: lo del alta, menos dos cosas.
+ *
+ * La fecha de alta y el estado quedan afuera a propósito. El alta las pone una vez —nace Activa,
+ * con la fecha de hoy— y después son historia: una edición que pueda moverlas convierte un cambio
+ * de dirección en la oportunidad de hacer desaparecer una cuenta o de inventarle una antigüedad.
+ * Dar de baja se hace en monday, donde queda registrado quién lo hizo.
+ */
+const COLUMNAS_DE_CUENTA_EDITABLES = new Set<string>(
+  [...COLUMNAS_DE_CUENTA].filter((c) => c !== COL_CUENTA.fechaAlta && c !== COL_CUENTA.estado),
+)
+
 /** Lo único que la app escribe al dar de alta un contacto. */
 const COLUMNAS_DE_CONTACTO = new Set<string>([
   COL_CONTACTO.nombres,
@@ -568,6 +582,13 @@ const COLUMNAS_DE_CONTACTO = new Set<string>([
   COL_CONTACTO.cuenta,
   COL_CONTACTO.fechaAlta,
 ])
+
+/** Lo mismo para la edición de un contacto: ni la fecha de alta ni el estado. */
+const COLUMNAS_DE_CONTACTO_EDITABLES = new Set<string>(
+  [...COLUMNAS_DE_CONTACTO].filter(
+    (c) => c !== COL_CONTACTO.fechaAlta && c !== COL_CONTACTO.estado,
+  ),
+)
 
 /** Todos los contenedores del tablero. La usan BERGER y el despachante, cada uno con su módulo. */
 const CONSULTA_CONTENEDORES = `
@@ -748,6 +769,68 @@ const OPS_CRM = {
       tableros: [TABLEROS.cuentas, TABLEROS.contactos],
       columnasCuenta: idsDeColumnas(v.columnasCuenta),
       columnasContacto: idsDeColumnas(v.columnasContacto),
+    }),
+  },
+
+  /**
+   * Cambiar los datos de una cuenta que ya existe.
+   *
+   * Escribe las mismas columnas que el alta y además el nombre del item: si cambia la razón
+   * social y el nombre queda con la vieja, en el tablero la cuenta sigue llamándose como antes.
+   * Las dos cosas van en una sola mutación para que no quede a medias.
+   */
+  actualizarCuentaCrm: {
+    modulo: 'ventas' as const,
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $nombre: String!, $valores: JSON!) {
+        cambiar: change_multiple_column_values(
+          board_id: $tablero
+          item_id: $item
+          column_values: $valores
+        ) { id }
+        renombrar: change_simple_column_value(
+          board_id: $tablero
+          item_id: $item
+          column_id: "name"
+          value: $nombre
+        ) { id name }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.cuentas,
+      item: idMonday(v.item, 'item'),
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_CUENTA_EDITABLES, 'la edición de una cuenta'),
+    }),
+  },
+
+  /** Lo mismo para un contacto. */
+  actualizarContactoCrm: {
+    modulo: 'ventas' as const,
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $nombre: String!, $valores: JSON!) {
+        cambiar: change_multiple_column_values(
+          board_id: $tablero
+          item_id: $item
+          column_values: $valores
+        ) { id }
+        renombrar: change_simple_column_value(
+          board_id: $tablero
+          item_id: $item
+          column_id: "name"
+          value: $nombre
+        ) { id name }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.contactos,
+      item: idMonday(v.item, 'item'),
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(
+        v.valores,
+        COLUMNAS_DE_CONTACTO_EDITABLES,
+        'la edición de un contacto',
+      ),
     }),
   },
 

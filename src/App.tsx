@@ -18,7 +18,7 @@ import { PlanificarPeriodo } from '@/features/drafts/PlanificarPeriodo'
 import { Buscador } from '@/features/inicio/Buscador'
 import { PanelLateral } from '@/features/inicio/PanelLateral'
 import { BarraNavegacion } from '@/features/inicio/BarraNavegacion'
-import { AltaCuentasContactos } from '@/features/ventas/AltaCuentasContactos'
+import { CuentasYContactos } from '@/features/ventas/CuentasYContactos'
 import { Actividades } from '@/features/ventas/Actividades'
 import { PanelOpciones } from '@/features/inicio/PanelOpciones'
 import { DespachoVista } from '@/features/vista/DespachoVista'
@@ -282,7 +282,7 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
 
       {principal === 'usuarios' && <RegistroUsuario />}
 
-      {principal === 'clientes' && <AltaCuentasContactos />}
+      {principal === 'clientes' && <CuentasYContactos />}
 
       {principal === 'actividades' && <Actividades />}
 

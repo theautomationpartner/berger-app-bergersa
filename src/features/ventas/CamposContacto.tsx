@@ -24,6 +24,15 @@ export interface DatosContacto {
   area: string
   abonado: string
   comentarios: string
+  /**
+   * El WhatsApp entero, como está guardado. Sólo lo usa la edición.
+   *
+   * Un número ya cargado —"+5492494520152"— no se puede partir en característica y abonado sin
+   * adivinar dónde termina una: las características argentinas van de dos a cuatro dígitos. Antes
+   * que mostrar una división inventada, editar muestra el número completo y escribe lo que la
+   * persona deje.
+   */
+  whatsappCompleto?: string
 }
 
 export const CONTACTO_VACIO: DatosContacto = {
@@ -46,6 +55,12 @@ interface Props {
   conComentarios?: boolean
 }
 
+/** El número que va a monday: el que se escribió entero, o el que se armó en tres partes. */
+export const whatsappDe = (d: DatosContacto): string =>
+  d.whatsappCompleto !== undefined
+    ? d.whatsappCompleto.trim()
+    : armarWhatsapp(d.paisCodigo, d.area, d.abonado)
+
 export function CamposContacto({
   datos,
   onCambiar,
@@ -54,8 +69,11 @@ export function CamposContacto({
   conComentarios = true,
 }: Props) {
   const cambiar = (parcial: Partial<DatosContacto>) => onCambiar({ ...datos, ...parcial })
-  const whatsapp = armarWhatsapp(datos.paisCodigo, datos.area, datos.abonado)
-  const problemaTel = problemaDelTelefono(datos.paisCodigo, datos.area, datos.abonado)
+  const enEdicion = datos.whatsappCompleto !== undefined
+  const whatsapp = whatsappDe(datos)
+  const problemaTel = enEdicion
+    ? null
+    : problemaDelTelefono(datos.paisCodigo, datos.area, datos.abonado)
 
   return (
     <>
@@ -116,39 +134,58 @@ export function CamposContacto({
           los demás campos, quedaban de dos centímetros. */}
       <div className="campo campo--suelto">
         <span className="campo-lbl">WhatsApp</span>
-        <div className="tel-partes">
-          <div className="tel-pais">
-            <Desplegable
-              valor={datos.paisCodigo}
-              opciones={PAISES.map((p) => ({
-                valor: p.codigo,
-                rotulo: p.nombre,
-                detalle: `+${p.prefijo}`,
-              }))}
-              buscable
-              onCambiar={(v) => cambiar({ paisCodigo: v })}
+
+        {enEdicion ? (
+          <>
+            <input
+              className="input"
+              inputMode="tel"
+              placeholder="+54 9 2494 520152"
+              value={datos.whatsappCompleto ?? ''}
+              onChange={(e) => cambiar({ whatsappCompleto: e.target.value })}
+            />
+            <span className="campo-ayuda">
+              Es el número como está guardado. Si lo cambiás, escribilo entero con el código de
+              país.
+            </span>
+          </>
+        ) : (
+          <div className="tel-partes">
+            <div className="tel-pais">
+              <Desplegable
+                valor={datos.paisCodigo}
+                opciones={PAISES.map((p) => ({
+                  valor: p.codigo,
+                  rotulo: p.nombre,
+                  detalle: `+${p.prefijo}`,
+                }))}
+                buscable
+                onCambiar={(v) => cambiar({ paisCodigo: v })}
+              />
+            </div>
+            <span className="tel-prefijo">+{prefijoDe(datos.paisCodigo)}</span>
+            <input
+              className="input tel-area"
+              placeholder="Característica"
+              inputMode="numeric"
+              value={datos.area}
+              onChange={(e) => cambiar({ area: e.target.value })}
+            />
+            <input
+              className="input tel-numero"
+              placeholder="Número"
+              inputMode="numeric"
+              value={datos.abonado}
+              onChange={(e) => cambiar({ abonado: e.target.value })}
             />
           </div>
-          <span className="tel-prefijo">+{prefijoDe(datos.paisCodigo)}</span>
-          <input
-            className="input tel-area"
-            placeholder="Característica"
-            inputMode="numeric"
-            value={datos.area}
-            onChange={(e) => cambiar({ area: e.target.value })}
-          />
-          <input
-            className="input tel-numero"
-            placeholder="Número"
-            inputMode="numeric"
-            value={datos.abonado}
-            onChange={(e) => cambiar({ abonado: e.target.value })}
-          />
-        </div>
-        <span className="campo-ayuda campo-ayuda--ejemplo">
-          La característica sin el 0 y el número sin el 15.
-        </span>
-        {whatsapp && (
+        )}
+        {!enEdicion && (
+          <span className="campo-ayuda campo-ayuda--ejemplo">
+            La característica sin el 0 y el número sin el 15.
+          </span>
+        )}
+        {!enEdicion && whatsapp && (
           <span className="campo-ayuda campo-ayuda--ok">
             Se guarda como <b>{whatsapp}</b>.
           </span>

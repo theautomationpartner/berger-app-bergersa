@@ -20,6 +20,14 @@ export interface OpcionBuscable {
   rotulo: string
   /** La segunda línea: lo que distingue a esta de otra que se llama parecido. */
   detalle?: string
+  /**
+   * Texto adicional por el que también se encuentra, sin mostrarse.
+   *
+   * Lo que se ve y por lo que se busca no son lo mismo: el CUIT se muestra con guiones y hay que
+   * poder encontrarlo escribiéndolo sin ellos, y a un contacto se lo busca por el apellido suelto
+   * aunque en pantalla diga el nombre completo.
+   */
+  busqueda?: string
 }
 
 /** Sin tildes y en minúsculas: nadie escribe "Martínez" con tilde en un buscador. */
@@ -34,7 +42,8 @@ function coincidencias(
   const q = normalizar(texto.trim())
   if (!q) return []
   const palabras = q.split(/\s+/).filter(Boolean)
-  const donde = (o: OpcionBuscable) => normalizar(`${o.rotulo} ${o.detalle ?? ''}`)
+  const donde = (o: OpcionBuscable) =>
+    normalizar(`${o.rotulo} ${o.detalle ?? ''} ${o.busqueda ?? ''}`)
 
   /* Primero las que EMPIEZAN con lo tipeado: buscando "tap", "TAPIR" interesa más que "salTAPe". */
   const peso = (o: OpcionBuscable) => (normalizar(o.rotulo).startsWith(palabras[0]) ? 1 : 0)

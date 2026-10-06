@@ -90,7 +90,7 @@ const SINONIMOS: Record<string, string> = {
   'venta/actividades':
     'actividad actividades llamada llamado whatsapp visita reunion meeting email mail agenda tarea pendiente cliente contacto seguimiento',
   'venta/clientes':
-    'cuenta cuentas contacto contactos cliente clientes cuit cuil alta crm razon social whatsapp telefono email mail concesionario arca',
+    'cuenta cuentas contacto contactos cliente clientes cuit cuil alta crm razon social whatsapp telefono email mail concesionario arca editar corregir modificar cambiar datos duplicado',
   'compra/usuarios': 'usuario usuarios alta baja invitado lista blanca acceso permisos registro',
   'compra/drafts/planificar': 'draft drafts periodo produccion planificar proveedor deutz',
   'compra/drafts/enviar': 'draft drafts enviar planificacion proveedor deutz mail',

@@ -109,11 +109,11 @@ export const OPERACIONES_PRINCIPALES: (OpcionPanel<OperacionPrincipal> & {
     id: 'clientes',
     area: 'venta',
     modulo: 'ventas',
-    titulo: 'ALTA DE CUENTAS Y CONTACTOS',
-    corto: 'Alta de cuentas y contactos',
+    titulo: 'CUENTAS Y CONTACTOS',
+    corto: 'Cuentas y contactos',
     detalle:
-      'Dar de alta una cuenta con su CUIT, o un contacto de una cuenta que ya existe. Es el único ' +
-      'lugar donde se controla que el CUIT esté bien y que no haya duplicados.',
+      'Dar de alta una cuenta o un contacto, y corregir los que ya están. Es el único lugar donde ' +
+      'se controla que el CUIT esté bien y que no haya duplicados sin que nadie se entere.',
     icono: 'fa-solid fa-address-book',
   },
   {

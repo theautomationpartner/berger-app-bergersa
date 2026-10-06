@@ -1882,3 +1882,21 @@
 .decision--elige .opcion--elegida .opcion-det {
   color: var(--text-mid);
 }
+
+/* La tercera tarjeta de una decisión: corregir algo que ya existe. Verde, porque no crea ni
+   reemplaza nada —ajusta lo que está— y porque azul y ámbar ya están tomados. */
+.decision--elige .opcion--editar.opcion--elegida {
+  background: var(--green-soft);
+  border-color: var(--green);
+  box-shadow:
+    0 0 0 3px rgba(0, 200, 117, 0.18),
+    var(--sombra-alta);
+}
+.decision--elige .opcion--editar.opcion--elegida .opcion-ic,
+.decision--elige .opcion--editar.opcion--elegida::after {
+  background: var(--green-dark);
+  color: #fff;
+}
+.decision--elige .opcion--editar.opcion--elegida .opcion-tit {
+  color: var(--green-dark);
+}
