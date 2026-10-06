@@ -59,7 +59,14 @@ export interface Destino {
   icono: string
   modulo: ModuloApp
   ruta: Ruta
-  /** Texto contra el que busca el buscador, ya normalizado. */
+  /**
+   * Quién usa esta pantalla, cuando la operación está dividida por eso.
+   *
+   * En DESPACHO DE ADUANA conviven dos trabajos sobre las mismas OP —lo del despachante y lo de
+   * BERGER— con nombres casi iguales: hay dos "ACTUALIZAR OP". Sin saber de quién es cada una, el
+   * título no alcanza para elegir.
+   */
+  seccion?: string
   busqueda: string
 }
 
@@ -130,6 +137,7 @@ export const DESTINOS: Destino[] = (() => {
       detalle: string
       icono: string
       modulo?: ModuloApp
+      seccion?: string
       ruta: Ruta
     }[] =
       p.id === 'despacho'
@@ -181,6 +189,7 @@ export const DESTINOS: Destino[] = (() => {
         /* Las operaciones de aduana tienen módulo propio —el despachante no ve las de BERGER—; las
            demás heredan el de su principal. */
         modulo: h.modulo ?? p.modulo,
+        seccion: h.seccion,
         ruta: h.ruta,
       })
     }

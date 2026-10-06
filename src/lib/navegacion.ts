@@ -146,6 +146,16 @@ export const principalesDeModulos = (modulos: ModuloApp[]): OpcionPanel<Operacio
  * El dashboard tiene su propio módulo: el despachante externo entra a actualizar los datos de sus
  * OP, no a mirar el estado de toda la operación de BERGER. Administración ve las dos.
  */
+/**
+ * Qué operaciones principales están divididas por quién las usa, y en qué secciones.
+ *
+ * Es la regla, no el caso: cualquier operación que agrupe sus pantallas por quién las usa se
+ * declara acá una vez, y con eso quedan agrupadas en los dos lugares donde aparecen —el panel de
+ * elección y el desplegable de la barra—. Sin este registro, agrupar en uno y no en el otro es
+ * cuestión de tiempo.
+ */
+export const SECCIONES_POR_PRINCIPAL: Partial<Record<OperacionPrincipal, SeccionPanel[]>> = {}
+
 export const SECCIONES_ADUANA: SeccionPanel[] = [
   {
     id: 'despachante',
@@ -162,6 +172,8 @@ export const SECCIONES_ADUANA: SeccionPanel[] = [
     icono: 'fa-solid fa-building',
   },
 ]
+
+SECCIONES_POR_PRINCIPAL.aduana = SECCIONES_ADUANA
 
 /**
  * Operaciones dentro de DESPACHO DE ADUANA.

@@ -1988,3 +1988,21 @@
     display: none;
   }
 }
+
+/* Quién usa cada pantalla, dentro del desplegable. Va chiquito y en mayúsculas: es un rótulo que
+   ordena, no una opción que se pueda elegir. */
+.topnav-grupo {
+  display: block;
+  padding: 9px 11px 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+/* Entre un grupo y el anterior, una línea: sin ella los dos bloques se leen como una sola lista. */
+.topnav-panel li + li > .topnav-grupo {
+  margin-top: 4px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 9px;
+}

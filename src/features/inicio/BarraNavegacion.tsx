@@ -16,7 +16,13 @@
 import { useCallback, useRef, useState } from 'react'
 import { useClickAfuera } from '@/hooks/useClickAfuera'
 import { destinosDe, RUTA_INICIO, type Destino, type Ruta } from '@/lib/catalogo'
-import { AREAS, areasDeModulos, OPERACIONES_PRINCIPALES, principalesDeArea } from '@/lib/navegacion'
+import {
+  AREAS,
+  areasDeModulos,
+  OPERACIONES_PRINCIPALES,
+  principalesDeArea,
+  SECCIONES_POR_PRINCIPAL,
+} from '@/lib/navegacion'
 import type { ModuloApp } from '@/services/monday/operaciones'
 import type { AreaApp, OperacionPrincipal } from '@/types'
 
@@ -26,6 +32,13 @@ interface OpcionNav {
   icono: string
   /** Separada del resto por una línea: «Inicio» no es un área más. */
   aparte?: boolean
+  /**
+   * Bajo qué encabezado va, cuando la lista está dividida por quién usa cada pantalla.
+   *
+   * En DESPACHO DE ADUANA hay dos "ACTUALIZAR OP" —la del despachante y la de BERGER— y el título
+   * solo no alcanza para saber cuál es cuál.
+   */
+  grupo?: string
 }
 
 interface PropsSelector {
@@ -70,8 +83,13 @@ function SelectorNav({ etiqueta, actual, opciones, onElegir }: PropsSelector) {
 
         {abierto && (
           <ul className="topnav-panel" role="listbox">
-            {opciones.map((o) => (
+            {opciones.map((o, i) => (
               <li key={o.valor} className={o.aparte ? 'topnav-op-aparte' : undefined}>
+                {/* El encabezado del grupo se dibuja sólo cuando cambia: con una línea por opción
+                    repetiría "Despachante" dos veces seguidas. */}
+                {o.grupo && o.grupo !== opciones[i - 1]?.grupo && (
+                  <span className="topnav-grupo">{o.grupo}</span>
+                )}
                 <button
                   type="button"
                   role="option"
@@ -131,6 +149,30 @@ export function BarraNavegacion({ ruta, modulos, onIr, onAbrirPanel }: Props) {
         d.ruta.drafts === ruta.drafts &&
         d.ruta.fechas === ruta.fechas,
     ) ?? null
+
+  /**
+   * Las pantallas del desplegable, agrupadas por quién las usa si la operación está dividida.
+   *
+   * El orden lo da la lista de secciones y no el de las pantallas: así el desplegable se lee en el
+   * mismo orden en que están los bloques de la pantalla de elección, y lo que no cae en ninguna
+   * sección va primero, suelto.
+   */
+  const pantallas: OpcionNav[] = (() => {
+    const secciones = ruta.principal ? SECCIONES_POR_PRINCIPAL[ruta.principal] : undefined
+    const comoOpcion = (d: Destino, grupo?: string): OpcionNav => ({
+      valor: d.id,
+      rotulo: d.titulo,
+      icono: d.icono,
+      grupo,
+    })
+    if (!secciones) return dentro.map((d) => comoOpcion(d))
+    return [
+      ...dentro.filter((d) => !d.seccion).map((d) => comoOpcion(d)),
+      ...secciones.flatMap((sec) =>
+        dentro.filter((d) => d.seccion === sec.id).map((d) => comoOpcion(d, sec.titulo)),
+      ),
+    ]
+  })()
 
   const irADestino = (id: string) => {
     const d = dentro.find((x: Destino) => x.id === id)
@@ -219,7 +261,7 @@ export function BarraNavegacion({ ruta, modulos, onIr, onAbrirPanel }: Props) {
                 ? { valor: actualDentro.id, rotulo: actualDentro.titulo, icono: actualDentro.icono }
                 : null
             }
-            opciones={dentro.map((d) => ({ valor: d.id, rotulo: d.titulo, icono: d.icono }))}
+            opciones={pantallas}
             onElegir={irADestino}
           />
         </>
