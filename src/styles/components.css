@@ -2703,3 +2703,230 @@
 .datos + .aviso {
   margin-top: 16px;
 }
+
+/* ===== VENTA · el catálogo en lista, con filtros ===== */
+
+.catalogo-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.catalogo-barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.catalogo-barra .input {
+  flex: 1 1 auto;
+}
+.btn--activo {
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
+  background: var(--tint-input);
+}
+.btn-contador {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--primary-blue);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+/* Los filtros salen de lo que hay cargado, no de una lista escrita: nadie se acuerda de que
+   existe la gama "Agrofarm 5" hasta que la ve. */
+.facetas {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--tint-neutral);
+}
+.faceta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.faceta-rotulo {
+  flex: 0 0 92px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+.faceta-valores {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.faceta-op {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.faceta-op:hover {
+  border-color: var(--primary-blue);
+}
+.faceta-op small {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-gray);
+  font-variant-numeric: tabular-nums;
+}
+.faceta-op--si {
+  border-color: var(--primary-blue);
+  background: var(--primary-blue);
+  color: #fff;
+}
+.faceta-op--si small {
+  color: rgba(255, 255, 255, 0.82);
+}
+/* El filtro que llevaría a cero resultados se muestra apagado en vez de esconderse: esconderlo
+   haría que la lista de opciones cambiara de tamaño a cada clic. */
+.faceta-op--vacia {
+  opacity: 0.45;
+}
+
+.catalogo-cuenta {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-gray);
+  font-variant-numeric: tabular-nums;
+}
+
+/* La lista. En tarjetas, veinte modelos eran cuatro pantallazos y comparar dos precios obligaba a
+   acordarse del primero. */
+.tractores {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+.tractor {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.tractor:last-child {
+  border-bottom: none;
+}
+.tractor--elegido {
+  background: var(--tint-input);
+  box-shadow: inset 3px 0 0 var(--primary-blue);
+}
+.tractor-datos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tractor-nom {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+.tractor-nom small {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+.tractor-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.tractor-precio {
+  flex: 0 0 auto;
+  text-align: right;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+}
+.tractor-precio small {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+.tractor-acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* En pantalla angosta la fila se apila: antes de encimarse, baja. */
+@media (max-width: 720px) {
+  .tractor {
+    flex-wrap: wrap;
+  }
+  .tractor-precio {
+    text-align: left;
+  }
+  .tractor-acciones {
+    margin-left: auto;
+  }
+}
+
+/* ===== VENTA · el alta rápida del cliente final ===== */
+
+.alta-rapida {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1.5px dashed var(--primary-blue);
+  border-radius: 12px;
+  background: #fff;
+}
+.alta-rapida-tit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #0a4f9e;
+}
+.alta-rapida .aviso {
+  margin-bottom: 0;
+}
+.alta-rapida .aviso button {
+  display: block;
+  margin-top: 8px;
+}
+.alta-rapida-pie {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}

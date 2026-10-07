@@ -36,8 +36,9 @@ export default async function handler(req: Request): Promise<Response> {
 
   const paso = await porton(req)
   if (paso.rechazo) return paso.rechazo
-  /* El alta de cuentas es del módulo de ventas: nadie más necesita consultar un CUIT. */
-  if (!paso.modulos.includes('ventas')) {
+  /* Consultar un CUIT es para dar de alta una cuenta: el CRM, y el concesionario cuando carga
+     el cliente final de una venta directa, que no tiene el CRM ni debería tenerlo. */
+  if (!paso.modulos.includes('ventas') && !paso.modulos.includes('pedidos')) {
     return json(403, { ok: false, mensaje: 'No tenés acceso a esta consulta.' })
   }
 

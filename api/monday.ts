@@ -23,7 +23,11 @@ import { porton } from './_seguridad/porton'
    funciones edge de Vercel no lo resuelve —Vite sí—, así que un import de más rompe el deploy sin
    que el build local diga nada. `columns` y `operaciones` cuelgan de imports relativos. */
 import { COL_DESPACHANTE, NACIONALIZADO } from '../src/services/monday/columns'
-import { OperacionInvalida, resolverOperacion } from '../src/services/monday/operaciones'
+import {
+  OperacionInvalida,
+  operacionPermitida,
+  resolverOperacion,
+} from '../src/services/monday/operaciones'
 
 const API = 'https://api.monday.com/v2'
 const API_VERSION = '2024-10'
@@ -114,10 +118,8 @@ export default async function handler(req: Request): Promise<Response> {
   let version = API_VERSION
   try {
     const operacion = resolverOperacion(pedido.operacion)
-    /* Y acá está el segundo candado, el que separa a las dos poblaciones: la operación existe,
-       pero tiene que pertenecer a un módulo que este perfil tenga habilitado. Un despachante que
-       pida los pagos del inventario se choca con esto, aunque su pantalla no ofrezca el botón. */
-    if (!paso.modulos.includes(operacion.modulo)) {
+    /* Y acá está el segundo candado, el que separa a las dos poblaciones. */
+    if (!operacionPermitida(operacion, paso.modulos)) {
       return error(403, 'No tenés acceso a esta aplicación. Contactá al administrador.')
     }
     query = operacion.query

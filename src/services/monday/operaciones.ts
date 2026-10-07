@@ -110,10 +110,8 @@ export type NombreOperacion =
   | 'completarActividadCrm'
   | 'etiquetasDeActividad'
   | 'crearPedido'
-  | 'renombrarPedido'
   | 'crearSubitemDePedido'
   | 'crearUnidadDeVenta'
-  | 'renombrarUnidadDeVenta'
   | 'catalogoDeVenta'
   | 'configuracionDeVenta'
   | 'cuentasDelCrm'
@@ -160,6 +158,18 @@ export class OperacionInvalida extends Error {}
 interface Operacion {
   /** A qué módulo pertenece. Sin él, cualquier perfil podría pedir cualquier cosa del catálogo. */
   modulo: ModuloApp
+  /**
+   * Otros módulos que también la pueden pedir.
+   *
+   * Casi ninguna operación necesita esto: una operación es de un circuito y de uno solo. La
+   * excepción son las del CRM que el concesionario necesita para armar un pedido —buscar la cuenta
+   * del cliente final, y darla de alta si no está—, porque el concesionario no tiene el módulo de
+   * ventas ni debería tenerlo: eso le abriría el CRM entero.
+   *
+   * Es una lista explícita y no un "si tenés cualquiera de estos": cada entrada es una decisión
+   * sobre quién más puede hacer exactamente esa consulta.
+   */
+  tambienEn?: readonly ModuloApp[]
   /**
    * Versión de la API de monday con la que tiene que correr ESTA operación.
    *
@@ -684,6 +694,8 @@ const COLUMNAS_DE_PEDIDO_SUB = new Set<string>([
  */
 const COLUMNAS_DE_VENTA = new Set<string>([
   COL_VENTA.concesionario,
+  COL_VENTA.tercero,
+  COL_VENTA.concesionarioPersonas,
   COL_VENTA.comercial,
   COL_VENTA.catalogo,
   COL_VENTA.subitemPedido,
@@ -839,30 +851,6 @@ const OPS_CRM = {
     }),
   },
 
-  /**
-   * El nombre del pedido lleva su propio ID, que monday recién da al crearlo.
-   *
-   * Por eso hay una operación aparte en vez de mandarlo en el alta: el item nace con un nombre
-   * provisorio y se renombra con el id ya en la mano.
-   */
-  renombrarPedido: {
-    modulo: 'pedidos' as const,
-    query: `
-      mutation ($tablero: ID!, $item: ID!, $nombre: String!) {
-        change_simple_column_value(
-          board_id: $tablero
-          item_id: $item
-          column_id: "name"
-          value: $nombre
-        ) { id }
-      }
-    `,
-    validar: (v: Record<string, unknown>) => ({
-      tablero: TABLEROS.pedidos,
-      item: idMonday(v.item, 'item'),
-      nombre: nombre(v.nombre),
-    }),
-  },
 
   /** Un renglón del pedido: un modelo con su cantidad y sus precios. */
   crearSubitemDePedido: {
@@ -894,25 +882,6 @@ const OPS_CRM = {
     }),
   },
 
-  /** Mismo motivo que el pedido: el nombre lleva el id que monday da al crear. */
-  renombrarUnidadDeVenta: {
-    modulo: 'pedidos' as const,
-    query: `
-      mutation ($tablero: ID!, $item: ID!, $nombre: String!) {
-        change_simple_column_value(
-          board_id: $tablero
-          item_id: $item
-          column_id: "name"
-          value: $nombre
-        ) { id }
-      }
-    `,
-    validar: (v: Record<string, unknown>) => ({
-      tablero: TABLEROS.ventas,
-      item: idMonday(v.item, 'item'),
-      nombre: nombre(v.nombre),
-    }),
-  },
 
   /**
    * El catálogo con el que el concesionario arma su pedido.
@@ -944,6 +913,8 @@ const OPS_CRM = {
   /** Las cuentas, para buscarlas y para controlar que un CUIT no esté repetido. */
   cuentasDelCrm: {
     modulo: 'ventas' as const,
+    /* El concesionario la necesita para elegir el cliente final de su pedido. */
+    tambienEn: ['pedidos'] as const,
     query: CONSULTA_ITEMS_CRM,
     validar: (v: Record<string, unknown>) => ({
       tablero: TABLEROS.cuentas,
@@ -991,6 +962,8 @@ const OPS_CRM = {
    */
   etiquetasDelCrm: {
     modulo: 'ventas' as const,
+    /* El concesionario la necesita para elegir el cliente final de su pedido. */
+    tambienEn: ['pedidos'] as const,
     query: `
       query ($tableros: [ID!], $columnasCuenta: [String!], $columnasContacto: [String!]) {
         boards(ids: $tableros) {
@@ -1072,6 +1045,8 @@ const OPS_CRM = {
   /** Alta de una cuenta. El tablero lo fija el servidor y las columnas son una lista cerrada. */
   crearCuentaCrm: {
     modulo: 'ventas' as const,
+    /* El concesionario la necesita para elegir el cliente final de su pedido. */
+    tambienEn: ['pedidos'] as const,
     query: `
       mutation ($tablero: ID!, $nombre: String!, $valores: JSON!) {
         create_item(board_id: $tablero, item_name: $nombre, column_values: $valores) { id name }
@@ -2230,6 +2205,19 @@ export const OPERACIONES: Record<NombreOperacion, Operacion> = {
     },
   },
 }
+
+/**
+ * Si un perfil con estos módulos puede pedir esta operación.
+ *
+ * Es el candado que separa a las dos poblaciones: la operación existe en el catálogo, pero tiene
+ * que pertenecer a un módulo habilitado. Un despachante que pida los pagos del inventario se choca
+ * con esto aunque su pantalla no ofrezca el botón.
+ */
+export const operacionPermitida = (
+  operacion: Operacion,
+  modulos: readonly ModuloApp[],
+): boolean =>
+  modulos.includes(operacion.modulo) || (operacion.tambienEn ?? []).some((m) => modulos.includes(m))
 
 /** Resuelve una operación por nombre. Lanza si no existe: no hay consultas fuera del catálogo. */
 export function resolverOperacion(nombreOperacion: unknown): Operacion {

@@ -33,6 +33,7 @@ import {
   ESTADO_UNIDAD,
   esContado,
   TIPO_PEDIDO,
+  TIPO_VENTA,
 } from './columns'
 import { mondayApi } from './sdk'
 import { obtenerDatosSesion } from './sesion'
@@ -70,8 +71,15 @@ export interface AltaPedido {
   tipoPedido: string
   /** Sólo si es VENTA A TERCEROS. */
   tipoVenta: string
-  /** Las cuentas de los clientes finales. Sólo en VENTA A TERCEROS, y puede ser más de una. */
-  clienteIds: string[]
+  /**
+   * Los clientes finales. Sólo en VENTA DIRECTA, y puede ser más de uno: un tractor se vende a
+   * nombre de dos hermanos o de una sociedad y su titular más veces de las que uno creería.
+   *
+   * Van con el nombre y no sólo con el id porque el nombre del pedido se arma con ellos, y volver
+   * a buscarlos en el CRM para escribir un título sería pedirle a monday algo que la pantalla ya
+   * tiene en la mano.
+   */
+  clientes: { id: string; nombre: string }[]
   /** Cómo paga el tercero (VENTA A TERCEROS). */
   condicionVenta: string
   banco: string
@@ -88,7 +96,11 @@ export function faltaParaElPedido(d: AltaPedido): string[] {
   if (!d.tipoPedido) faltan.push('el tipo de pedido')
   if (d.tipoPedido === TIPO_PEDIDO.TERCEROS) {
     if (!d.tipoVenta) faltan.push('el tipo de venta')
-    if (d.clienteIds.length === 0) faltan.push('el cliente final')
+    /* Sólo la venta directa necesita el cliente final: en la indirecta BERGER le factura al
+       concesionario y a quién le vende él después no es parte de este pedido. */
+    if (d.tipoVenta === TIPO_VENTA.DIRECTA && d.clientes.length === 0) {
+      faltan.push('el cliente final')
+    }
     if (!d.condicionVenta) faltan.push('la condición de venta')
   } else if (d.tipoPedido === TIPO_PEDIDO.STOCK) {
     if (!d.conceptoPago) faltan.push('el concepto de pago')
@@ -126,13 +138,24 @@ export interface ResultadoPedido {
   advertencias: string[]
 }
 
-/** El nombre del item: `ID Pedido - Concesionario`, como lo pidió BERGER. */
-const nombreDelPedido = (idPedido: string, cuenta: string): string =>
-  [idPedido, cuenta.trim()].filter(Boolean).join(' - ')
-
-/** El de cada unidad: `ID Pedido - ID Venta - Concesionario`. */
-const nombreDeLaUnidad = (idPedido: string, idVenta: string, cuenta: string): string =>
-  [idPedido, idVenta, cuenta.trim()].filter(Boolean).join(' - ')
+/**
+ * El nombre del item, en 🔖Pedidos y en 🛍️Ventas: `Concesionario - Cliente final`.
+ *
+ * Es lo que se lee en el tablero sin abrir nada, y son las dos puntas del pedido. Sin cliente
+ * final —compra de stock o venta indirecta, donde BERGER le factura al concesionario— queda sólo
+ * el concesionario, que es toda la verdad que hay. Con más de uno van separados por coma: un
+ * tractor a nombre de dos titulares es más común de lo que parece.
+ *
+ * El ID del pedido ya no va en el nombre: vive en su columna `pulse_id`, y repetirlo acá sólo
+ * gastaba los primeros doce caracteres de la celda en un número que nadie lee.
+ */
+const nombreDelPedido = (concesionario: string, clientes: { nombre: string }[]): string => {
+  const finales = clientes
+    .map((c) => c.nombre.trim())
+    .filter(Boolean)
+    .join(', ')
+  return [concesionario.trim(), finales].filter(Boolean).join(' - ')
+}
 
 /** Las columnas de precio de un subelemento del pedido. */
 function preciosDelSubitem(p: PrecioDeUnidad): Record<string, unknown> {
@@ -206,12 +229,14 @@ export async function crearPedido(
     [COL_PEDIDO.totalFacturaSinIva]: aTextoMonday(totales.facturaSinIva),
     [COL_PEDIDO.totalFacturaConIva]: aTextoMonday(totales.facturaConIva),
   }
-  if (d.clienteIds.length > 0) valores[COL_PEDIDO.tercero] = { item_ids: d.clienteIds }
+  const clienteIds = d.clientes.map((c) => c.id)
+  if (clienteIds.length > 0) valores[COL_PEDIDO.tercero] = { item_ids: clienteIds }
   if (comercialId) {
     valores[COL_PEDIDO.comercial] = { personsAndTeams: [{ id: comercialId, kind: 'person' }] }
   }
-  /* El equipo del concesionario, no una persona: el pedido es del concesionario y lo carga quien
-     esté de turno. */
+  /* El equipo del concesionario además de la persona: la persona dice quién lo cargó y el equipo,
+     de quién es el pedido. Con sólo la persona, el día que esa persona se va el pedido queda
+     huérfano; con sólo el equipo, no se sabe a quién preguntarle. */
   if (d.equipoId) {
     valores[COL_PEDIDO.equipo] = { personsAndTeams: [{ id: Number(d.equipoId), kind: 'team' }] }
   }
@@ -224,20 +249,12 @@ export async function crearPedido(
   }
   if (d.plazo) valores[COL_PEDIDO.plazo] = { label: d.plazo }
 
-  /* El nombre lleva el ID del pedido, que monday recién da al crearlo: se crea con un nombre
-     provisorio y se renombra enseguida. */
+  const nombre = nombreDelPedido(d.cuentaNombre, d.clientes)
   const creado = await mondayApi<{ create_item: { id: string } }>('crearPedido', {
-    nombre: `Pedido de ${d.cuentaNombre.trim()}`,
+    nombre,
     valores: JSON.stringify(valores),
   })
   const pedidoId = creado.create_item.id
-  const nombre = nombreDelPedido(pedidoId, d.cuentaNombre)
-
-  try {
-    await mondayApi('renombrarPedido', { item: pedidoId, nombre })
-  } catch (e) {
-    advertencias.push(`El pedido se creó pero quedó con el nombre provisorio: ${motivo(e)}`)
-  }
 
   let unidades = 0
   for (const r of renglones) {
@@ -262,10 +279,13 @@ export async function crearPedido(
     /* Una fila de 🛍️Ventas por UNIDAD: es lo que después se aprueba y se asigna de a una. */
     for (let i = 0; i < r.cantidad; i += 1) {
       try {
-        const u = await mondayApi<{ create_item: { id: string } }>('crearUnidadDeVenta', {
-          nombre: `${nombre} · ${r.nombre}`,
+        await mondayApi<{ create_item: { id: string } }>('crearUnidadDeVenta', {
+          /* El mismo nombre que el pedido: las unidades se leen agrupadas por su pedido, y lo que
+             distingue a una de otra —el modelo, la matrícula— está en sus propias columnas. */
+          nombre,
           valores: JSON.stringify({
             [COL_VENTA.concesionario]: { item_ids: [d.cuentaId] },
+            ...(clienteIds.length > 0 ? { [COL_VENTA.tercero]: { item_ids: clienteIds } } : {}),
             [COL_VENTA.catalogo]: { item_ids: [r.productoId] },
             [COL_VENTA.subitemPedido]: { item_ids: [subitemId] },
             [COL_VENTA.pedido]: { item_ids: [pedidoId] },
@@ -275,18 +295,17 @@ export async function crearPedido(
                   [COL_VENTA.comercial]: { personsAndTeams: [{ id: comercialId, kind: 'person' }] },
                 }
               : {}),
+            ...(d.equipoId
+              ? {
+                  [COL_VENTA.concesionarioPersonas]: {
+                    personsAndTeams: [{ id: Number(d.equipoId), kind: 'team' }],
+                  },
+                }
+              : {}),
             ...preciosDeLaUnidad(r.precio),
           }),
         })
         unidades += 1
-        try {
-          await mondayApi('renombrarUnidadDeVenta', {
-            item: u.create_item.id,
-            nombre: nombreDeLaUnidad(pedidoId, u.create_item.id, d.cuentaNombre),
-          })
-        } catch {
-          /* El nombre es para leerlo en el tablero; si falla, la unidad ya está y se ve igual. */
-        }
       } catch (e) {
         advertencias.push(`No se pudo crear una unidad de ${r.nombre}: ${motivo(e)}`)
       }

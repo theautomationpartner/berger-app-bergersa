@@ -13,16 +13,19 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Desplegable } from '@/components/ui/Desplegable'
-import { SelectorBuscable } from '@/components/ui/SelectorBuscable'
 import { importe as aMoneda } from '@/lib/format'
-import { descuentoTotalEnPorcentaje, totalesDePedido, type DescuentoConfigurado } from '@/lib/precios'
+import {
+  descuentoTotalEnPorcentaje,
+  totalesDePedido,
+  type DescuentoConfigurado,
+} from '@/lib/precios'
 import {
   catalogoDeVenta,
   descuentosDeContado,
   type ProductoDeCatalogo,
 } from '@/services/monday/catalogoVenta'
 import { esContado, TIPO_PEDIDO, TIPO_VENTA } from '@/services/monday/columns'
-import { cuentasDelCrm, type CuentaCrm } from '@/services/monday/crm'
+import { cuentasDelCrm, etiquetasDelCrm, type CuentaCrm } from '@/services/monday/crm'
 import {
   calcularRenglones,
   crearPedido,
@@ -31,6 +34,8 @@ import {
   type AltaPedido,
 } from '@/services/monday/pedidos'
 import { SinAcceso } from '@/services/monday/sdk'
+import { CatalogoTractores } from './CatalogoTractores'
+import { ClienteFinal } from './ClienteFinal'
 import { FichaCuenta } from './FichaCuenta'
 
 const mensaje = (e: unknown): string => (e instanceof Error ? e.message : String(e))
@@ -90,7 +95,7 @@ const VACIO: AltaPedido = {
   equipoId: '',
   tipoPedido: '',
   tipoVenta: '',
-  clienteIds: [],
+  clientes: [],
   condicionVenta: '',
   banco: '',
   plazo: '',
@@ -121,19 +126,21 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
   const [avisos, setAvisos] = useState<string[]>([])
 
   const [datos, setDatos] = useState<AltaPedido>({ ...VACIO, equipoId })
-  const [busqueda, setBusqueda] = useState('')
+  const [condicionesFiscales, setCondicionesFiscales] = useState<string[]>([])
   const [viendoFotos, setViendoFotos] = useState<ProductoDeCatalogo | null>(null)
 
   const recargar = useCallback(async () => {
     setCargando(true)
     setError(null)
     try {
-      const [c, cat, ds] = await Promise.all([
+      const [c, cat, ds, et] = await Promise.all([
         cuentasDelCrm(),
         catalogoDeVenta(),
         descuentosDeContado(),
+        etiquetasDelCrm(),
       ])
       setCuentas(c)
+      setCondicionesFiscales(et.condicionFiscal)
       setCatalogo(cat.filter((p) => p.vigente))
       setDescuentos(ds)
     } catch (e) {
@@ -182,17 +189,7 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
   )
   const totales = useMemo(() => totalesDePedido(renglones), [renglones])
   const faltan = faltaParaElPedido({ ...datos, equipoId })
-  const terceros = cuentas.filter((c) => datos.clienteIds.includes(c.id))
-
-  const visibles = useMemo(() => {
-    const q = busqueda.trim().toLowerCase()
-    if (!q) return catalogo
-    return catalogo.filter((p) =>
-      `${p.nombre} ${p.modelo} ${p.codigo} ${p.marca} ${p.linea} ${p.gama}`
-        .toLowerCase()
-        .includes(q),
-    )
-  }, [catalogo, busqueda])
+  const terceros = cuentas.filter((c) => datos.clientes.some((x) => x.id === c.id))
 
   const cantidadDe = (id: string) => datos.renglones.find((r) => r.productoId === id)?.cantidad ?? 0
   const productoDe = (id: string) => catalogo.find((p) => p.id === id)
@@ -205,7 +202,9 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
       if (actual) {
         return {
           ...d,
-          renglones: d.renglones.map((r) => (r.productoId === p.id ? { ...r, cantidad: nueva } : r)),
+          renglones: d.renglones.map((r) =>
+            r.productoId === p.id ? { ...r, cantidad: nueva } : r,
+          ),
         }
       }
       return {
@@ -485,7 +484,7 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
                               ...datos,
                               tipoPedido: v,
                               tipoVenta: '',
-                              clienteIds: [],
+                              clientes: [],
                               condicionVenta: '',
                               banco: '',
                               conceptoPago: '',
@@ -506,7 +505,16 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
                             valor={datos.tipoVenta}
                             opciones={[TIPO_VENTA.DIRECTA, TIPO_VENTA.INDIRECTA]}
                             vacio="Elegir…"
-                            onCambiar={(v) => setDatos({ ...datos, tipoVenta: v })}
+                            /* Pasar a indirecta borra el cliente final: deja de preguntarse, y
+                               dejarlo cargado escribiría en el pedido un tercero que la pantalla
+                               ya no muestra. */
+                            onCambiar={(v) =>
+                              setDatos({
+                                ...datos,
+                                tipoVenta: v,
+                                clientes: v === TIPO_VENTA.DIRECTA ? datos.clientes : [],
+                              })
+                            }
                           />
                           {/* Es lo que decide a quién le factura BERGER. */}
                           <span className="campo-ayuda">
@@ -531,56 +539,20 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
                       conCredito
                     />
 
-                    {/* A quién se le vende. En indirecta y en stock la factura va al concesionario,
-                        que ya está arriba; el cliente final se carga igual para que quede
-                        registrado a quién va el tractor. */}
-                    {esTerceros && (
-                      <div className="ficha ficha--elegir">
-                        <div className="ficha-head">
-                          <span className="ficha-rotulo">
-                            Cliente final
-                            {esDirecta && <span className="campo-req"> · obligatorio</span>}
-                          </span>
-                        </div>
-
-                        {terceros.map((c) => (
-                          <FichaCuenta
-                            key={c.id}
-                            cuenta={c}
-                            rotulo=""
-                            onQuitar={() =>
-                              setDatos({
-                                ...datos,
-                                clienteIds: datos.clienteIds.filter((x) => x !== c.id),
-                              })
-                            }
-                          />
-                        ))}
-
-                        <SelectorBuscable
-                          valor=""
-                          opciones={cuentas
-                            .filter((c) => c.id !== datos.cuentaId && !datos.clienteIds.includes(c.id))
-                            .map((c) => ({
-                              valor: c.id,
-                              rotulo: c.nombre,
-                              detalle: [c.cuit && `CUIT ${c.cuit}`, c.ciudad, c.provincia]
-                                .filter(Boolean)
-                                .join(' · '),
-                            }))}
-                          vacio={cargando ? 'Cargando las cuentas…' : 'Buscar por nombre o CUIT…'}
-                          queSon="cuentas"
-                          bloqueado={cargando}
-                          onCambiar={(v) =>
-                            v && setDatos({ ...datos, clienteIds: [...datos.clienteIds, v] })
-                          }
-                        />
-                        <span className="campo-ayuda">
-                          Si el cliente todavía no está cargado, se da de alta en{' '}
-                          <b>Cuentas y contactos</b> —ahí el CUIT trae los datos de ARCA— y volvés
-                          acá a buscarlo.
-                        </span>
-                      </div>
+                    {/* A quién se le vende, sólo en venta DIRECTA: ahí BERGER le factura al cliente
+                        final y necesita saber quién es. En la indirecta y en la compra de stock la
+                        factura va al concesionario, que ya está acá arriba, y preguntar por un
+                        cliente que no interviene sólo haría dudar de si hay que completarlo. */}
+                    {esDirecta && (
+                      <ClienteFinal
+                        cuentas={cuentas}
+                        condicionesFiscales={condicionesFiscales}
+                        elegidos={datos.clientes}
+                        onCambiar={(clientes) => setDatos({ ...datos, clientes })}
+                        excluirId={datos.cuentaId}
+                        cargando={cargando}
+                        onCuentaNueva={(c) => setCuentas((v) => [...v, c])}
+                      />
                     )}
                   </div>
                 )}
@@ -599,90 +571,14 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
                       <span className="chip chip--indigo">{catalogo.length} modelos</span>
                     </span>
                   </div>
-                  <div className="op-editor-cuerpo form-moderno">
-                    <input
-                      className="input"
-                      placeholder="Buscar por modelo, código, marca, línea o gama…"
-                      value={busqueda}
-                      onChange={(e) => setBusqueda(e.target.value)}
+                  <div className="op-editor-cuerpo">
+                    <CatalogoTractores
+                      productos={catalogo}
+                      cantidadDe={cantidadDe}
+                      onCambiarCantidad={cambiarCantidad}
+                      onVerFotos={setViendoFotos}
+                      cargando={cargando}
                     />
-
-                    <div className="catalogo">
-                      {visibles.map((p) => {
-                        const q = cantidadDe(p.id)
-                        return (
-                          <div key={p.id} className={`producto${q > 0 ? ' producto--elegido' : ''}`}>
-                            <div className="producto-head">
-                              <span className="producto-nom">{p.modelo || p.nombre}</span>
-                              {p.imagenes.length > 0 && (
-                                <button
-                                  type="button"
-                                  className="btn btn--texto btn--chico"
-                                  onClick={() => setViendoFotos(p)}
-                                >
-                                  <i className="fa-solid fa-image" aria-hidden="true" />{' '}
-                                  {p.imagenes.length}
-                                </button>
-                              )}
-                            </div>
-                            <div className="producto-datos">
-                              {p.marca && <span className="chip chip--gris">{p.marca}</span>}
-                              {p.linea && <span className="chip chip--gris">{p.linea}</span>}
-                              {p.gama && <span className="chip chip--gris">{p.gama}</span>}
-                              {p.traccion && (
-                                <span className="chip chip--gris">Tracción {p.traccion}</span>
-                              )}
-                              {p.potenciaKw != null && (
-                                <span className="chip chip--gris">{p.potenciaKw} kW</span>
-                              )}
-                              {p.cilindrada != null && (
-                                <span className="chip chip--gris">{p.cilindrada} cm³</span>
-                              )}
-                            </div>
-                            {p.rodado && <div className="producto-rodado">Rodado: {p.rodado}</div>}
-                            <div className="producto-pie">
-                              <span className="producto-precio">
-                                {aMoneda(p.precio)}
-                                <small>+ IVA {p.iva}%</small>
-                              </span>
-                              {q > 0 ? (
-                                <span className="contador">
-                                  <button
-                                    type="button"
-                                    aria-label="Uno menos"
-                                    onClick={() => cambiarCantidad(p, -1)}
-                                  >
-                                    −
-                                  </button>
-                                  <b>{q}</b>
-                                  <button
-                                    type="button"
-                                    aria-label="Uno más"
-                                    onClick={() => cambiarCantidad(p, 1)}
-                                  >
-                                    +
-                                  </button>
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="btn btn--borde btn--chico"
-                                  onClick={() => cambiarCantidad(p, 1)}
-                                >
-                                  Agregar
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                      {visibles.length === 0 && !cargando && (
-                        <div className="aviso aviso--neutro">
-                          <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
-                          <span>No hay ningún tractor que coincida con «{busqueda}».</span>
-                        </div>
-                      )}
-                    </div>
                   </div>
                 </div>
 
@@ -747,7 +643,9 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
                             vacio="Elegir…"
                             onCambiar={(v) => setDatos({ ...datos, conceptoPago: v })}
                           />
-                          <span className="campo-ayuda">Cómo pagan ustedes la compra de stock.</span>
+                          <span className="campo-ayuda">
+                            Cómo pagan ustedes la compra de stock.
+                          </span>
                         </div>
                       )}
 
@@ -811,7 +709,8 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
                   <div className="card card--flush op-editor">
                     <div className="ctitle op-editor-head">
                       <span className="op-editor-nom">
-                        <i className="fa-solid fa-receipt" aria-hidden="true" /> Cómo queda el pedido
+                        <i className="fa-solid fa-receipt" aria-hidden="true" /> Cómo queda el
+                        pedido
                       </span>
                       {contado && (
                         <span className="op-editor-chips">
@@ -851,7 +750,9 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
                       {datos.tipoPedido && (
                         <span className="chip chip--indigo">{datos.tipoPedido}</span>
                       )}
-                      {datos.tipoVenta && <span className="chip chip--azul">{datos.tipoVenta}</span>}
+                      {datos.tipoVenta && (
+                        <span className="chip chip--azul">{datos.tipoVenta}</span>
+                      )}
                       {pago && <span className="chip chip--verde">{pago}</span>}
                     </span>
                   </div>
@@ -896,8 +797,8 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
 
                     {faltan.length > 0 && (
                       <span className="campo-ayuda campo-ayuda--falta">
-                        <i className="fa-solid fa-lock" aria-hidden="true" /> Falta {faltan.join(', ')}
-                        .
+                        <i className="fa-solid fa-lock" aria-hidden="true" /> Falta{' '}
+                        {faltan.join(', ')}.
                       </span>
                     )}
                   </div>

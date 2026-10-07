@@ -81,7 +81,10 @@ export function FichaCuenta({ cuenta, rotulo, conCredito, onQuitar }: Props) {
             </span>
           </div>
           <div className="credito-barra">
-            <span className={`credito-barra-usa credito-barra-usa--${tono}`} style={{ width: `${porciento}%` }} />
+            <span
+              className={`credito-barra-usa credito-barra-usa--${tono}`}
+              style={{ width: `${porciento}%` }}
+            />
           </div>
           <span className="credito-pie">
             {asignado > 0 ? `${porciento}% de la línea utilizada` : 'Sin línea de crédito asignada'}

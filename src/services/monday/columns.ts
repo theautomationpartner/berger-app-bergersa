@@ -1099,8 +1099,11 @@ export const COL_PEDIDO_SUB = {
 export const COL_VENTA = {
   inventario: 'board_relation_mm7x6m1z',
   comercial: 'multiple_person_mm7xvzr1',
+  /** El equipo de monday del concesionario, igual que en 🔖Pedidos. */
   concesionarioPersonas: 'multiple_person_mm7x116b',
   concesionario: 'board_relation_mm7xqezp',
+  /** El cliente final, cuando el pedido es una venta a terceros. */
+  tercero: 'board_relation_mm7xev9j',
   catalogo: 'board_relation_mm7xb5ms',
   /** El subitem del pedido del que salió esta unidad. */
   subitemPedido: 'board_relation_mm7xz8pv',
