@@ -11,6 +11,10 @@ import { sesionDelDia } from './sesionDelDia'
 export interface PerfilIngreso {
   id: string
   nombre: string
+  /** Los equipos de su fila de la Lista Blanca: "Administracion", "Concesionario 1"… */
+  equipos?: string[]
+  /** El id de ese equipo en monday. Lo decide el servidor, no la pantalla. */
+  equipoId?: string
 }
 
 /** Lo que devuelve el servidor, ya traducido a un paso de la pantalla. */

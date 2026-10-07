@@ -63,6 +63,8 @@ export interface RenglonElegido {
 export interface AltaPedido {
   /** La cuenta del concesionario que pide. */
   cuentaId: string
+  /** El equipo de monday de ese concesionario. Sale de la sesión, no de la pantalla. */
+  equipoId: string
   /** Cómo se llama, para el nombre del item. */
   cuentaNombre: string
   tipoPedido: string
@@ -191,7 +193,9 @@ export async function crearPedido(
   }
 
   const valores: Record<string, unknown> = {
-    [COL_PEDIDO.cuenta]: { item_ids: [d.cuentaId, ...d.clienteIds] },
+    /* El concesionario y el tercero van en columnas distintas: el primero es quien pide y el
+       segundo a quién se le vende, y mezclarlos haría imposible saber cuál es cuál. */
+    [COL_PEDIDO.cuenta]: { item_ids: [d.cuentaId] },
     [COL_PEDIDO.tipoPedido]: { label: d.tipoPedido },
     [COL_PEDIDO.estado]: { label: ESTADO_PEDIDO.CARGADA },
     [COL_PEDIDO.fechaSolicitud]: { date: hoy() },
@@ -202,8 +206,14 @@ export async function crearPedido(
     [COL_PEDIDO.totalFacturaSinIva]: aTextoMonday(totales.facturaSinIva),
     [COL_PEDIDO.totalFacturaConIva]: aTextoMonday(totales.facturaConIva),
   }
+  if (d.clienteIds.length > 0) valores[COL_PEDIDO.tercero] = { item_ids: d.clienteIds }
   if (comercialId) {
     valores[COL_PEDIDO.comercial] = { personsAndTeams: [{ id: comercialId, kind: 'person' }] }
+  }
+  /* El equipo del concesionario, no una persona: el pedido es del concesionario y lo carga quien
+     esté de turno. */
+  if (d.equipoId) {
+    valores[COL_PEDIDO.equipo] = { personsAndTeams: [{ id: Number(d.equipoId), kind: 'team' }] }
   }
   if (d.tipoPedido === TIPO_PEDIDO.TERCEROS) {
     if (d.tipoVenta) valores[COL_PEDIDO.tipoVenta] = { label: d.tipoVenta }

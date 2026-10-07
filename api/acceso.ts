@@ -69,7 +69,19 @@ const json = (status: number, cuerpo: unknown): Response =>
 const sinAcceso = () => json(403, { estado: 'sin_acceso' })
 
 /** Lo mínimo de un perfil que necesita la pantalla. Nada de la configuración de acceso. */
-const publico = (p: Perfil) => ({ id: p.id, nombre: p.nombre })
+/**
+ * Lo que la app sabe del perfil.
+ *
+ * Va el equipo además del nombre porque la venta lo necesita: un pedido se firma con el
+ * concesionario que lo carga, y ese dato tiene que salir del servidor. Si lo eligiera la pantalla,
+ * un comercial podría cargar un pedido a nombre de otro concesionario.
+ */
+const publico = (p: Perfil) => ({
+  id: p.id,
+  nombre: p.nombre,
+  equipos: p.teams,
+  equipoId: p.idTeam,
+})
 
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') return json(405, { estado: 'error' })

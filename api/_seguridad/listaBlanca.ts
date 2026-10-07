@@ -20,6 +20,8 @@ export interface Perfil {
   apps: string[]
   /** Equipos de la columna "Team": deciden qué módulos de la app ve. */
   teams: string[]
+  /** Id del equipo en monday, tal como quedó cargado en la fila. */
+  idTeam: string
   tipoUsuario: string
   autenticadorDesactivado: boolean
 }
@@ -59,6 +61,7 @@ function aPerfil(item: ItemCrudo): Perfil {
     activo: textoDe(c, COL_LISTA_BLANCA.estado) === ETIQUETA.ACTIVO,
     apps: lista(textoDe(c, COL_LISTA_BLANCA.appsIds)),
     teams: lista(textoDe(c, COL_LISTA_BLANCA.team)),
+    idTeam: textoDe(c, COL_LISTA_BLANCA.idTeam),
     tipoUsuario: textoDe(c, COL_LISTA_BLANCA.tipoUsuario),
     autenticadorDesactivado:
       textoDe(c, COL_LISTA_BLANCA.desactivarAutenticador) === ETIQUETA.AUTENTICADOR_DESACTIVADO,

@@ -64,6 +64,8 @@ export const COL_LISTA_BLANCA = {
   appsIds: 'dropdown_mm72bgr3',
   /** Equipo al que pertenece: decide qué módulos de la app ve. */
   team: 'dropdown_mm72dj2g',
+  /** Id de ese equipo en monday. Lo usa la venta para firmar el pedido con el concesionario. */
+  idTeam: 'text_mm7w9a21',
   tipoUsuario: 'color_mm728j0d',
   desactivarAutenticador: 'color_mm779m2m',
 } as const

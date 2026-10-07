@@ -1,20 +1,21 @@
 /**
  * VENTA · Gestionar pedidos, del lado del concesionario.
  *
- * Dos trabajos: cargar un pedido nuevo y seguir los que ya mandó. Arriba, quién es y a qué
- * concesionario pertenece —dato que no se elige, sale de su fila de la Lista Blanca y de la cuenta
- * del CRM—, porque un comercial que carga un pedido para el concesionario equivocado es un
- * problema que después hay que deshacer a mano en tres tableros.
+ * Dos trabajos: cargar un pedido nuevo y seguir los que ya mandó.
  *
  * El pedido se arma en cuatro pasos y no en una pantalla larga: lo que se pregunta en cada uno
  * depende de lo anterior. Si es compra de stock no hay cliente final; si no es contado no hay
  * descuentos; si la condición no menciona un banco, no se pregunta cuál.
+ *
+ * Desde que hay un tractor adentro, el pedido queda a la vista con el total de cada renglón y el
+ * del pedido entero. Acá lo que se decide es un número: esconderlo hasta el resumen obliga a
+ * llegar al final para descubrir que no cerraba.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Desplegable } from '@/components/ui/Desplegable'
-import { SelectorBuscableMulti } from '@/components/ui/SelectorBuscable'
+import { SelectorBuscable } from '@/components/ui/SelectorBuscable'
 import { importe as aMoneda } from '@/lib/format'
-import { descuentoTotalEnPorcentaje, type DescuentoConfigurado } from '@/lib/precios'
+import { descuentoTotalEnPorcentaje, totalesDePedido, type DescuentoConfigurado } from '@/lib/precios'
 import {
   catalogoDeVenta,
   descuentosDeContado,
@@ -30,7 +31,7 @@ import {
   type AltaPedido,
 } from '@/services/monday/pedidos'
 import { SinAcceso } from '@/services/monday/sdk'
-import { totalesDePedido } from '@/lib/precios'
+import { FichaCuenta } from './FichaCuenta'
 
 const mensaje = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
@@ -86,6 +87,7 @@ const PLAZOS = ['30 días', '60 días', '90 días', '120 días', '12 Cuotas', '2
 const VACIO: AltaPedido = {
   cuentaId: '',
   cuentaNombre: '',
+  equipoId: '',
   tipoPedido: '',
   tipoVenta: '',
   clienteIds: [],
@@ -96,7 +98,14 @@ const VACIO: AltaPedido = {
   renglones: [],
 }
 
-export function GestionarPedidos() {
+const PASOS = ['El pedido', 'Los tractores', 'El pago', 'Revisar y mandar']
+
+interface Props {
+  /** El equipo de monday del concesionario. Sale de la sesión, no de la pantalla. */
+  equipoId?: string
+}
+
+export function GestionarPedidos({ equipoId = '' }: Props) {
   const [trabajo, setTrabajo] = useState<Trabajo>('nuevo')
   const [paso, setPaso] = useState(1)
 
@@ -111,7 +120,7 @@ export function GestionarPedidos() {
   const [hecho, setHecho] = useState<string | null>(null)
   const [avisos, setAvisos] = useState<string[]>([])
 
-  const [datos, setDatos] = useState<AltaPedido>(VACIO)
+  const [datos, setDatos] = useState<AltaPedido>({ ...VACIO, equipoId })
   const [busqueda, setBusqueda] = useState('')
   const [viendoFotos, setViendoFotos] = useState<ProductoDeCatalogo | null>(null)
 
@@ -142,8 +151,8 @@ export function GestionarPedidos() {
     void recargar()
   }, [recargar])
 
-  /* El concesionario sale de las cuentas con categoría Concesionario. Mientras haya una sola, se
-     elige sola: preguntarle a alguien algo que tiene una única respuesta es hacerlo trabajar. */
+  /* El concesionario sale de las cuentas con categoría Concesionario. Si hay una sola, se elige
+     sola: preguntar algo que tiene una única respuesta es hacer trabajar al otro de gusto. */
   const concesionarios = useMemo(
     () => cuentas.filter((c) => c.categoria.toLowerCase().includes('concesionario')),
     [cuentas],
@@ -161,6 +170,7 @@ export function GestionarPedidos() {
 
   const miConcesionario = cuentas.find((c) => c.id === datos.cuentaId) ?? null
   const esTerceros = datos.tipoPedido === TIPO_PEDIDO.TERCEROS
+  const esDirecta = esTerceros && datos.tipoVenta === TIPO_VENTA.DIRECTA
   const pago = pagoDelPedido(datos)
   const contado = esContado(pago)
   /* "BANCO" aparece suelto y dentro de combinaciones: alcanza con que la condición lo mencione. */
@@ -171,7 +181,8 @@ export function GestionarPedidos() {
     [datos, descuentos, contado],
   )
   const totales = useMemo(() => totalesDePedido(renglones), [renglones])
-  const faltan = faltaParaElPedido(datos)
+  const faltan = faltaParaElPedido({ ...datos, equipoId })
+  const terceros = cuentas.filter((c) => datos.clienteIds.includes(c.id))
 
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
@@ -184,6 +195,7 @@ export function GestionarPedidos() {
   }, [catalogo, busqueda])
 
   const cantidadDe = (id: string) => datos.renglones.find((r) => r.productoId === id)?.cantidad ?? 0
+  const productoDe = (id: string) => catalogo.find((p) => p.id === id)
 
   const cambiarCantidad = (p: ProductoDeCatalogo, delta: number) => {
     setDatos((d) => {
@@ -193,9 +205,7 @@ export function GestionarPedidos() {
       if (actual) {
         return {
           ...d,
-          renglones: d.renglones.map((r) =>
-            r.productoId === p.id ? { ...r, cantidad: nueva } : r,
-          ),
+          renglones: d.renglones.map((r) => (r.productoId === p.id ? { ...r, cantidad: nueva } : r)),
         }
       }
       return {
@@ -221,12 +231,12 @@ export function GestionarPedidos() {
     setHecho(null)
     setAvisos([])
     try {
-      const r = await crearPedido(datos, descuentos)
+      const r = await crearPedido({ ...datos, equipoId }, descuentos)
       setHecho(
         `${r.nombre} quedó cargado con ${r.unidades} unidad${r.unidades === 1 ? '' : 'es'}, por ${aMoneda(r.totales.facturaSinIva)} + IVA.`,
       )
       setAvisos(r.advertencias)
-      setDatos({ ...VACIO, cuentaId: datos.cuentaId, cuentaNombre: datos.cuentaNombre })
+      setDatos({ ...VACIO, equipoId, cuentaId: datos.cuentaId, cuentaNombre: datos.cuentaNombre })
       setPaso(1)
     } catch (e) {
       setErrorEnvio(mensaje(e))
@@ -235,9 +245,100 @@ export function GestionarPedidos() {
     }
   }
 
-  const PASOS = ['El pedido', 'Los tractores', 'El pago', 'Revisar y mandar']
+  /**
+   * El pedido armado hasta acá.
+   *
+   * Cada renglón muestra el precio de una unidad y el subtotal por la cantidad, sin IVA y con IVA,
+   * en columnas propias. Es la única forma de que alguien pueda controlar la cuenta: un renglón que
+   * mezcla los cuatro números en una línea no se lee, se adivina.
+   */
+  const tablaDelPedido = (editable: boolean) => (
+    <div className="pedido-tabla">
+      <div className="pedido-tabla-caja">
+        <table>
+          <thead>
+            <tr>
+              <th>Tractor</th>
+              <th className="n">Cant.</th>
+              <th className="n">Lista s/IVA</th>
+              {contado && <th className="n">Con desc. s/IVA</th>}
+              <th className="n">Subtotal s/IVA</th>
+              <th className="n">Subtotal c/IVA</th>
+              {editable && <th aria-label="Cantidad" />}
+            </tr>
+          </thead>
+          <tbody>
+            {renglones.map((r) => {
+              const p = productoDe(r.productoId)
+              return (
+                <tr key={r.productoId}>
+                  <td className="pedido-tractor">
+                    <b>{r.modelo || r.nombre}</b>
+                    <small>
+                      {[p?.marca, p?.linea].filter(Boolean).join(' · ') || 'Catálogo'} · IVA{' '}
+                      {p?.iva ?? 0}%
+                    </small>
+                  </td>
+                  <td className="n">{r.cantidad}</td>
+                  <td className="n apagado">{aMoneda(r.precio.listaSinIva)}</td>
+                  {contado && <td className="n verde">{aMoneda(r.precio.contadoSinIva)}</td>}
+                  <td className="n fuerte">{aMoneda(r.precio.facturaSinIva * r.cantidad)}</td>
+                  <td className="n apagado">{aMoneda(r.precio.facturaConIva * r.cantidad)}</td>
+                  {editable && (
+                    <td className="n">
+                      <span className="contador">
+                        <button
+                          type="button"
+                          aria-label="Uno menos"
+                          onClick={() => p && cambiarCantidad(p, -1)}
+                        >
+                          −
+                        </button>
+                        <b>{r.cantidad}</b>
+                        <button
+                          type="button"
+                          aria-label="Uno más"
+                          onClick={() => p && cambiarCantidad(p, 1)}
+                        >
+                          +
+                        </button>
+                      </span>
+                    </td>
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
-  /* ---------------- pantalla ---------------- */
+      <div className="pedido-totales">
+        <div className="pedido-linea">
+          <span>Total de lista s/IVA</span>
+          <b>{aMoneda(totales.listaSinIva)}</b>
+        </div>
+        {contado && (
+          <div className="pedido-linea pedido-linea--resta">
+            <span>Descuento por contado ({descuentoTotalEnPorcentaje(descuentos)}%)</span>
+            <b>− {aMoneda(totales.listaSinIva - totales.contadoSinIva)}</b>
+          </div>
+        )}
+        <div className="pedido-linea">
+          <span>IVA</span>
+          <b>{aMoneda(totales.facturaConIva - totales.facturaSinIva)}</b>
+        </div>
+        {/* El número del que se habla es el de sin IVA: es el que se factura. */}
+        <div className="pedido-linea pedido-linea--total">
+          <span>A facturar s/IVA</span>
+          <span>{aMoneda(totales.facturaSinIva)}</span>
+        </div>
+        <div className="pedido-linea pedido-linea--suave">
+          <span>Con IVA</span>
+          <b>{aMoneda(totales.facturaConIva)}</b>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="scroll">
@@ -253,23 +354,6 @@ export function GestionarPedidos() {
             </span>
           </span>
         </div>
-
-        {/* Quién es y de dónde: no se elige, sale de la cuenta del CRM. */}
-        {miConcesionario && (
-          <div className="ficha-concesionario">
-            <span className="ficha-concesionario-ic">
-              <i className="fa-solid fa-store" aria-hidden="true" />
-            </span>
-            <span className="ficha-concesionario-txt">
-              <span className="ficha-concesionario-nom">{miConcesionario.nombre}</span>
-              <span className="ficha-concesionario-det">
-                {[miConcesionario.direccion, miConcesionario.ciudad, miConcesionario.provincia]
-                  .filter(Boolean)
-                  .join(', ') || 'Sin dirección cargada'}
-              </span>
-            </span>
-          </div>
-        )}
 
         <div className="decision decision--grande decision--elige">
           <button
@@ -303,24 +387,22 @@ export function GestionarPedidos() {
         </div>
 
         {error && (
-          <div className="aviso aviso--error" style={{ marginTop: 14 }}>
+          <div className="aviso aviso--error">
             <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
             <span>No se pudo leer el catálogo: {error}</span>
           </div>
         )}
-
         {hecho && (
-          <div className="aviso aviso--ok" style={{ marginTop: 14 }}>
+          <div className="aviso aviso--ok">
             <i className="fa-solid fa-circle-check" aria-hidden="true" />
             <span>{hecho}</span>
           </div>
         )}
-
         {avisos.length > 0 && (
-          <div className="aviso aviso--alerta" style={{ marginTop: 14 }}>
+          <div className="aviso aviso--alerta">
             <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
             <span>
-              Quedó algo sin hacer:
+              El pedido quedó cargado, pero algo no se pudo hacer:
               <ul className="lista-compacta">
                 {avisos.map((a) => (
                   <li key={a}>{a}</li>
@@ -329,9 +411,8 @@ export function GestionarPedidos() {
             </span>
           </div>
         )}
-
         {errorEnvio && (
-          <div className="aviso aviso--error" style={{ marginTop: 14 }}>
+          <div className="aviso aviso--error">
             <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
             <span>No se pudo cargar el pedido: {errorEnvio}</span>
           </div>
@@ -339,12 +420,13 @@ export function GestionarPedidos() {
 
         {trabajo === 'nuevo' && (
           <>
-            {/* Los pasos, para saber cuánto falta. */}
             <ol className="pasos">
               {PASOS.map((p, i) => (
                 <li
                   key={p}
-                  className={`paso${i + 1 === paso ? ' paso--actual' : i + 1 < paso ? ' paso--hecho' : ''}`}
+                  className={`paso${
+                    i + 1 === paso ? ' paso--actual' : i + 1 < paso ? ' paso--hecho' : ''
+                  }`}
                 >
                   <span className="paso-num">{i + 1 < paso ? '✓' : i + 1}</span>
                   <span className="paso-txt">{p}</span>
@@ -352,11 +434,17 @@ export function GestionarPedidos() {
               ))}
             </ol>
 
-            <div className="card card--flush op-editor">
-              <div className="op-editor-cuerpo form-moderno">
-                {/* ---------- 1. El pedido ---------- */}
-                {paso === 1 && (
-                  <>
+            {/* ============ 1. Qué clase de pedido es y para quién ============ */}
+            {paso === 1 && (
+              <>
+                <div className="card card--flush op-editor">
+                  <div className="ctitle op-editor-head">
+                    <span className="op-editor-nom">
+                      <i className="fa-solid fa-file-invoice" aria-hidden="true" /> Qué clase de
+                      pedido es
+                    </span>
+                  </div>
+                  <div className="op-editor-cuerpo form-moderno">
                     <div className="datos datos--form">
                       {concesionarios.length > 1 && (
                         <div className="campo">
@@ -368,9 +456,11 @@ export function GestionarPedidos() {
                             opciones={concesionarios.map((c) => ({
                               valor: c.id,
                               rotulo: c.nombre,
+                              detalle: c.cuit ? `CUIT ${c.cuit}` : '',
                             }))}
                             vacio="Elegir…"
                             bloqueado={cargando}
+                            buscable
                             onCambiar={(v) =>
                               setDatos({
                                 ...datos,
@@ -394,7 +484,6 @@ export function GestionarPedidos() {
                             setDatos({
                               ...datos,
                               tipoPedido: v,
-                              /* Pasar de terceros a stock deja datos que ya no corresponden. */
                               tipoVenta: '',
                               clienteIds: [],
                               condicionVenta: '',
@@ -419,69 +508,110 @@ export function GestionarPedidos() {
                             vacio="Elegir…"
                             onCambiar={(v) => setDatos({ ...datos, tipoVenta: v })}
                           />
-                          {/* Es la diferencia que decide a quién le factura BERGER. */}
+                          {/* Es lo que decide a quién le factura BERGER. */}
                           <span className="campo-ayuda">
                             {datos.tipoVenta === TIPO_VENTA.DIRECTA
-                              ? 'BERGER le factura al cliente final.'
+                              ? 'BERGER le factura directo al cliente final.'
                               : datos.tipoVenta === TIPO_VENTA.INDIRECTA
-                                ? 'BERGER les factura a ustedes, como en compra de stock.'
+                                ? 'BERGER les factura a ustedes, y ustedes al cliente.'
                                 : 'Directa: BERGER factura al cliente. Indirecta: les factura a ustedes.'}
                           </span>
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
 
+                {/* Quién pide: siempre, y con su línea de crédito, que es lo que condiciona todo. */}
+                {miConcesionario && (
+                  <div className="fichas">
+                    <FichaCuenta
+                      cuenta={miConcesionario}
+                      rotulo="Concesionario que pide"
+                      conCredito
+                    />
+
+                    {/* A quién se le vende. En indirecta y en stock la factura va al concesionario,
+                        que ya está arriba; el cliente final se carga igual para que quede
+                        registrado a quién va el tractor. */}
                     {esTerceros && (
-                      <div className="sub-bloque">
-                        <span className="sub-bloque-tit">
-                          <i className="fa-solid fa-users" aria-hidden="true" /> El cliente final
-                        </span>
-                        <SelectorBuscableMulti
-                          valores={datos.clienteIds}
+                      <div className="ficha ficha--elegir">
+                        <div className="ficha-head">
+                          <span className="ficha-rotulo">
+                            Cliente final
+                            {esDirecta && <span className="campo-req"> · obligatorio</span>}
+                          </span>
+                        </div>
+
+                        {terceros.map((c) => (
+                          <FichaCuenta
+                            key={c.id}
+                            cuenta={c}
+                            rotulo=""
+                            onQuitar={() =>
+                              setDatos({
+                                ...datos,
+                                clienteIds: datos.clienteIds.filter((x) => x !== c.id),
+                              })
+                            }
+                          />
+                        ))}
+
+                        <SelectorBuscable
+                          valor=""
                           opciones={cuentas
-                            .filter((c) => c.id !== datos.cuentaId)
+                            .filter((c) => c.id !== datos.cuentaId && !datos.clienteIds.includes(c.id))
                             .map((c) => ({
                               valor: c.id,
                               rotulo: c.nombre,
-                              detalle: [c.cuit && `CUIT ${c.cuit}`, c.ciudad]
+                              detalle: [c.cuit && `CUIT ${c.cuit}`, c.ciudad, c.provincia]
                                 .filter(Boolean)
                                 .join(' · '),
                             }))}
-                          vacio="Escribí el nombre o el CUIT"
+                          vacio={cargando ? 'Cargando las cuentas…' : 'Buscar por nombre o CUIT…'}
                           queSon="cuentas"
-                          fichasGrandes
                           bloqueado={cargando}
-                          onCambiar={(ids) => setDatos({ ...datos, clienteIds: ids })}
+                          onCambiar={(v) =>
+                            v && setDatos({ ...datos, clienteIds: [...datos.clienteIds, v] })
+                          }
                         />
                         <span className="campo-ayuda">
-                          Puede ser más de uno. Si todavía no está cargado, se da de alta en
-                          «Cuentas y contactos» y vuelve acá.
+                          Si el cliente todavía no está cargado, se da de alta en{' '}
+                          <b>Cuentas y contactos</b> —ahí el CUIT trae los datos de ARCA— y volvés
+                          acá a buscarlo.
                         </span>
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
+              </>
+            )}
 
-                {/* ---------- 2. Los tractores ---------- */}
-                {paso === 2 && (
-                  <>
-                    <div className="campo campo--busqueda">
-                      <input
-                        className="input"
-                        placeholder="Buscar por modelo, código, línea o gama…"
-                        value={busqueda}
-                        onChange={(e) => setBusqueda(e.target.value)}
-                      />
-                    </div>
+            {/* ============ 2. Los tractores ============ */}
+            {paso === 2 && (
+              <>
+                <div className="card card--flush op-editor">
+                  <div className="ctitle op-editor-head">
+                    <span className="op-editor-nom">
+                      <i className="fa-solid fa-tractor" aria-hidden="true" /> Elegí los tractores
+                    </span>
+                    <span className="op-editor-chips">
+                      <span className="chip chip--indigo">{catalogo.length} modelos</span>
+                    </span>
+                  </div>
+                  <div className="op-editor-cuerpo form-moderno">
+                    <input
+                      className="input"
+                      placeholder="Buscar por modelo, código, marca, línea o gama…"
+                      value={busqueda}
+                      onChange={(e) => setBusqueda(e.target.value)}
+                    />
 
                     <div className="catalogo">
                       {visibles.map((p) => {
                         const q = cantidadDe(p.id)
                         return (
-                          <div
-                            key={p.id}
-                            className={`producto${q > 0 ? ' producto--elegido' : ''}`}
-                          >
+                          <div key={p.id} className={`producto${q > 0 ? ' producto--elegido' : ''}`}>
                             <div className="producto-head">
                               <span className="producto-nom">{p.modelo || p.nombre}</span>
                               {p.imagenes.length > 0 && (
@@ -513,15 +643,23 @@ export function GestionarPedidos() {
                             <div className="producto-pie">
                               <span className="producto-precio">
                                 {aMoneda(p.precio)}
-                                <small> + IVA {p.iva}%</small>
+                                <small>+ IVA {p.iva}%</small>
                               </span>
                               {q > 0 ? (
                                 <span className="contador">
-                                  <button type="button" onClick={() => cambiarCantidad(p, -1)}>
+                                  <button
+                                    type="button"
+                                    aria-label="Uno menos"
+                                    onClick={() => cambiarCantidad(p, -1)}
+                                  >
                                     −
                                   </button>
                                   <b>{q}</b>
-                                  <button type="button" onClick={() => cambiarCantidad(p, 1)}>
+                                  <button
+                                    type="button"
+                                    aria-label="Uno más"
+                                    onClick={() => cambiarCantidad(p, 1)}
+                                  >
                                     +
                                   </button>
                                 </span>
@@ -538,19 +676,45 @@ export function GestionarPedidos() {
                           </div>
                         )
                       })}
-                      {visibles.length === 0 && (
+                      {visibles.length === 0 && !cargando && (
                         <div className="aviso aviso--neutro">
                           <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
                           <span>No hay ningún tractor que coincida con «{busqueda}».</span>
                         </div>
                       )}
                     </div>
-                  </>
-                )}
+                  </div>
+                </div>
 
-                {/* ---------- 3. El pago ---------- */}
-                {paso === 3 && (
-                  <>
+                {/* El pedido, abajo y siempre visible mientras se elige. */}
+                {renglones.length > 0 && (
+                  <div className="card card--flush op-editor">
+                    <div className="ctitle op-editor-head">
+                      <span className="op-editor-nom">
+                        <i className="fa-solid fa-receipt" aria-hidden="true" /> El pedido
+                      </span>
+                      <span className="op-editor-chips">
+                        <span className="chip chip--verde">
+                          {totales.unidades} unidad{totales.unidades === 1 ? '' : 'es'}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="op-editor-cuerpo">{tablaDelPedido(true)}</div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ============ 3. El pago ============ */}
+            {paso === 3 && (
+              <>
+                <div className="card card--flush op-editor">
+                  <div className="ctitle op-editor-head">
+                    <span className="op-editor-nom">
+                      <i className="fa-solid fa-money-bill-wave" aria-hidden="true" /> Cómo se paga
+                    </span>
+                  </div>
+                  <div className="op-editor-cuerpo form-moderno">
                     <div className="datos datos--form">
                       {esTerceros ? (
                         <div className="campo">
@@ -583,10 +747,10 @@ export function GestionarPedidos() {
                             vacio="Elegir…"
                             onCambiar={(v) => setDatos({ ...datos, conceptoPago: v })}
                           />
+                          <span className="campo-ayuda">Cómo pagan ustedes la compra de stock.</span>
                         </div>
                       )}
 
-                      {/* El banco sólo si la condición lo menciona. */}
                       {pideBanco && (
                         <div className="campo">
                           <span className="campo-lbl">Banco</span>
@@ -600,20 +764,20 @@ export function GestionarPedidos() {
                         </div>
                       )}
 
-                      {(datos.conceptoPago === 'Crédito Bancario' || pideBanco || esTerceros) && (
-                        <div className="campo">
-                          <span className="campo-lbl">Plazo propuesto</span>
-                          <Desplegable
-                            valor={datos.plazo}
-                            opciones={PLAZOS}
-                            vacio="Elegir…"
-                            onCambiar={(v) => setDatos({ ...datos, plazo: v })}
-                          />
-                        </div>
-                      )}
+                      <div className="campo">
+                        <span className="campo-lbl">Plazo propuesto</span>
+                        <Desplegable
+                          valor={datos.plazo}
+                          opciones={PLAZOS}
+                          vacio="Elegir…"
+                          onCambiar={(v) => setDatos({ ...datos, plazo: v })}
+                        />
+                        <span className="campo-ayuda">
+                          Es una propuesta: BERGER lo confirma al aprobar el pedido.
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Los descuentos, sólo con contado y antes de ver un solo número. */}
                     {contado && descuentos.length > 0 && (
                       <div className="descuentos">
                         <span className="descuentos-tit">
@@ -639,106 +803,89 @@ export function GestionarPedidos() {
                         </span>
                       </div>
                     )}
-                  </>
-                )}
+                  </div>
+                </div>
 
-                {/* ---------- 4. Revisar ---------- */}
-                {paso === 4 && (
-                  <>
-                    <div className="resumen-pedido">
-                      <div className="dl-row">
-                        <span>Concesionario</span>
-                        <b>{datos.cuentaNombre || '—'}</b>
-                      </div>
-                      <div className="dl-row">
-                        <span>Tipo de pedido</span>
-                        <b>
-                          {datos.tipoPedido}
-                          {esTerceros && datos.tipoVenta ? ` · ${datos.tipoVenta}` : ''}
-                        </b>
-                      </div>
-                      {esTerceros && (
-                        <div className="dl-row">
-                          <span>Cliente final</span>
-                          <b>
-                            {datos.clienteIds
-                              .map((id) => cuentas.find((c) => c.id === id)?.nombre ?? id)
-                              .join(', ') || '—'}
-                          </b>
-                        </div>
-                      )}
-                      <div className="dl-row">
-                        <span>Pago</span>
-                        <b>
-                          {pago || '—'}
-                          {datos.banco ? ` · ${datos.banco}` : ''}
-                          {datos.plazo ? ` · ${datos.plazo}` : ''}
-                        </b>
-                      </div>
-                    </div>
-
-                    <table className="prod-table" style={{ marginTop: 14 }}>
-                      <thead>
-                        <tr>
-                          <th>Tractor</th>
-                          <th style={{ textAlign: 'center' }}>Cant.</th>
-                          <th style={{ textAlign: 'right' }}>Lista s/IVA</th>
-                          {contado && <th style={{ textAlign: 'right' }}>Con descuento</th>}
-                          <th style={{ textAlign: 'right' }}>Subtotal s/IVA</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {renglones.map((r) => (
-                          <tr key={r.productoId}>
-                            <td>
-                              <b>{r.modelo || r.nombre}</b>
-                            </td>
-                            <td style={{ textAlign: 'center' }}>{r.cantidad}</td>
-                            <td style={{ textAlign: 'right' }}>{aMoneda(r.precio.listaSinIva)}</td>
-                            {contado && (
-                              <td style={{ textAlign: 'right' }}>
-                                {aMoneda(r.precio.contadoSinIva)}
-                              </td>
-                            )}
-                            <td style={{ textAlign: 'right' }}>
-                              <b>{aMoneda(r.precio.facturaSinIva * r.cantidad)}</b>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    <div className="totales">
-                      <div className="res-line">
-                        <span>Total de lista s/IVA</span>
-                        <b>{aMoneda(totales.listaSinIva)}</b>
-                      </div>
+                {/* Elegir la forma de pago cambia los números: se ven acá mismo, sin ir al resumen. */}
+                {renglones.length > 0 && (
+                  <div className="card card--flush op-editor">
+                    <div className="ctitle op-editor-head">
+                      <span className="op-editor-nom">
+                        <i className="fa-solid fa-receipt" aria-hidden="true" /> Cómo queda el pedido
+                      </span>
                       {contado && (
-                        <div className="res-line neg">
-                          <span>Descuento por contado</span>
-                          <b>- {aMoneda(totales.listaSinIva - totales.contadoSinIva)}</b>
+                        <span className="op-editor-chips">
+                          <span className="chip chip--verde">con descuento por contado</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="op-editor-cuerpo">{tablaDelPedido(false)}</div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ============ 4. Revisar y mandar ============ */}
+            {paso === 4 && (
+              <>
+                <div className="fichas">
+                  {miConcesionario && (
+                    <FichaCuenta
+                      cuenta={miConcesionario}
+                      rotulo="Concesionario que pide"
+                      conCredito
+                    />
+                  )}
+                  {terceros.map((c) => (
+                    <FichaCuenta key={c.id} cuenta={c} rotulo="Cliente final" />
+                  ))}
+                </div>
+
+                <div className="card card--flush op-editor">
+                  <div className="ctitle op-editor-head">
+                    <span className="op-editor-nom">
+                      <i className="fa-solid fa-clipboard-check" aria-hidden="true" /> El pedido que
+                      se va a mandar
+                    </span>
+                    <span className="op-editor-chips">
+                      {datos.tipoPedido && (
+                        <span className="chip chip--indigo">{datos.tipoPedido}</span>
+                      )}
+                      {datos.tipoVenta && <span className="chip chip--azul">{datos.tipoVenta}</span>}
+                      {pago && <span className="chip chip--verde">{pago}</span>}
+                    </span>
+                  </div>
+                  <div className="op-editor-cuerpo">
+                    <dl className="datos-pares">
+                      <div>
+                        <dt>Forma de pago</dt>
+                        <dd>{pago || '—'}</dd>
+                      </div>
+                      {datos.banco && (
+                        <div>
+                          <dt>Banco</dt>
+                          <dd>{datos.banco}</dd>
                         </div>
                       )}
-                      <div className="res-line">
-                        <span>IVA</span>
-                        <b>{aMoneda(totales.facturaConIva - totales.facturaSinIva)}</b>
+                      {datos.plazo && (
+                        <div>
+                          <dt>Plazo propuesto</dt>
+                          <dd>{datos.plazo}</dd>
+                        </div>
+                      )}
+                      <div>
+                        <dt>Modelos distintos</dt>
+                        <dd>{renglones.length}</dd>
                       </div>
-                      {/* Lo que se factura es el de SIN IVA: es el número del que se habla. */}
-                      <div className="res-line tot">
-                        <span>A facturar s/IVA</span>
-                        <span>{aMoneda(totales.facturaSinIva)}</span>
+                      <div>
+                        <dt>Unidades</dt>
+                        <dd>{totales.unidades}</dd>
                       </div>
-                      <div className="res-line">
-                        <span>Con IVA</span>
-                        <b>{aMoneda(totales.facturaConIva)}</b>
-                      </div>
-                      <div className="res-line">
-                        <span>Unidades</span>
-                        <b>{totales.unidades}</b>
-                      </div>
-                    </div>
+                    </dl>
 
-                    <div className="aviso aviso--neutro" style={{ marginTop: 12 }}>
+                    {tablaDelPedido(false)}
+
+                    <div className="aviso aviso--neutro">
                       <i className="fa-solid fa-circle-info" aria-hidden="true" />
                       <span>
                         Al mandarlo se crea el pedido y <b>{totales.unidades}</b> unidad
@@ -746,68 +893,84 @@ export function GestionarPedidos() {
                         apruebe y les asigne inventario de a una.
                       </span>
                     </div>
-                  </>
-                )}
 
-                {faltan.length > 0 && paso === 4 && (
-                  <span className="campo-ayuda campo-ayuda--falta" style={{ marginTop: 8 }}>
-                    <i className="fa-solid fa-lock" aria-hidden="true" /> Falta {faltan.join(', ')}.
-                  </span>
-                )}
-
-                <div className="op-editor-acciones">
-                  {paso > 1 && (
-                    <button
-                      type="button"
-                      className="btn btn--texto btn--chico"
-                      disabled={enviando}
-                      onClick={() => setPaso(paso - 1)}
-                    >
-                      ← Volver
-                    </button>
-                  )}
-                  <span className="totales-mini">
-                    {totales.unidades > 0 && (
-                      <>
-                        {totales.unidades} unidad{totales.unidades === 1 ? '' : 'es'} ·{' '}
-                        <b>{aMoneda(totales.facturaSinIva)}</b> + IVA
-                      </>
+                    {faltan.length > 0 && (
+                      <span className="campo-ayuda campo-ayuda--falta">
+                        <i className="fa-solid fa-lock" aria-hidden="true" /> Falta {faltan.join(', ')}
+                        .
+                      </span>
                     )}
-                  </span>
-                  {paso < 4 ? (
-                    <button
-                      type="button"
-                      className="btn btn--primario"
-                      disabled={cargando || (paso === 2 && datos.renglones.length === 0)}
-                      onClick={() => setPaso(paso + 1)}
-                    >
-                      Seguir →
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn btn--primario"
-                      disabled={enviando || faltan.length > 0}
-                      onClick={() => void mandar()}
-                    >
-                      <i className="fa-solid fa-paper-plane" aria-hidden="true" />{' '}
-                      {enviando ? 'Mandando…' : 'Mandar el pedido'}
-                    </button>
-                  )}
+                  </div>
                 </div>
-              </div>
+              </>
+            )}
+
+            {/* La barra de abajo: dónde estoy, cuánto va y qué sigue. */}
+            <div className="barra-pasos">
+              {paso > 1 ? (
+                <button
+                  type="button"
+                  className="btn btn--texto btn--chico"
+                  disabled={enviando}
+                  onClick={() => setPaso(paso - 1)}
+                >
+                  ← Volver
+                </button>
+              ) : (
+                <span />
+              )}
+
+              <span className="barra-pasos-total">
+                {totales.unidades > 0 ? (
+                  <>
+                    {totales.unidades} unidad{totales.unidades === 1 ? '' : 'es'} ·{' '}
+                    <b>{aMoneda(totales.facturaSinIva)}</b> + IVA
+                  </>
+                ) : (
+                  'Todavía no agregaste ningún tractor'
+                )}
+              </span>
+
+              {paso < 4 ? (
+                <button
+                  type="button"
+                  className="btn btn--primario"
+                  disabled={
+                    cargando ||
+                    (paso === 1 &&
+                      (!datos.cuentaId ||
+                        !datos.tipoPedido ||
+                        (esTerceros && !datos.tipoVenta) ||
+                        (esDirecta && terceros.length === 0))) ||
+                    (paso === 2 && datos.renglones.length === 0) ||
+                    (paso === 3 && !pago)
+                  }
+                  onClick={() => setPaso(paso + 1)}
+                >
+                  Seguir →
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn--primario"
+                  disabled={enviando || faltan.length > 0}
+                  onClick={() => void mandar()}
+                >
+                  <i className="fa-solid fa-paper-plane" aria-hidden="true" />{' '}
+                  {enviando ? 'Mandando…' : 'Mandar el pedido'}
+                </button>
+              )}
             </div>
           </>
         )}
 
         {trabajo === 'mios' && (
-          <div className="aviso aviso--neutro" style={{ marginTop: 14 }}>
+          <div className="aviso aviso--neutro">
             <i className="fa-solid fa-hammer" aria-hidden="true" />
             <span>El seguimiento de los pedidos cargados está en camino.</span>
           </div>
         )}
 
-        {/* Las fotos del tractor, para mirarlas antes de pedirlo. */}
         {viendoFotos && (
           <>
             <button

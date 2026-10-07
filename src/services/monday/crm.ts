@@ -11,9 +11,9 @@
  * sí: el mismo señor puede ser el comprador de dos empresas, y son dos contactos legítimos con los
  * mismos datos de contacto.
  */
-import { CRM, COL_CONTACTO, COL_CUENTA } from './columns'
+import { CRM, COL_CONTACTO, COL_CUENTA, COL_CUENTA_VENTA } from './columns'
 import { normalizarWhatsapp } from '@/lib/telefono'
-import { porId, texto, type ColumnaCruda } from './parse'
+import { aNumeroEspejo, porId, texto, type ColumnaCruda } from './parse'
 import { mondayApi } from './sdk'
 
 const hoy = (): string => {
@@ -42,6 +42,9 @@ export interface CuentaCrm {
   pais: string
   descripcion: string
   estado: string
+  /** La línea de crédito que BERGER le asignó, y cuánto lleva usado. */
+  creditoAsignado: number | null
+  creditoUtilizado: number | null
   concesionarioIds: string[]
   /** Ids de los contactos conectados. */
   contactoIds: string[]
@@ -85,6 +88,8 @@ const COLUMNAS_CUENTA = [
   COL_CUENTA.pais,
   COL_CUENTA.descripcion,
   COL_CUENTA.estado,
+  COL_CUENTA_VENTA.creditoAsignado,
+  COL_CUENTA_VENTA.creditoUtilizado,
   COL_CUENTA.concesionario,
   COL_CUENTA.contactos,
 ]
@@ -128,6 +133,8 @@ export async function cuentasDelCrm(): Promise<CuentaCrm[]> {
         pais: texto(c[COL_CUENTA.pais]),
         descripcion: texto(c[COL_CUENTA.descripcion]),
         estado: texto(c[COL_CUENTA.estado]),
+        creditoAsignado: aNumeroEspejo(texto(c[COL_CUENTA_VENTA.creditoAsignado])),
+        creditoUtilizado: aNumeroEspejo(texto(c[COL_CUENTA_VENTA.creditoUtilizado])),
         concesionarioIds: conectados(c[COL_CUENTA.concesionario]),
         contactoIds: conectados(c[COL_CUENTA.contactos]),
       }

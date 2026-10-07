@@ -1047,9 +1047,12 @@ export const ESTADO_ACTIVIDAD = {
  */
 export const COL_PEDIDO = {
   comercial: 'multiple_person_mm5fphyt',
-  concesionarioPersonas: 'multiple_person_mm5fwapm',
+  /** El equipo de monday del concesionario. */
+  equipo: 'multiple_person_mm5fwapm',
   /** La cuenta del concesionario en el CRM. De ahí sale la dirección y la línea de crédito. */
   cuenta: 'board_relation_mm7xm8vj',
+  /** El cliente final, cuando el pedido es una venta a terceros. Es otra columna, a propósito. */
+  tercero: 'board_relation_mm7x3p4w',
   tipoPedido: 'color_mm7wy0s9',
   tipoVenta: 'color_mm7wd3d6',
   estado: 'color_mm5ft345',

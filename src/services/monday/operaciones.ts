@@ -641,7 +641,9 @@ const COLUMNAS_DE_CONTACTO_EDITABLES = new Set<string>(
  */
 const COLUMNAS_DE_PEDIDO = new Set<string>([
   COL_PEDIDO.cuenta,
+  COL_PEDIDO.tercero,
   COL_PEDIDO.comercial,
+  COL_PEDIDO.equipo,
   COL_PEDIDO.tipoPedido,
   COL_PEDIDO.tipoVenta,
   COL_PEDIDO.estado,

@@ -2123,44 +2123,6 @@
 
 /* ===== VENTA · pedidos del concesionario ===== */
 
-/* Quién pide, arriba de todo y sin poder elegirlo: un pedido cargado para el concesionario
-   equivocado después hay que deshacerlo a mano en tres tableros. */
-.ficha-concesionario {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-top: 14px;
-  padding: 14px 16px;
-  border: 1px solid var(--border-soft);
-  border-left: 4px solid var(--primary-blue);
-  border-radius: 12px;
-  background: var(--tint-input);
-}
-.ficha-concesionario-ic {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: var(--primary-blue);
-  color: #fff;
-  flex: 0 0 auto;
-}
-.ficha-concesionario-txt {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.ficha-concesionario-nom {
-  font-size: 15px;
-  font-weight: 800;
-  color: #0a4f9e;
-}
-.ficha-concesionario-det {
-  font-size: 12.5px;
-  color: var(--text-mid);
-}
-
 /* Los pasos: cuánto falta para terminar. */
 .pasos {
   display: flex;
@@ -2417,4 +2379,327 @@
   width: 100%;
   border-radius: 10px;
   border: 1px solid var(--border-soft);
+}
+
+/* ===== VENTA · la ficha de una cuenta y su línea de crédito ===== */
+
+.fichas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+  align-items: start;
+}
+
+.ficha {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 16px 18px;
+  border: 1px solid var(--border-soft);
+  border-left: 4px solid var(--primary-blue);
+  border-radius: 12px;
+  background: #fff;
+  min-width: 0;
+}
+/* La caja donde todavía no se eligió a nadie: no se pinta de azul porque no hay nada que mostrar. */
+.ficha--elegir {
+  border-left-color: var(--border-soft);
+  background: var(--tint-neutral);
+  gap: 12px;
+}
+.ficha--elegir .ficha {
+  border-left-color: var(--green-dark);
+}
+
+.ficha-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ficha-rotulo {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+.ficha-nombre {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--text-dark);
+  /* Las razones sociales son largas: cortan en varias líneas antes que desbordar la caja. */
+  overflow-wrap: anywhere;
+}
+.ficha-donde {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-mid);
+  overflow-wrap: anywhere;
+}
+.ficha-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* El crédito. El número solo —"usó 2.800.000 de 3.250.000"— obliga a hacer una división mental
+   antes de decidir, y la decisión es justamente si entra o no entra. */
+.credito {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.credito-cifras {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.credito-dato {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.credito-dato small {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+.credito-dato b {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.credito-dato--verde b {
+  color: var(--green-dark);
+}
+.credito-dato--amarillo b {
+  color: #9a7b06;
+}
+.credito-dato--naranja b {
+  color: #b5600a;
+}
+.credito-dato--rojo b {
+  color: var(--berger-red);
+}
+
+.credito-barra {
+  height: 8px;
+  border-radius: 999px;
+  background: #e8edf3;
+  overflow: hidden;
+}
+.credito-barra-usa {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+.credito-barra-usa--verde {
+  background: var(--green-dark);
+}
+.credito-barra-usa--amarillo {
+  background: var(--orange);
+}
+.credito-barra-usa--naranja {
+  background: #e8740c;
+}
+.credito-barra-usa--rojo {
+  background: var(--berger-red);
+}
+.credito-pie {
+  font-size: 11.5px;
+  color: var(--text-gray);
+}
+
+/* ===== VENTA · la tabla del pedido ===== */
+
+.pedido-tabla {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+}
+/* La tabla se desplaza sola cuando no entra: antes las columnas se encimaban unas con otras y los
+   números quedaban ilegibles, que es justo lo único que acá hay que poder leer. */
+.pedido-tabla-caja {
+  overflow-x: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: #fff;
+}
+.pedido-tabla table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+}
+.pedido-tabla th,
+.pedido-tabla td {
+  padding: 11px 14px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap;
+}
+.pedido-tabla thead th {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+  background: var(--tint-neutral);
+}
+.pedido-tabla tbody tr:last-child td {
+  border-bottom: none;
+}
+.pedido-tabla .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pedido-tabla .apagado {
+  color: var(--text-gray);
+}
+.pedido-tabla .fuerte {
+  font-weight: 800;
+  color: var(--text-dark);
+}
+.pedido-tabla .verde {
+  color: var(--green-dark);
+  font-weight: 700;
+}
+.pedido-tractor {
+  white-space: normal;
+  min-width: 190px;
+}
+.pedido-tractor b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+.pedido-tractor small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-gray);
+}
+
+.pedido-totales {
+  margin-left: auto;
+  width: min(380px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--tint-neutral);
+}
+.pedido-linea {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+.pedido-linea b {
+  font-weight: 700;
+  color: var(--text-dark);
+}
+.pedido-linea--resta b {
+  color: var(--green-dark);
+}
+.pedido-linea--total {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+.pedido-linea--suave {
+  font-size: 12px;
+  color: var(--text-gray);
+}
+.pedido-linea--suave b {
+  color: var(--text-mid);
+  font-weight: 700;
+}
+
+/* Los pares del resumen: una grilla, para que el rótulo y el dato no se pisen. */
+.datos-pares {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px 18px;
+  margin: 0 0 4px;
+}
+.datos-pares div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.datos-pares dt {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+.datos-pares dd {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-dark);
+  overflow-wrap: anywhere;
+}
+
+/* La barra de abajo: dónde estoy, cuánto va y qué sigue, siempre a la vista. */
+.barra-pasos {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 -4px 14px rgba(16, 24, 40, 0.06);
+}
+.barra-pasos-total {
+  flex: 1 1 auto;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+.barra-pasos-total b {
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+/* El aviso viene pegado a lo que comenta; sin esto queda encimado contra el bloque de arriba,
+   porque `.aviso` sólo separa por abajo. */
+.decision + .aviso,
+.pedido-tabla + .aviso,
+.datos + .aviso {
+  margin-top: 16px;
 }

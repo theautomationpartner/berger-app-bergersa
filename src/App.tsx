@@ -304,7 +304,9 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
 
       {principal === 'pedidos' &&
         operacionPedidos === 'gestionar' &&
-        puedeEnPedidos(sesion.modulos, 'gestionar') && <GestionarPedidos />}
+        puedeEnPedidos(sesion.modulos, 'gestionar') && (
+          <GestionarPedidos equipoId={sesion.perfil.equipoId} />
+        )}
 
       {principal === 'fechas' && operacionFechas === 'confirmar' && <ConfirmarProponerFecha />}
       {principal === 'fechas' && operacionFechas === 'enviar' && <EnviarConfirmacion />}
