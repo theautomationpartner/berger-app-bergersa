@@ -261,6 +261,16 @@ export const COL_INV = {
   confirmacionFecha: 'color_mm6s8xp2',
   /** Conexión al Catálogo de Productos. Es lo que permite saber en qué contenedor entra. */
   catalogo: 'board_relation_mm6sxre2',
+  /**
+   * Estado Comercial: si el tractor está libre para venderse o ya tiene dueño.
+   *
+   * Es lo que evita prometerle el mismo chasis a dos concesionarios. La app lo lee para ofrecer
+   * sólo los disponibles y lo escribe al asignar; el resto del recorrido —facturada, entregada—
+   * lo mueve el tablero.
+   */
+  estadoComercial: 'color_mm7pgb70',
+  /** N° de matrícula o chasis: es lo único que distingue a dos tractores del mismo modelo. */
+  chasis: 'text_mm6n4m60',
 
   /* Lo que mira y escribe el módulo de Fechas de Producción. */
   /** Estado del PRIMARY STATUS de fábrica, como lo informa el proveedor. */
@@ -1132,7 +1142,16 @@ export const COL_ENTREGA = {
 /** Subelementos de 🚛Entregas (18434281488) — una fila por unidad asignada. */
 export const COL_ENTREGA_SUB = {
   inventario: 'board_relation_mm7wfzwq',
-  unidadDeVenta: 'board_relation_mm7wcs5f',
+  /**
+   * Se llama "🤖Pedido de venta (unidad)" pero está conectada a los SUBELEMENTOS de 🔖Pedidos
+   * (18428606873), no a 🛍️Ventas.
+   *
+   * Así que lo que se le escribe es el renglón del pedido —el modelo con su cantidad— y no la
+   * unidad. Escribirle el id de una unidad de Ventas hace fallar la creación entera del
+   * subelemento con "There are items that are not in the connected boards". Qué tractor va en cada
+   * fila lo dice la conexión al Inventario, que sí apunta donde debe.
+   */
+  renglonDelPedido: 'board_relation_mm7wcs5f',
   estado: 'color_mm7wbd71',
 } as const
 
@@ -1206,6 +1225,21 @@ export const ESTADO_UNIDAD = {
 
 export const ESTADO_ENTREGA_PENDIENTE = 'Pendiente'
 export const ESTADO_UNIDAD_ENTREGA_CARGADA = 'Cargada'
+
+/**
+ * Estado Comercial del tractor en el 🧮Inventario (la columna color_mm7pgb70).
+ *
+ * Es lo que dice si un chasis se puede prometer. Sólo DISPONIBLE se ofrece para asignar; el resto
+ * del recorrido lo mueve el tablero, no esta app.
+ */
+export const ESTADO_COMERCIAL = {
+  DISPONIBLE: 'Disponible',
+  RESERVADA: 'Reservada',
+  ASIGNADA: 'Asignada',
+  FACTURADA: 'Facturada',
+  ENTREGADA: 'Entregada',
+  DEMO: 'Demo',
+} as const
 
 /** Las etiquetas de Tipo de Pedido y Tipo de Venta. */
 export const TIPO_PEDIDO = { STOCK: 'COMPRA STOCK', TERCEROS: 'VENTA A TERCEROS' } as const

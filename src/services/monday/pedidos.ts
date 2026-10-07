@@ -66,6 +66,8 @@ export interface AltaPedido {
   cuentaId: string
   /** El equipo de monday de ese concesionario. Sale de la sesión, no de la pantalla. */
   equipoId: string
+  /** El usuario de monday que está cargando. También sale de la sesión. */
+  comercialId?: string
   /** Cómo se llama, para el nombre del item. */
   cuentaNombre: string
   tipoPedido: string
@@ -207,12 +209,18 @@ export async function crearPedido(
   const totales = totalesDePedido(renglones)
 
   /* El comercial que pide es quien está usando la app. No se pregunta: el dato que importa es
-     quién lo pidió de verdad, y preguntarlo sería dejar cargar a nombre de otro. */
-  let comercialId = 0
-  try {
-    comercialId = (await obtenerDatosSesion()).userId ?? 0
-  } catch {
-    /* Fuera de monday no hay sesión. El pedido se crea igual, sin comercial. */
+     quién lo pidió de verdad, y preguntarlo sería dejar cargar a nombre de otro.
+
+     Primero el usuario de la sesión de la app, que sale de su fila de la Lista Blanca; el del SDK
+     de monday es el respaldo. Es al revés de lo que parece: fuera del iframe —el servidor de
+     desarrollo— el SDK no tiene sesión, y entonces el pedido quedaba sin comercial. */
+  let comercialId = Number(d.comercialId ?? 0) || 0
+  if (!comercialId) {
+    try {
+      comercialId = (await obtenerDatosSesion()).userId ?? 0
+    } catch {
+      /* Sin ninguno de los dos el pedido se crea igual, sin comercial. */
+    }
   }
 
   const valores: Record<string, unknown> = {

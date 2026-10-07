@@ -81,6 +81,7 @@ const publico = (p: Perfil) => ({
   nombre: p.nombre,
   equipos: p.teams,
   equipoId: p.idTeam,
+  usuarioId: p.usuarioId,
 })
 
 export default async function handler(req: Request): Promise<Response> {

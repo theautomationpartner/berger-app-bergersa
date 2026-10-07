@@ -37,6 +37,7 @@ import { SinAcceso } from '@/services/monday/sdk'
 import { CatalogoTractores } from './CatalogoTractores'
 import { ClienteFinal } from './ClienteFinal'
 import { FichaCuenta } from './FichaCuenta'
+import { MisPedidos } from './MisPedidos'
 
 const mensaje = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
@@ -108,9 +109,11 @@ const PASOS = ['El pedido', 'Los tractores', 'El pago', 'Revisar y mandar']
 interface Props {
   /** El equipo de monday del concesionario. Sale de la sesión, no de la pantalla. */
   equipoId?: string
+  /** El usuario de monday que está cargando. Queda como comercial del pedido. */
+  comercialId?: string
 }
 
-export function GestionarPedidos({ equipoId = '' }: Props) {
+export function GestionarPedidos({ equipoId = '', comercialId = '' }: Props) {
   const [trabajo, setTrabajo] = useState<Trabajo>('nuevo')
   const [paso, setPaso] = useState(1)
 
@@ -230,7 +233,7 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
     setHecho(null)
     setAvisos([])
     try {
-      const r = await crearPedido({ ...datos, equipoId }, descuentos)
+      const r = await crearPedido({ ...datos, equipoId, comercialId }, descuentos)
       setHecho(
         `${r.nombre} quedó cargado con ${r.unidades} unidad${r.unidades === 1 ? '' : 'es'}, por ${aMoneda(r.totales.facturaSinIva)} + IVA.`,
       )
@@ -865,12 +868,7 @@ export function GestionarPedidos({ equipoId = '' }: Props) {
           </>
         )}
 
-        {trabajo === 'mios' && (
-          <div className="aviso aviso--neutro">
-            <i className="fa-solid fa-hammer" aria-hidden="true" />
-            <span>El seguimiento de los pedidos cargados está en camino.</span>
-          </div>
-        )}
+        {trabajo === 'mios' && <MisPedidos equipoId={equipoId} />}
 
         {viendoFotos && (
           <>

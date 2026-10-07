@@ -15,6 +15,14 @@ export interface PerfilIngreso {
   equipos?: string[]
   /** El id de ese equipo en monday. Lo decide el servidor, no la pantalla. */
   equipoId?: string
+  /**
+   * Su id de usuario de monday, el de la fila de la Lista Blanca.
+   *
+   * Es con el que se firma lo que hace: quién cargó un pedido, quién lo aprobó. No se usa el de la
+   * sesión del SDK porque fuera del iframe de monday —el servidor de desarrollo— no hay sesión, y
+   * entonces el pedido quedaría sin comercial.
+   */
+  usuarioId?: string
 }
 
 /** Lo que devuelve el servidor, ya traducido a un paso de la pantalla. */

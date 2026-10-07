@@ -32,6 +32,8 @@ import {
   COL_DESPACHANTE_SUB,
   COL_DRAFT,
   COL_INV,
+  COL_ENTREGA_SUB,
+  COL_ENTREGA,
   COL_LISTA_BLANCA,
   COL_PAGO,
   COL_PAGO_SUB,
@@ -112,6 +114,15 @@ export type NombreOperacion =
   | 'crearPedido'
   | 'crearSubitemDePedido'
   | 'crearUnidadDeVenta'
+  | 'pedidosCargados'
+  | 'unidadesDeVenta'
+  | 'inventarioParaAsignar'
+  | 'resolverPedido'
+  | 'resolverUnidadDeVenta'
+  | 'resolverRenglonDePedido'
+  | 'reservarEnInventario'
+  | 'crearEntrega'
+  | 'crearSubitemDeEntrega'
   | 'catalogoDeVenta'
   | 'configuracionDeVenta'
   | 'cuentasDelCrm'
@@ -540,7 +551,10 @@ const CAMPOS_COLUMNA = `
   type
   text
   ... on MirrorValue { display_value }
-  ... on BoardRelationValue { linked_item_ids }
+  # Las conexiones también devuelven text: null y traen los nombres en display_value. Sin pedirlo,
+  # de una conexión se lee su lista de ids y nada más: un pedido sin concesionario, una unidad sin
+  # modelo. (El comentario va con #: esto es GraphQL, no JavaScript.)
+  ... on BoardRelationValue { linked_item_ids display_value }
   ... on LocationValue { lat lng }
 `
 
@@ -712,6 +726,52 @@ const COLUMNAS_DE_VENTA = new Set<string>([
   COL_VENTA.facturaConIva,
 ])
 
+/**
+ * Lo que BERGER puede cambiar de un pedido ya cargado.
+ *
+ * No están los totales ni el concesionario ni los renglones: aprobar un pedido es decir que sí o
+ * que no, no reescribirlo. Si el precio está mal, el pedido se rechaza con el motivo y el
+ * concesionario lo vuelve a cargar — así queda constancia de que cambió.
+ */
+const COLUMNAS_DE_RESOLUCION = new Set<string>([
+  COL_PEDIDO.estado,
+  COL_PEDIDO.motivo,
+  COL_PEDIDO.fechaAprobacion,
+  COL_PEDIDO.fechaEstimadaEntrega,
+])
+
+/** Lo que se le toca a una unidad al aprobarla o asignarla. */
+const COLUMNAS_DE_UNIDAD = new Set<string>([
+  COL_VENTA.estado,
+  COL_VENTA.inventario,
+  COL_VENTA.fechaAsignacion,
+])
+
+/** Lo del renglón: sólo su estado, que acompaña al de sus unidades. */
+const COLUMNAS_DE_RENGLON = new Set<string>([COL_PEDIDO_SUB.estado])
+
+/**
+ * Lo que la app le escribe a un tractor del inventario: su estado comercial y nada más.
+ *
+ * El inventario es el tablero más caro de la cuenta —precios, fechas de producción, despachos— y
+ * asignar una unidad no es motivo para poder tocar nada de eso.
+ */
+const COLUMNAS_DE_INVENTARIO_COMERCIAL = new Set<string>([COL_INV.estadoComercial])
+
+/** Lo que se carga al crear la entrega de un pedido asignado. */
+const COLUMNAS_DE_ENTREGA = new Set<string>([
+  COL_ENTREGA.estado,
+  COL_ENTREGA.concesionario,
+  COL_ENTREGA.pedido,
+])
+
+/** Y lo de cada unidad dentro de esa entrega. */
+const COLUMNAS_DE_ENTREGA_SUB = new Set<string>([
+  COL_ENTREGA_SUB.estado,
+  COL_ENTREGA_SUB.inventario,
+  COL_ENTREGA_SUB.renglonDelPedido,
+])
+
 /** Todos los contenedores del tablero. La usan BERGER y el despachante, cada uno con su módulo. */
 const CONSULTA_CONTENEDORES = `
   query ($tablero: ID!, $columnas: [String!], $limite: Int!) {
@@ -851,7 +911,6 @@ const OPS_CRM = {
     }),
   },
 
-
   /** Un renglón del pedido: un modelo con su cantidad y sus precios. */
   crearSubitemDePedido: {
     modulo: 'pedidos' as const,
@@ -882,6 +941,176 @@ const OPS_CRM = {
     }),
   },
 
+  /* ------------------------------------------------------------------ *
+   * Pedidos: lo que se lee para seguirlos, aprobarlos y asignarlos
+   * ------------------------------------------------------------------ */
+
+  /**
+   * Los pedidos con sus renglones.
+   *
+   * La misma consulta sirve para los dos lados del mostrador —el concesionario mira los suyos,
+   * BERGER los de todos— porque lo que cambia no es la consulta sino el filtro, y el filtro lo
+   * decide quién pregunta. Por eso `tambienEn`: el módulo que la pide dice para qué pantalla es.
+   *
+   * El filtro por concesionario se aplica del lado del cliente y no acá. monday no filtra por
+   * columna de conexión sin `query_params` sobre el id interno de la relación, que cambia cuando
+   * se reordena el tablero; preferible traer la página y filtrar por los ids que ya tenemos.
+   */
+  pedidosCargados: {
+    modulo: 'pedidosBerger' as const,
+    tambienEn: ['pedidos'] as const,
+    query: `
+      query ($tablero: ID!, $columnas: [String!], $subColumnas: [String!], $limite: Int!) {
+        boards(ids: [$tablero]) {
+          items_page(limit: $limite) {
+            items {
+              id
+              name
+              column_values(ids: $columnas) { ${CAMPOS_COLUMNA} }
+              subitems { id name column_values(ids: $subColumnas) { ${CAMPOS_COLUMNA} } }
+            }
+          }
+        }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.pedidos,
+      columnas: idsDeColumnas(v.columnas),
+      subColumnas: idsDeColumnas(v.subColumnas),
+      limite: entero(v.limite, 'limite', 1, 500),
+    }),
+  },
+
+  /** Las unidades de 🛍️Ventas. Una por tractor pedido: son las que se aprueban y se asignan. */
+  unidadesDeVenta: {
+    modulo: 'pedidosBerger' as const,
+    tambienEn: ['pedidos'] as const,
+    query: CONSULTA_ITEMS_CRM,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.ventas,
+      columnas: idsDeColumnas(v.columnas),
+      limite: entero(v.limite, 'limite', 1, 500),
+    }),
+  },
+
+  /**
+   * El inventario, para elegir con qué tractor se cumple cada unidad.
+   *
+   * Es de BERGER y de nadie más: el concesionario pide un modelo, no un chasis. Dejarle ver el
+   * inventario sería dejarle ver qué tiene BERGER para vender y a qué precio lo compró.
+   */
+  inventarioParaAsignar: {
+    modulo: 'pedidosBerger' as const,
+    query: CONSULTA_ITEMS_CRM,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.inventario,
+      columnas: idsDeColumnas(v.columnas),
+      limite: entero(v.limite, 'limite', 1, 500),
+    }),
+  },
+
+  /* ------------------------------------------------------------------ *
+   * Pedidos: lo que BERGER escribe
+   * ------------------------------------------------------------------ */
+
+  /** Aprobar o rechazar un pedido. Las columnas son las cuatro de la resolución. */
+  resolverPedido: {
+    modulo: 'pedidosBerger' as const,
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $valores: JSON!) {
+        change_multiple_column_values(board_id: $tablero, item_id: $item, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.pedidos,
+      item: idMonday(v.item, 'item'),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_RESOLUCION, 'la resolución de un pedido'),
+    }),
+  },
+
+  /** Lo mismo para una unidad: su estado, y el tractor con el que se la cumple. */
+  resolverUnidadDeVenta: {
+    modulo: 'pedidosBerger' as const,
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $valores: JSON!) {
+        change_multiple_column_values(board_id: $tablero, item_id: $item, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.ventas,
+      item: idMonday(v.item, 'item'),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_UNIDAD, 'la resolución de una unidad'),
+    }),
+  },
+
+  /** El estado del renglón, que acompaña al de sus unidades. */
+  resolverRenglonDePedido: {
+    modulo: 'pedidosBerger' as const,
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $valores: JSON!) {
+        change_multiple_column_values(board_id: $tablero, item_id: $item, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.pedidosSubitems,
+      item: idMonday(v.item, 'item'),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_RENGLON, 'el estado de un renglón'),
+    }),
+  },
+
+  /**
+   * Marcar un tractor del inventario como asignado.
+   *
+   * Es lo que evita que el mismo chasis se le prometa a dos concesionarios: la asignación tiene
+   * que quedar escrita en el tractor, no sólo en el pedido.
+   */
+  reservarEnInventario: {
+    modulo: 'pedidosBerger' as const,
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $valores: JSON!) {
+        change_multiple_column_values(board_id: $tablero, item_id: $item, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.inventario,
+      item: idMonday(v.item, 'item'),
+      valores: valoresAcotados(
+        v.valores,
+        COLUMNAS_DE_INVENTARIO_COMERCIAL,
+        'la reserva de un tractor',
+      ),
+    }),
+  },
+
+  /** La entrega del pedido, una vez que todas sus unidades tienen tractor. */
+  crearEntrega: {
+    modulo: 'pedidosBerger' as const,
+    query: `
+      mutation ($tablero: ID!, $nombre: String!, $valores: JSON!) {
+        create_item(board_id: $tablero, item_name: $nombre, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.entregas,
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_ENTREGA, 'el alta de una entrega'),
+    }),
+  },
+
+  /** Una fila por tractor dentro de esa entrega. */
+  crearSubitemDeEntrega: {
+    modulo: 'pedidosBerger' as const,
+    query: `
+      mutation ($padre: ID!, $nombre: String!, $valores: JSON!) {
+        create_subitem(parent_item_id: $padre, item_name: $nombre, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      padre: idMonday(v.padre, 'padre'),
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_ENTREGA_SUB, 'una unidad de la entrega'),
+    }),
+  },
 
   /**
    * El catálogo con el que el concesionario arma su pedido.
@@ -2213,10 +2442,7 @@ export const OPERACIONES: Record<NombreOperacion, Operacion> = {
  * que pertenecer a un módulo habilitado. Un despachante que pida los pagos del inventario se choca
  * con esto aunque su pantalla no ofrezca el botón.
  */
-export const operacionPermitida = (
-  operacion: Operacion,
-  modulos: readonly ModuloApp[],
-): boolean =>
+export const operacionPermitida = (operacion: Operacion, modulos: readonly ModuloApp[]): boolean =>
   modulos.includes(operacion.modulo) || (operacion.tambienEn ?? []).some((m) => modulos.includes(m))
 
 /** Resuelve una operación por nombre. Lanza si no existe: no hay consultas fuera del catálogo. */

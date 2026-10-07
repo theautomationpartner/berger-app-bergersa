@@ -2738,73 +2738,6 @@
   font-weight: 800;
 }
 
-/* Los filtros salen de lo que hay cargado, no de una lista escrita: nadie se acuerda de que
-   existe la gama "Agrofarm 5" hasta que la ve. */
-.facetas {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px 16px;
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
-  background: var(--tint-neutral);
-}
-.faceta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-}
-.faceta-rotulo {
-  flex: 0 0 92px;
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-gray);
-}
-.faceta-valores {
-  display: flex;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.faceta-op {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 11px;
-  border: 1px solid var(--border-soft);
-  border-radius: 999px;
-  background: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-mid);
-  cursor: pointer;
-}
-.faceta-op:hover {
-  border-color: var(--primary-blue);
-}
-.faceta-op small {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--text-gray);
-  font-variant-numeric: tabular-nums;
-}
-.faceta-op--si {
-  border-color: var(--primary-blue);
-  background: var(--primary-blue);
-  color: #fff;
-}
-.faceta-op--si small {
-  color: rgba(255, 255, 255, 0.82);
-}
-/* El filtro que llevaría a cero resultados se muestra apagado en vez de esconderse: esconderlo
-   haría que la lista de opciones cambiara de tamaño a cada clic. */
-.faceta-op--vacia {
-  opacity: 0.45;
-}
-
 .catalogo-cuenta {
   font-size: 11.5px;
   font-weight: 700;
@@ -2929,4 +2862,331 @@
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+}
+
+/* Los filtros del catálogo: un desplegable por característica.
+   Todas las etiquetas a la vez eran cuatro renglones de chips —veinte potencias distintas— que
+   ocupaban más que el catálogo que venían a filtrar. */
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.filtro {
+  position: relative;
+}
+.filtro-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.filtro-btn:hover {
+  border-color: var(--primary-blue);
+}
+.filtro-btn i {
+  font-size: 10px;
+  color: var(--text-gray);
+}
+.filtro-btn--puesto {
+  border-color: var(--primary-blue);
+  background: var(--tint-input);
+  color: #0a4f9e;
+}
+
+.filtro-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  min-width: 210px;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.14);
+}
+.filtro-opciones {
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.filtro-op {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text-dark);
+  cursor: pointer;
+}
+.filtro-op:hover {
+  background: var(--tint-input);
+}
+.filtro-op input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary-blue);
+  cursor: pointer;
+}
+.filtro-op-txt {
+  flex: 1 1 auto;
+}
+.filtro-op-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-gray);
+  font-variant-numeric: tabular-nums;
+}
+/* Lo que llevaría a cero se apaga en vez de esconderse: esconderlo haría que la lista cambiara de
+   tamaño a cada tilde. */
+.filtro-op--vacia {
+  opacity: 0.45;
+}
+
+.filtros-puestos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+.filtro-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border: 1px solid var(--primary-blue);
+  border-radius: 999px;
+  background: var(--primary-blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.filtro-chip small {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.filtro-chip i {
+  font-size: 10px;
+  opacity: 0.85;
+}
+.filtro-chip:hover i {
+  opacity: 1;
+}
+
+/* ===== VENTA · los pedidos ya cargados: seguirlos, aprobarlos, asignarlos ===== */
+
+.resumen-estados {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 14px;
+}
+.ver-cerrados {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.ver-cerrados input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary-blue);
+  cursor: pointer;
+}
+
+.pedidos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pedido-card {
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+/* La cabecera es el botón que pliega: con diez pedidos abiertos no se encuentra ninguno. */
+.pedido-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  background: var(--tint-neutral);
+  text-align: left;
+  cursor: pointer;
+}
+.pedido-card-head:disabled {
+  cursor: default;
+}
+.pedido-card-tit {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.pedido-card-nom {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--text-dark);
+  overflow-wrap: anywhere;
+}
+.pedido-card-sub {
+  font-size: 11.5px;
+  color: var(--text-gray);
+}
+.pedido-card-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.pedido-card-importe {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+}
+.pedido-card-importe small {
+  margin-left: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+.pedido-card-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+.pedido-card-cuerpo .aviso,
+.pedido-card-cuerpo .fichas {
+  margin: 0;
+}
+
+/* Las unidades, de a una: el estado del pedido no cuenta que una salió del galpón y la otra se
+   pidió a fábrica. */
+.unidades {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.unidades-tit {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+.unidad {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--tint-neutral);
+}
+.unidad-nom {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.unidad-nom small {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+.unidad-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.unidad--asignar {
+  align-items: flex-start;
+}
+.unidad-elegir {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 1 320px;
+  min-width: 0;
+}
+.unidad-elegir .campo-ayuda {
+  margin: 0;
+}
+
+.pedido-acciones {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+.pedido-acciones-nota {
+  margin-right: auto;
+  font-size: 12.5px;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rechazar es destructivo del lado del otro: alguien tiene que volver a cargar el pedido. No va
+   con el mismo botón que aprobar. */
+.btn--peligro {
+  border: 1px solid var(--berger-red);
+  background: var(--berger-red);
+  color: #fff;
+}
+.btn--peligro:hover:not(:disabled) {
+  filter: brightness(0.93);
+}
+
+@media (max-width: 720px) {
+  .pedido-card-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .unidad,
+  .unidad--asignar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .unidad-chips {
+    justify-content: flex-start;
+  }
 }

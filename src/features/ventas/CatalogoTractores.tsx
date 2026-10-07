@@ -11,10 +11,85 @@
  * "Agrofarm 5" hasta que la ve, y obligar a escribirla para encontrarla es pedirle a la persona
  * que sepa de antemano lo que vino a averiguar.
  */
-import { useMemo, useState } from 'react'
-import { importe as aMoneda } from '@/lib/format'
-import { normalizar } from '@/lib/format'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { useClickAfuera } from '@/hooks/useClickAfuera'
+import { importe as aMoneda, normalizar } from '@/lib/format'
 import type { ProductoDeCatalogo } from '@/services/monday/catalogoVenta'
+
+interface FiltroProps {
+  rotulo: string
+  valores: string[]
+  marcados: string[]
+  abierto: boolean
+  onAbrir: () => void
+  onCerrar: () => void
+  /** Cuántos modelos quedarían si además se marcara este valor. */
+  cuantosCon: (valor: string) => number
+  onAlternar: (valor: string) => void
+  onLimpiar: () => void
+}
+
+/**
+ * Un filtro: el botón con lo que está elegido, y su lista de opciones para tildar.
+ *
+ * Es de tildar y no de elegir uno: querer ver dos marcas es querer ver las dos, y un desplegable
+ * de una sola opción obligaría a filtrar dos veces para comparar.
+ */
+function FiltroDesplegable({
+  rotulo,
+  valores,
+  marcados,
+  abierto,
+  onAbrir,
+  onCerrar,
+  cuantosCon,
+  onAlternar,
+  onLimpiar,
+}: FiltroProps) {
+  const caja = useRef<HTMLDivElement>(null)
+  useClickAfuera(caja, abierto, onCerrar)
+
+  return (
+    <div className="filtro" ref={caja}>
+      <button
+        type="button"
+        className={`filtro-btn${marcados.length > 0 ? ' filtro-btn--puesto' : ''}`}
+        aria-expanded={abierto}
+        onClick={onAbrir}
+      >
+        {rotulo}
+        {marcados.length > 0 && <span className="btn-contador">{marcados.length}</span>}
+        <i className={`fa-solid fa-chevron-${abierto ? 'up' : 'down'}`} aria-hidden="true" />
+      </button>
+
+      {abierto && (
+        <div className="filtro-panel">
+          <div className="filtro-opciones">
+            {valores.map((v) => {
+              const marcado = marcados.includes(v)
+              const cuantos = cuantosCon(v)
+              return (
+                <label
+                  key={v}
+                  className={`filtro-op${!marcado && cuantos === 0 ? ' filtro-op--vacia' : ''}`}
+                >
+                  <input type="checkbox" checked={marcado} onChange={() => onAlternar(v)} />
+                  <span className="filtro-op-txt">{v}</span>
+                  <span className="filtro-op-num">{cuantos}</span>
+                </label>
+              )
+            })}
+          </div>
+          {marcados.length > 0 && (
+            <button type="button" className="btn btn--texto btn--chico" onClick={onLimpiar}>
+              Sacar los de {rotulo.toLowerCase()}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /** Las características por las que se puede filtrar, en el orden en que se muestran. */
 const FACETAS = [
@@ -94,7 +169,9 @@ export function CatalogoTractores({
 }: Props) {
   const [texto, setTexto] = useState('')
   const [elegidos, setElegidos] = useState<Elegidos>(SIN_FILTROS)
-  const [abiertos, setAbiertos] = useState(false)
+  /** Cuál de los desplegables está abierto. Uno solo por vez, como cualquier menú. */
+  const [abierto, setAbierto] = useState<Clave | null>(null)
+  const cerrar = useCallback(() => setAbierto(null), [])
 
   const porTexto = useMemo(() => {
     const q = normalizar(texto)
@@ -154,58 +231,59 @@ export function CatalogoTractores({
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
         />
-        <button
-          type="button"
-          className={`btn btn--borde btn--chico${abiertos || cuantosFiltros > 0 ? ' btn--activo' : ''}`}
-          aria-expanded={abiertos}
-          onClick={() => setAbiertos((v) => !v)}
-        >
-          <i className="fa-solid fa-sliders" aria-hidden="true" /> Filtros
-          {cuantosFiltros > 0 && <span className="btn-contador">{cuantosFiltros}</span>}
-        </button>
       </div>
 
-      {(abiertos || cuantosFiltros > 0) && (
-        <div className="facetas">
-          {FACETAS.map(({ clave, rotulo }) => {
-            const valores = valoresDe(productos, clave)
-            if (valores.length < 2) return null
-            return (
-              <div key={clave} className="faceta">
-                <span className="faceta-rotulo">{rotulo}</span>
-                <div className="faceta-valores">
-                  {valores.map((v) => {
-                    const marcado = elegidos[clave].includes(v)
-                    const cuantos = cuantosCon(clave, v)
-                    return (
-                      <button
-                        key={v}
-                        type="button"
-                        aria-pressed={marcado}
-                        className={`faceta-op${marcado ? ' faceta-op--si' : ''}${
-                          !marcado && cuantos === 0 ? ' faceta-op--vacia' : ''
-                        }`}
-                        onClick={() => alternar(clave, v)}
-                      >
-                        {v}
-                        <small>{cuantos}</small>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
+      {/* Un desplegable por característica. Todas las etiquetas a la vez eran cuatro renglones de
+          chips —veinte potencias distintas— que ocupaban más que el catálogo que venían a filtrar.
+          Acá cada lista se abre sólo si se la pide. */}
+      <div className="filtros">
+        {FACETAS.map(({ clave, rotulo }) => {
+          const valores = valoresDe(productos, clave)
+          if (valores.length < 2) return null
+          const marcados = elegidos[clave]
+          return (
+            <FiltroDesplegable
+              key={clave}
+              rotulo={rotulo}
+              valores={valores}
+              marcados={marcados}
+              abierto={abierto === clave}
+              onAbrir={() => setAbierto((v) => (v === clave ? null : clave))}
+              onCerrar={cerrar}
+              cuantosCon={(v) => cuantosCon(clave, v)}
+              onAlternar={(v) => alternar(clave, v)}
+              onLimpiar={() => setElegidos((v) => ({ ...v, [clave]: [] }))}
+            />
+          )
+        })}
+      </div>
 
-          {cuantosFiltros > 0 && (
-            <button
-              type="button"
-              className="btn btn--texto btn--chico"
-              onClick={() => setElegidos(SIN_FILTROS)}
-            >
-              Limpiar los filtros
-            </button>
+      {/* Lo que está filtrado, junto y en un solo lugar: con los filtros cerrados, ésta es la única
+          forma de saber por qué la lista muestra tres modelos y no veintiuno. */}
+      {cuantosFiltros > 0 && (
+        <div className="filtros-puestos">
+          {FACETAS.map(({ clave, rotulo }) =>
+            elegidos[clave].map((v) => (
+              <button
+                key={`${clave}-${v}`}
+                type="button"
+                className="filtro-chip"
+                onClick={() => alternar(clave, v)}
+                title={`Sacar el filtro ${rotulo}: ${v}`}
+              >
+                <small>{rotulo}</small>
+                {v}
+                <i className="fa-solid fa-xmark" aria-hidden="true" />
+              </button>
+            )),
           )}
+          <button
+            type="button"
+            className="btn btn--texto btn--chico"
+            onClick={() => setElegidos(SIN_FILTROS)}
+          >
+            Limpiar todo
+          </button>
         </div>
       )}
 

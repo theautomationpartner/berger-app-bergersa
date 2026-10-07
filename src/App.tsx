@@ -20,7 +20,8 @@ import { PanelLateral } from '@/features/inicio/PanelLateral'
 import { BarraNavegacion } from '@/features/inicio/BarraNavegacion'
 import { CuentasYContactos } from '@/features/ventas/CuentasYContactos'
 import { Actividades } from '@/features/ventas/Actividades'
-import { EnConstruccion } from '@/features/ventas/EnConstruccion'
+import { AprobarPedidos } from '@/features/ventas/AprobarPedidos'
+import { AsignarPedidos } from '@/features/ventas/AsignarPedidos'
 import { GestionarPedidos } from '@/features/ventas/GestionarPedidos'
 import { PanelOpciones } from '@/features/inicio/PanelOpciones'
 import { DespachoVista } from '@/features/vista/DespachoVista'
@@ -306,23 +307,19 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
       {principal === 'pedidos' &&
         operacionPedidos === 'gestionar' &&
         puedeEnPedidos(sesion.modulos, 'gestionar') && (
-          <GestionarPedidos equipoId={sesion.perfil.equipoId} />
-        )}
-
-      {/* Las dos de BERGER todavía no están hechas. Un cartel que lo diga es mejor que una pantalla
-          en blanco: en blanco parece que la app se rompió. */}
-      {principal === 'pedidos' &&
-        (operacionPedidos === 'aprobar' || operacionPedidos === 'asignar') &&
-        puedeEnPedidos(sesion.modulos, operacionPedidos) && (
-          <EnConstruccion
-            titulo={operacionPedidos === 'aprobar' ? 'Aprobar pedidos' : 'Asignar pedidos'}
-            detalle={
-              operacionPedidos === 'aprobar'
-                ? 'Acá van a aparecer los pedidos pendientes de todos los concesionarios, con su línea de crédito, para aprobarlos o rechazarlos.'
-                : 'Acá se va a unir cada unidad aprobada con un tractor del inventario, o pedirla a fábrica.'
-            }
+          <GestionarPedidos
+            equipoId={sesion.perfil.equipoId}
+            comercialId={sesion.perfil.usuarioId}
           />
         )}
+
+      {principal === 'pedidos' &&
+        operacionPedidos === 'aprobar' &&
+        puedeEnPedidos(sesion.modulos, 'aprobar') && <AprobarPedidos />}
+
+      {principal === 'pedidos' &&
+        operacionPedidos === 'asignar' &&
+        puedeEnPedidos(sesion.modulos, 'asignar') && <AsignarPedidos />}
 
       {principal === 'fechas' && operacionFechas === 'confirmar' && <ConfirmarProponerFecha />}
       {principal === 'fechas' && operacionFechas === 'enviar' && <EnviarConfirmacion />}
