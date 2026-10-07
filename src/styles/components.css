@@ -2120,3 +2120,301 @@
   border-color: var(--berger-red-bd);
   color: var(--berger-red);
 }
+
+/* ===== VENTA · pedidos del concesionario ===== */
+
+/* Quién pide, arriba de todo y sin poder elegirlo: un pedido cargado para el concesionario
+   equivocado después hay que deshacerlo a mano en tres tableros. */
+.ficha-concesionario {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-left: 4px solid var(--primary-blue);
+  border-radius: 12px;
+  background: var(--tint-input);
+}
+.ficha-concesionario-ic {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--primary-blue);
+  color: #fff;
+  flex: 0 0 auto;
+}
+.ficha-concesionario-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ficha-concesionario-nom {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0a4f9e;
+}
+.ficha-concesionario-det {
+  font-size: 12.5px;
+  color: var(--text-mid);
+}
+
+/* Los pasos: cuánto falta para terminar. */
+.pasos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 16px 0 12px;
+  padding: 0;
+}
+.paso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+.paso-num {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: var(--text-mid);
+  font-size: 11px;
+  font-weight: 800;
+}
+.paso--actual {
+  border-color: var(--primary-blue);
+  color: #0a4f9e;
+  box-shadow: 0 0 0 3px rgba(0, 115, 234, 0.12);
+}
+.paso--actual .paso-num {
+  background: var(--primary-blue);
+  color: #fff;
+}
+.paso--hecho {
+  color: var(--green-dark);
+  border-color: var(--green-bd);
+}
+.paso--hecho .paso-num {
+  background: var(--green-dark);
+  color: #fff;
+}
+
+/* El catálogo: tarjetas y no una tabla, porque de un tractor se mira la ficha entera —potencia,
+   rodado, línea— y en una fila de tabla eso no entra. */
+.catalogo {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.producto {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1.5px solid var(--border-soft);
+  border-radius: 12px;
+  background: #fff;
+}
+.producto--elegido {
+  border-color: var(--primary-blue);
+  background: var(--tint-input);
+  box-shadow: 0 0 0 3px rgba(0, 115, 234, 0.1);
+}
+.producto-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.producto-nom {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-dark);
+  line-height: 1.3;
+}
+.producto-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.producto-rodado {
+  font-size: 11.5px;
+  color: var(--text-gray);
+}
+.producto-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+.producto-precio {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+}
+.producto-precio small {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+
+.contador {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--primary-blue);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.contador button {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: #fff;
+  color: var(--primary-blue);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.contador button:hover {
+  background: var(--primary-blue);
+  color: #fff;
+}
+.contador b {
+  min-width: 30px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Los descuentos de contado, antes de ver un solo número: el total no es la suma y conviene que
+   eso se vea. */
+.descuentos {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1.5px dashed var(--green-bd);
+  border-radius: 12px;
+  background: var(--green-soft);
+}
+.descuentos-tit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+}
+.descuentos-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+.descuento {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 86px;
+  padding: 9px 14px;
+  border: 1px solid var(--green-bd);
+  border-radius: 10px;
+  background: #fff;
+}
+.descuento b {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--green-dark);
+}
+.descuento small {
+  font-size: 11px;
+  color: var(--text-gray);
+}
+.descuento--total {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+.descuento--total b,
+.descuento--total small {
+  color: #fff;
+}
+
+.resumen-pedido {
+  padding: 4px 0;
+}
+.totales {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--tint-neutral);
+}
+.totales-mini {
+  flex: 1 1 auto;
+  text-align: right;
+  font-size: 13px;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+
+/* La galería del producto. */
+.galeria {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 50;
+  width: min(760px, 92vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(16, 24, 40, 0.3);
+  overflow: hidden;
+}
+.galeria-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-soft);
+  font-weight: 800;
+}
+.galeria-head button {
+  border: none;
+  background: none;
+  font-size: 18px;
+  color: var(--text-gray);
+  cursor: pointer;
+}
+.galeria-fotos {
+  padding: 16px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.galeria-fotos img {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+}

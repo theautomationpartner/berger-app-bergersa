@@ -15,6 +15,7 @@ import {
   OPERACIONES_ADUANA,
   OPERACIONES_DRAFTS,
   OPERACIONES_FECHAS,
+  OPERACIONES_PEDIDOS,
   OPERACIONES_PRINCIPALES,
 } from './navegacion'
 import type { ModuloApp } from '@/services/monday/operaciones'
@@ -24,6 +25,7 @@ import type {
   OperacionAduana,
   OperacionDrafts,
   OperacionFechas,
+  OperacionPedidos,
   OperacionPrincipal,
 } from '@/types'
 
@@ -35,6 +37,7 @@ export interface Ruta {
   aduana: OperacionAduana | null
   drafts: OperacionDrafts | null
   fechas: OperacionFechas | null
+  pedidos: OperacionPedidos | null
 }
 
 export const RUTA_INICIO: Ruta = {
@@ -44,6 +47,7 @@ export const RUTA_INICIO: Ruta = {
   aduana: null,
   drafts: null,
   fechas: null,
+  pedidos: null,
 }
 
 const ruta = (parcial: Partial<Ruta>): Ruta => ({ ...RUTA_INICIO, ...parcial })
@@ -87,6 +91,12 @@ export const normalizar = (texto: string): string =>
  * de para qué sirve.
  */
 const SINONIMOS: Record<string, string> = {
+  'venta/pedidos/gestionar':
+    'pedido pedidos nuevo cargar solicitar concesionario tractor tractores compra stock venta terceros carrito orden',
+  'venta/pedidos/aprobar':
+    'aprobar autorizar pedido pedidos credito linea de credito rechazar concesionario pendiente',
+  'venta/pedidos/asignar':
+    'asignar inventario unidad unidades stock fabrica pedido a fabrica chasis entrega',
   'venta/actividades':
     'actividad actividades llamada llamado whatsapp visita reunion meeting email mail agenda tarea pendiente cliente contacto seguimiento',
   'venta/clientes':
@@ -164,7 +174,13 @@ export const DESTINOS: Destino[] = (() => {
                   id: `compra/fechas/${o.id}`,
                   ruta: ruta({ area: 'compra', principal: 'fechas', fechas: o.id }),
                 }))
-              : []
+              : p.id === 'pedidos'
+                ? OPERACIONES_PEDIDOS.map((o) => ({
+                    ...o,
+                    id: `venta/pedidos/${o.id}`,
+                    ruta: ruta({ area: 'venta', principal: 'pedidos', pedidos: o.id }),
+                  }))
+                : []
 
     if (hijos.length === 0) {
       sumar({

@@ -23,6 +23,9 @@ import {
   COL_CONFIRMACION,
   COL_CONT_DESPACHO,
   COL_ACTIVIDAD,
+  COL_PEDIDO,
+  COL_PEDIDO_SUB,
+  COL_VENTA,
   COL_CONTACTO,
   COL_CUENTA,
   COL_DESPACHANTE,
@@ -106,6 +109,11 @@ export type NombreOperacion =
   | 'actividadesDelTablero'
   | 'completarActividadCrm'
   | 'etiquetasDeActividad'
+  | 'crearPedido'
+  | 'renombrarPedido'
+  | 'crearSubitemDePedido'
+  | 'crearUnidadDeVenta'
+  | 'renombrarUnidadDeVenta'
   | 'catalogoDeVenta'
   | 'configuracionDeVenta'
   | 'cuentasDelCrm'
@@ -624,6 +632,72 @@ const COLUMNAS_DE_CONTACTO_EDITABLES = new Set<string>(
   ),
 )
 
+/**
+ * Lo que el concesionario puede escribir en un pedido.
+ *
+ * No está el estado del pedido más allá del inicial, ni las fechas de aprobación o de entrega, ni
+ * el motivo de rechazo: eso lo mueve BERGER. El concesionario carga su solicitud y a partir de ahí
+ * sólo mira.
+ */
+const COLUMNAS_DE_PEDIDO = new Set<string>([
+  COL_PEDIDO.cuenta,
+  COL_PEDIDO.comercial,
+  COL_PEDIDO.tipoPedido,
+  COL_PEDIDO.tipoVenta,
+  COL_PEDIDO.estado,
+  COL_PEDIDO.condicionVenta,
+  COL_PEDIDO.banco,
+  COL_PEDIDO.plazo,
+  COL_PEDIDO.conceptoPago,
+  COL_PEDIDO.totalListaSinIva,
+  COL_PEDIDO.totalListaConIva,
+  COL_PEDIDO.totalContadoSinIva,
+  COL_PEDIDO.totalContadoConIva,
+  COL_PEDIDO.totalFacturaSinIva,
+  COL_PEDIDO.totalFacturaConIva,
+  COL_PEDIDO.fechaSolicitud,
+])
+
+/** Lo que puede escribir en cada renglón. Los precios los calcula la app, no se tipean. */
+const COLUMNAS_DE_PEDIDO_SUB = new Set<string>([
+  COL_PEDIDO_SUB.catalogo,
+  COL_PEDIDO_SUB.estado,
+  COL_PEDIDO_SUB.cantidad,
+  COL_PEDIDO_SUB.listaSinIva,
+  COL_PEDIDO_SUB.listaConIva,
+  COL_PEDIDO_SUB.dto1,
+  COL_PEDIDO_SUB.dto2,
+  COL_PEDIDO_SUB.dto3,
+  COL_PEDIDO_SUB.contadoSinIva,
+  COL_PEDIDO_SUB.contadoConIva,
+  COL_PEDIDO_SUB.facturaSinIva,
+  COL_PEDIDO_SUB.facturaConIva,
+])
+
+/**
+ * Lo que se escribe al crear una unidad.
+ *
+ * La conexión al Inventario NO está: asignar una unidad a un tractor concreto es de BERGER, y es
+ * justamente lo que el concesionario no puede hacer por su cuenta.
+ */
+const COLUMNAS_DE_VENTA = new Set<string>([
+  COL_VENTA.concesionario,
+  COL_VENTA.comercial,
+  COL_VENTA.catalogo,
+  COL_VENTA.subitemPedido,
+  COL_VENTA.pedido,
+  COL_VENTA.estado,
+  COL_VENTA.listaSinIva,
+  COL_VENTA.listaConIva,
+  COL_VENTA.dto1,
+  COL_VENTA.dto2,
+  COL_VENTA.dto3,
+  COL_VENTA.contadoSinIva,
+  COL_VENTA.contadoConIva,
+  COL_VENTA.facturaSinIva,
+  COL_VENTA.facturaConIva,
+])
+
 /** Todos los contenedores del tablero. La usan BERGER y el despachante, cada uno con su módulo. */
 const CONSULTA_CONTENEDORES = `
   query ($tablero: ID!, $columnas: [String!], $limite: Int!) {
@@ -741,6 +815,100 @@ const OPS_CRM = {
     validar: (v: Record<string, unknown>) => ({
       tablero: TABLEROS.actividades,
       columnas: idsDeColumnas(v.columnas),
+    }),
+  },
+
+  /* ------------------------------------------------------------------ *
+   * Módulo de pedidos: lo que carga el concesionario
+   * ------------------------------------------------------------------ */
+
+  /** El pedido. El concesionario lo crea; lo que pasa después ya no es suyo. */
+  crearPedido: {
+    modulo: 'pedidos' as const,
+    query: `
+      mutation ($tablero: ID!, $nombre: String!, $valores: JSON!) {
+        create_item(board_id: $tablero, item_name: $nombre, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.pedidos,
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_PEDIDO, 'el alta de un pedido'),
+    }),
+  },
+
+  /**
+   * El nombre del pedido lleva su propio ID, que monday recién da al crearlo.
+   *
+   * Por eso hay una operación aparte en vez de mandarlo en el alta: el item nace con un nombre
+   * provisorio y se renombra con el id ya en la mano.
+   */
+  renombrarPedido: {
+    modulo: 'pedidos' as const,
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $nombre: String!) {
+        change_simple_column_value(
+          board_id: $tablero
+          item_id: $item
+          column_id: "name"
+          value: $nombre
+        ) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.pedidos,
+      item: idMonday(v.item, 'item'),
+      nombre: nombre(v.nombre),
+    }),
+  },
+
+  /** Un renglón del pedido: un modelo con su cantidad y sus precios. */
+  crearSubitemDePedido: {
+    modulo: 'pedidos' as const,
+    query: `
+      mutation ($padre: ID!, $nombre: String!, $valores: JSON!) {
+        create_subitem(parent_item_id: $padre, item_name: $nombre, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      padre: idMonday(v.padre, 'padre'),
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_PEDIDO_SUB, 'un renglón del pedido'),
+    }),
+  },
+
+  /** Una UNIDAD: es lo que después BERGER aprueba y asigna de a una. */
+  crearUnidadDeVenta: {
+    modulo: 'pedidos' as const,
+    query: `
+      mutation ($tablero: ID!, $nombre: String!, $valores: JSON!) {
+        create_item(board_id: $tablero, item_name: $nombre, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.ventas,
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_VENTA, 'una unidad del pedido'),
+    }),
+  },
+
+  /** Mismo motivo que el pedido: el nombre lleva el id que monday da al crear. */
+  renombrarUnidadDeVenta: {
+    modulo: 'pedidos' as const,
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $nombre: String!) {
+        change_simple_column_value(
+          board_id: $tablero
+          item_id: $item
+          column_id: "name"
+          value: $nombre
+        ) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.ventas,
+      item: idMonday(v.item, 'item'),
+      nombre: nombre(v.nombre),
     }),
   },
 

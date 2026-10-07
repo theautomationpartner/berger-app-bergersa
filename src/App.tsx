@@ -20,6 +20,7 @@ import { PanelLateral } from '@/features/inicio/PanelLateral'
 import { BarraNavegacion } from '@/features/inicio/BarraNavegacion'
 import { CuentasYContactos } from '@/features/ventas/CuentasYContactos'
 import { Actividades } from '@/features/ventas/Actividades'
+import { GestionarPedidos } from '@/features/ventas/GestionarPedidos'
 import { PanelOpciones } from '@/features/inicio/PanelOpciones'
 import { DespachoVista } from '@/features/vista/DespachoVista'
 import { useAccesoMonday } from '@/hooks/useAccesoMonday'
@@ -31,7 +32,10 @@ import {
   OPERACIONES_DRAFTS,
   OPERACIONES_FECHAS,
   OPERACIONES_PRINCIPALES,
+  pedidosDeModulos,
   principalesDeArea,
+  puedeEnPedidos,
+  SECCIONES_PEDIDOS,
   SECCIONES_ADUANA,
   puedeEnAduana,
 } from '@/lib/navegacion'
@@ -118,6 +122,7 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
     aduana: operacionAduana,
     drafts: operacionDrafts,
     fechas: operacionFechas,
+    pedidos: operacionPedidos,
   } = ruta
 
   const areas = areasDeModulos(sesion.modulos)
@@ -177,7 +182,8 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
       d.ruta.modalidad === modalidad &&
       d.ruta.aduana === operacionAduana &&
       d.ruta.drafts === operacionDrafts &&
-      d.ruta.fechas === operacionFechas,
+      d.ruta.fechas === operacionFechas &&
+      d.ruta.pedidos === operacionPedidos,
   )?.id
 
   return (
@@ -285,6 +291,20 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
       {principal === 'clientes' && <CuentasYContactos />}
 
       {principal === 'actividades' && <Actividades />}
+
+      {principal === 'pedidos' && operacionPedidos === null && (
+        <PanelOpciones
+          titulo="Pedidos"
+          detalle="Los pedidos de los concesionarios, de los dos lados del mostrador."
+          opciones={pedidosDeModulos(sesion.modulos)}
+          secciones={SECCIONES_PEDIDOS}
+          onElegir={(id) => setRuta((v) => ({ ...v, pedidos: id }))}
+        />
+      )}
+
+      {principal === 'pedidos' &&
+        operacionPedidos === 'gestionar' &&
+        puedeEnPedidos(sesion.modulos, 'gestionar') && <GestionarPedidos />}
 
       {principal === 'fechas' && operacionFechas === 'confirmar' && <ConfirmarProponerFecha />}
       {principal === 'fechas' && operacionFechas === 'enviar' && <EnviarConfirmacion />}

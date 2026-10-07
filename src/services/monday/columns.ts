@@ -1178,16 +1178,16 @@ export const ESTADO_PEDIDO = {
   APROBADO: 'Aprobado Berger',
   RECHAZADO: 'Rechazado Berger',
   ASIGNADO: 'Inventario asignado',
-  A_FABRICA: 'Pedido a Fabrica',
+  A_FABRICA: 'Pedido a Fábrica',
 } as const
 
 /**
  * El estado de cada unidad, que es el que de verdad se mueve.
  *
- * OJO: el mismo estado está escrito distinto en cada tablero. "Pedido a Fabrica" sin tilde en
- * 🔖Pedidos y "Pedido a Fábrica" con tilde en los subelementos y en 🛍️Ventas. No se puede
- * unificar desde acá: una etiqueta que no existe hace fallar la escritura ENTERA del item, así
- * que cada tablero lleva la suya.
+ * Las etiquetas son las mismas en los tres tableros —BERGER las unificó el 07/10—, pero igual se
+ * escriben desde acá y no sueltas en cada lado: una etiqueta que no existe hace fallar la
+ * escritura ENTERA del item, así que el día que alguien renombre una conviene que haya un solo
+ * lugar donde corregirla.
  */
 export const ESTADO_UNIDAD = {
   PENDIENTE: 'Pendiente',

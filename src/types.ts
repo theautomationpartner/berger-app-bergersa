@@ -28,9 +28,14 @@ export type OperacionPrincipal =
   | 'clientes'
   /** VENTA · las actividades con cada cliente. */
   | 'actividades'
+  /** VENTA · los pedidos de los concesionarios. */
+  | 'pedidos'
 
 /** Operaciones dentro de "Fechas de Producción Inventario". */
 export type OperacionFechas = 'confirmar' | 'enviar'
+
+/** Operaciones dentro de "Pedidos". */
+export type OperacionPedidos = 'gestionar' | 'aprobar' | 'asignar'
 
 /** Operaciones dentro de "Despacho de Aduana". */
 export type OperacionAduana = 'actualizar' | 'turnos' | 'berger' | 'contenedores' | 'dashboard'

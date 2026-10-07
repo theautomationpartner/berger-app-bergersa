@@ -7,6 +7,7 @@ import type {
   SeccionPanel,
   OperacionDrafts,
   OperacionFechas,
+  OperacionPedidos,
   OperacionPrincipal,
 } from '@/types'
 
@@ -126,6 +127,17 @@ export const OPERACIONES_PRINCIPALES: (OpcionPanel<OperacionPrincipal> & {
       'Lo que se habló con un cliente y lo que falta hablar: llamadas, WhatsApp, visitas y ' +
       'reuniones, con quién y cuándo.',
     icono: 'fa-solid fa-calendar-check',
+  },
+  {
+    id: 'pedidos',
+    area: 'venta',
+    modulo: 'pedidos',
+    titulo: 'PEDIDOS',
+    corto: 'Pedidos',
+    detalle:
+      'Los pedidos de los concesionarios: cargarlos y seguirlos de un lado, aprobarlos y asignarles ' +
+      'inventario del otro.',
+    icono: 'fa-solid fa-cart-shopping',
   },
 ]
 
@@ -310,3 +322,69 @@ export const MODALIDADES_DESPACHO: OpcionPanel<ModalidadDespacho>[] = [
     icono: 'fa-solid fa-paper-plane',
   },
 ]
+
+/**
+ * Las dos caras de PEDIDOS: la del concesionario y la de BERGER.
+ *
+ * Es el mismo caso que DESPACHO DE ADUANA: dos trabajos sobre los mismos pedidos, hechos por gente
+ * distinta. El concesionario carga y mira los suyos; BERGER los aprueba y les asigna inventario.
+ * Que estén separadas no es decoración —cada sección es un módulo distinto— pero verlo ayuda a no
+ * entrar a la pantalla equivocada.
+ */
+export const SECCIONES_PEDIDOS: SeccionPanel[] = [
+  {
+    id: 'concesionario',
+    titulo: 'CONCESIONARIO',
+    detalle: 'Lo que carga y sigue cada concesionario de sus propios pedidos.',
+    tono: 'azul',
+    icono: 'fa-solid fa-store',
+  },
+  {
+    id: 'berger',
+    titulo: 'BERGER S.A.',
+    detalle: 'Lo que decide BERGER: qué se aprueba y con qué unidad se cumple.',
+    tono: 'naranja',
+    icono: 'fa-solid fa-building',
+  },
+]
+
+SECCIONES_POR_PRINCIPAL.pedidos = SECCIONES_PEDIDOS
+
+/** Las pantallas de PEDIDOS. */
+export const OPERACIONES_PEDIDOS: (OpcionPanel<OperacionPedidos> & { modulo: ModuloApp })[] = [
+  {
+    id: 'gestionar',
+    seccion: 'concesionario',
+    modulo: 'pedidos',
+    titulo: 'GESTIONAR PEDIDOS',
+    corto: 'Gestionar pedidos',
+    detalle: 'Cargar un pedido nuevo y seguir el estado de cada tractor de los que ya mandaste.',
+    icono: 'fa-solid fa-cart-plus',
+  },
+  {
+    id: 'aprobar',
+    seccion: 'berger',
+    modulo: 'pedidosBerger',
+    titulo: 'APROBAR PEDIDOS',
+    corto: 'Aprobar pedidos',
+    detalle: 'Los pedidos pendientes de todos los concesionarios, con su línea de crédito.',
+    icono: 'fa-solid fa-stamp',
+  },
+  {
+    id: 'asignar',
+    seccion: 'berger',
+    modulo: 'pedidosBerger',
+    titulo: 'ASIGNAR PEDIDOS',
+    corto: 'Asignar pedidos',
+    detalle: 'Unir cada unidad aprobada con un tractor del inventario, o pedirla a fábrica.',
+    icono: 'fa-solid fa-link',
+  },
+]
+
+/** Las de PEDIDOS que puede ver este perfil. */
+export const pedidosDeModulos = (modulos: ModuloApp[]): OpcionPanel<OperacionPedidos>[] =>
+  OPERACIONES_PEDIDOS.filter((o) => modulos.includes(o.modulo))
+
+/** ¿Tiene permitida ESTA pantalla de pedidos? */
+export const puedeEnPedidos = (modulos: ModuloApp[], id: OperacionPedidos): boolean =>
+  pedidosDeModulos(modulos).some((o) => o.id === id)

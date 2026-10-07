@@ -147,7 +147,8 @@ export function BarraNavegacion({ ruta, modulos, onIr, onAbrirPanel }: Props) {
         d.ruta.modalidad === ruta.modalidad &&
         d.ruta.aduana === ruta.aduana &&
         d.ruta.drafts === ruta.drafts &&
-        d.ruta.fechas === ruta.fechas,
+        d.ruta.fechas === ruta.fechas &&
+        d.ruta.pedidos === ruta.pedidos,
     ) ?? null
 
   /**
