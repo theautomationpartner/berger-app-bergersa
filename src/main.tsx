@@ -7,6 +7,7 @@ import '@/styles/layout.css'
 import '@/styles/components.css'
 import '@/styles/pago.css'
 import '@/styles/aduana.css'
+import '@/styles/pedidos.css'
 import '@/styles/ingreso.css'
 
 const container = document.getElementById('root')

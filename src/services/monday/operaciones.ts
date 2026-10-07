@@ -115,6 +115,7 @@ export type NombreOperacion =
   | 'crearSubitemDePedido'
   | 'crearUnidadDeVenta'
   | 'pedidosCargados'
+  | 'novedadesDePedidos'
   | 'unidadesDeVenta'
   | 'inventarioParaAsignar'
   | 'resolverPedido'
@@ -559,6 +560,18 @@ const CAMPOS_COLUMNA = `
 `
 
 /**
+ * Lo mismo, más el JSON crudo de la columna.
+ *
+ * `value` es el único lugar donde viaja el **id** de la persona de una columna `people`: el `text`
+ * trae su nombre, y con un nombre no se puede mencionar a nadie. Se pide sólo donde hace falta
+ * porque es el campo más pesado de la respuesta y en la mayoría de las consultas no se mira.
+ */
+const CAMPOS_COLUMNA_CON_VALOR = `
+  ${CAMPOS_COLUMNA}
+  value
+`
+
+/**
  * Las actividades, con dos campos que el resto de las consultas no pide.
  *
  * `value` trae el JSON crudo de la columna, y es de donde sale el **id** del responsable: el
@@ -682,6 +695,8 @@ const COLUMNAS_DE_PEDIDO = new Set<string>([
   COL_PEDIDO.totalFacturaSinIva,
   COL_PEDIDO.totalFacturaConIva,
   COL_PEDIDO.fechaSolicitud,
+  COL_PEDIDO.aprobComercial,
+  COL_PEDIDO.aprobFinanciera,
 ])
 
 /** Lo que puede escribir en cada renglón. Los precios los calcula la app, no se tipean. */
@@ -735,6 +750,8 @@ const COLUMNAS_DE_VENTA = new Set<string>([
  */
 const COLUMNAS_DE_RESOLUCION = new Set<string>([
   COL_PEDIDO.estado,
+  COL_PEDIDO.aprobComercial,
+  COL_PEDIDO.aprobFinanciera,
   COL_PEDIDO.motivo,
   COL_PEDIDO.fechaAprobacion,
   COL_PEDIDO.fechaEstimadaEntrega,
@@ -966,7 +983,7 @@ const OPS_CRM = {
             items {
               id
               name
-              column_values(ids: $columnas) { ${CAMPOS_COLUMNA} }
+              column_values(ids: $columnas) { ${CAMPOS_COLUMNA_CON_VALOR} }
               subitems { id name column_values(ids: $subColumnas) { ${CAMPOS_COLUMNA} } }
             }
           }
@@ -978,6 +995,41 @@ const OPS_CRM = {
       columnas: idsDeColumnas(v.columnas),
       subColumnas: idsDeColumnas(v.subColumnas),
       limite: entero(v.limite, 'limite', 1, 500),
+    }),
+  },
+
+  /**
+   * Los updates de los pedidos: de ahí salen las novedades que ve el concesionario.
+   *
+   * Es la misma información que monday le manda por notificación, pero puesta en la app: quien
+   * trabaja acá adentro no tiene por qué ir al tablero a enterarse de que le aprobaron un pedido.
+   */
+  novedadesDePedidos: {
+    modulo: 'pedidosBerger' as const,
+    tambienEn: ['pedidos'] as const,
+    query: `
+      query ($tablero: ID!, $columnas: [String!], $limite: Int!) {
+        boards(ids: [$tablero]) {
+          items_page(limit: $limite) {
+            items {
+              id
+              name
+              column_values(ids: $columnas) { ${CAMPOS_COLUMNA_CON_VALOR} }
+              updates(limit: 20) {
+                id
+                text_body
+                created_at
+                creator { id name }
+              }
+            }
+          }
+        }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.pedidos,
+      columnas: idsDeColumnas(v.columnas),
+      limite: entero(v.limite, 'limite', 1, 300),
     }),
   },
 
@@ -2390,6 +2442,8 @@ export const OPERACIONES: Record<NombreOperacion, Operacion> = {
    */
   crearUpdate: {
     modulo: 'aduana',
+    /* También avisa al comercial del concesionario cuando su pedido cambia de estado. */
+    tambienEn: ['pedidosBerger'] as const,
     apiVersion: API_CON_MENCIONES,
     query: `
       mutation ($item: ID!, $cuerpo: String!, $menciones: [UpdateMention]) {

@@ -1083,8 +1083,24 @@ export const COL_PEDIDO = {
   fechaEstimadaEntrega: 'date_mm5fbbgj',
   fechaEntregaReal: 'date_mm5fmcf9',
   motivo: 'long_text_mm7pg8ar',
+  /**
+   * Las dos aprobaciones, que son dos preguntas distintas y las contesta gente distinta.
+   *
+   * La comercial es "¿el precio cierra?" y la financiera "¿este cliente puede pagar?". Un pedido
+   * sólo queda aprobado con las dos: con una sola columna, aprobar el precio parecía aprobar la
+   * venta, y la pregunta del crédito se contestaba sola sin que nadie la hubiera mirado.
+   */
+  aprobComercial: 'color_mm7xbjw6',
+  aprobFinanciera: 'color_mm7xx12z',
   ventas: 'board_relation_mm7xa4vs',
   idPedido: 'pulse_id_mm7w6fc9',
+} as const
+
+/** Las etiquetas de las dos columnas de aprobación. */
+export const APROBACION = {
+  PENDIENTE: 'Pendiente',
+  APROBADO: 'Aprobado',
+  RECHAZADO: 'Rechazado',
 } as const
 
 /** Subelementos de 🔖Pedidos (18428606873) — una fila por modelo pedido, con su cantidad. */

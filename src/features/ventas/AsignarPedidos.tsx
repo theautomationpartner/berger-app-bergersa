@@ -89,6 +89,14 @@ export function AsignarPedidos() {
 
   const libres = useMemo(() => stock.filter(sePuedePrometer), [stock])
 
+  /* Las unidades que todavía no tienen tractor: es el trabajo que queda, y no se ve sumando
+     pedidos porque un pedido puede tener una asignada y otra no. */
+  const porAsignar = useMemo(
+    () =>
+      unidades.filter((u) => aprobados.some((p) => p.id === u.pedidoId) && !u.inventarioId).length,
+    [unidades, aprobados],
+  )
+
   const asignar = async (p: PedidoLeido) => {
     setTrabajando(p.id)
     setHecho(null)
@@ -134,9 +142,37 @@ export function AsignarPedidos() {
           </span>
         </div>
 
-        <div className="resumen-estados">
-          <span className="chip chip--verde">{aprobados.length} pedidos aprobados</span>
-          <span className="chip chip--gris">{libres.length} tractores sin dueño</span>
+        <div className="tableros">
+          <div className="tablero tablero--verde">
+            <span className="tablero-ic">
+              <i className="fa-solid fa-circle-check" aria-hidden="true" />
+            </span>
+            <span className="tablero-num">{aprobados.length}</span>
+            <span className="tablero-txt">
+              aprobados
+              <small>esperando inventario</small>
+            </span>
+          </div>
+          <div className="tablero tablero--azul">
+            <span className="tablero-ic">
+              <i className="fa-solid fa-warehouse" aria-hidden="true" />
+            </span>
+            <span className="tablero-num">{libres.length}</span>
+            <span className="tablero-txt">
+              tractores sin dueño
+              <small>de {stock.length} en el inventario</small>
+            </span>
+          </div>
+          <div className="tablero tablero--violeta">
+            <span className="tablero-ic">
+              <i className="fa-solid fa-boxes-stacked" aria-hidden="true" />
+            </span>
+            <span className="tablero-num">{porAsignar}</span>
+            <span className="tablero-txt">
+              unidades por asignar
+              <small>de todos los pedidos aprobados</small>
+            </span>
+          </div>
           <button
             type="button"
             className="btn btn--texto btn--chico"

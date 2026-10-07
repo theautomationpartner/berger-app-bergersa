@@ -1,0 +1,901 @@
+/**
+ * VENTA · pedidos: la plata, las tarjetas, las aprobaciones y el tablero.
+ *
+ * Vive en su propio archivo porque el módulo es grande y `components.css` ya pasaba las dos mil
+ * líneas: buscar una regla ahí adentro era leer todo el archivo.
+ */
+
+/* ===== La plata, siempre igual en toda la app ===== */
+
+/* En estas pantallas la plata es el dato por el que se entra. Antes cada tabla la escribía con el
+   peso que le tocaba por herencia, así que el número más importante se leía igual que el rótulo de
+   una columna. Las cifras tabulares tampoco son un detalle: con la fuente normal el 1 es más
+   angosto que el 8, y una columna de importes desalineada es justo lo que impide compararlos de un
+   vistazo. */
+.plata {
+  font-weight: 800;
+  color: var(--green-dark);
+  font-variant-numeric: tabular-nums;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+.plata--grande {
+  font-size: 16px;
+}
+.plata--resta {
+  color: var(--berger-red);
+}
+.plata--apagada {
+  color: var(--text-mid);
+  font-weight: 700;
+}
+.plata small {
+  margin-left: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+
+/* ===== Los renglones de un pedido ===== */
+
+/* Antes era una tabla sin reglas propias: la cantidad quedaba pegada al nombre del modelo y los
+   importes heredaban el tamaño de lo que los rodeara. */
+.renglones {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.renglon {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  background: #fff;
+}
+.renglon:last-child {
+  border-bottom: none;
+}
+.renglon-cant {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: var(--tint-input);
+  color: #0a4f9e;
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.renglon-nom {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-dark);
+  overflow-wrap: anywhere;
+}
+.renglon-nom small {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+.renglon-plata {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.renglon-plata small {
+  font-size: 10.5px;
+  color: var(--text-gray);
+  font-variant-numeric: tabular-nums;
+}
+
+.totales-pedido {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+.total-cuadro {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--tint-neutral);
+}
+.total-cuadro small {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+.total-cuadro--fuerte {
+  border-color: var(--green-bd);
+  background: var(--green-soft);
+}
+
+/* ===== Las listas de pedidos y sus piezas base ===== */
+
+.resumen-estados {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 14px;
+}
+.ver-cerrados {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.ver-cerrados input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary-blue);
+  cursor: pointer;
+}
+
+.pedidos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pedido-card {
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+/* La cabecera es el botón que pliega: con diez pedidos abiertos no se encuentra ninguno. */
+.pedido-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  background: var(--tint-neutral);
+  text-align: left;
+  cursor: pointer;
+}
+.pedido-card-head:disabled {
+  cursor: default;
+}
+.pedido-card-tit {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.pedido-card-nom {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--text-dark);
+  overflow-wrap: anywhere;
+}
+.pedido-card-sub {
+  font-size: 11.5px;
+  color: var(--text-gray);
+}
+.pedido-card-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.pedido-card-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+.pedido-card-cuerpo .aviso,
+.pedido-card-cuerpo .fichas {
+  margin: 0;
+}
+
+/* Las unidades, de a una: el estado del pedido no cuenta que una salió del galpón y la otra se
+   pidió a fábrica. */
+.unidades {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.unidades-tit {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+.unidad {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--tint-neutral);
+}
+.unidad-nom {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.unidad-nom small {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+.unidad-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.unidad--asignar {
+  align-items: flex-start;
+}
+.unidad-elegir {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 1 320px;
+  min-width: 0;
+}
+.unidad-elegir .campo-ayuda {
+  margin: 0;
+}
+
+.pedido-acciones {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+.pedido-acciones-nota {
+  margin-right: auto;
+  font-size: 12.5px;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .pedido-card-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .unidad,
+  .unidad--asignar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .unidad-chips {
+    justify-content: flex-start;
+  }
+}
+
+/* ===== La tarjeta, con su panel de decisión al costado ===== */
+
+/* Una franja de color por estado: con quince pedidos, el color dice en qué anda cada uno sin tener
+   que leer la etiqueta. */
+.pedido-card--ambar {
+  border-left: 4px solid var(--orange);
+}
+.pedido-card--verde {
+  border-left: 4px solid var(--green-dark);
+}
+.pedido-card--rojo {
+  border-left: 4px solid var(--berger-red);
+}
+.pedido-card--azul {
+  border-left: 4px solid var(--primary-blue);
+}
+.pedido-card--violeta {
+  border-left: 4px solid #7c4dff;
+}
+
+.pedido-card-cuerpo--doble {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 16px;
+  align-items: start;
+}
+.pedido-card-principal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.pedido-card-costado {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Cada aprobación en su caja, con su pregunta arriba: son dos decisiones distintas, y mezclarlas
+   en una fila de botones fue lo que hizo que el crédito se aprobara solo. */
+.decidir {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px;
+  border: 1.5px solid var(--border-soft);
+  border-radius: 12px;
+  background: #fff;
+}
+.decidir--comercial {
+  border-color: rgba(0, 115, 234, 0.35);
+  background: var(--tint-input);
+}
+.decidir--financiera {
+  border-color: rgba(124, 77, 255, 0.3);
+  background: #f6f3ff;
+}
+.decidir--listo {
+  opacity: 0.85;
+}
+/* La financiera se apaga hasta que la comercial esté contestada: evaluar el crédito de un precio
+   que todavía puede cambiar es trabajo tirado. */
+.decidir--esperando {
+  opacity: 0.6;
+}
+.decidir-tit {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+.decidir-pregunta {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+.decidir-datos {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--text-mid);
+}
+.decidir-datos span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.decidir-datos b {
+  color: var(--text-dark);
+  text-align: right;
+}
+.decidir-botones {
+  display: flex;
+  gap: 8px;
+}
+.decidir-botones .btn {
+  flex: 1 1 0;
+  justify-content: center;
+}
+.decidir-espera {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-gray);
+}
+.decidir .aviso {
+  margin: 0;
+}
+
+.linea-credito {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border-left: 3px solid var(--border-soft);
+  background: var(--tint-neutral);
+  font-size: 12.5px;
+  color: var(--text-mid);
+}
+.linea-credito span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.linea-credito--verde {
+  border-left-color: var(--green-dark);
+}
+.linea-credito--amarillo {
+  border-left-color: var(--orange);
+}
+.linea-credito--naranja {
+  border-left-color: #e8740c;
+}
+.linea-credito--rojo {
+  border-left-color: var(--berger-red);
+}
+
+/* ===== El buscador y los tableros ===== */
+
+.buscador-pedidos {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  margin: 16px 0 14px;
+}
+
+.tableros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.tableros--estados {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+.tablero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-soft);
+  border-left: 4px solid var(--border-soft);
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+}
+.tablero--boton {
+  cursor: pointer;
+}
+.tablero--boton:hover:not(:disabled) {
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.1);
+}
+.tablero--vacio {
+  opacity: 0.5;
+  cursor: default;
+}
+.tablero-ic {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--tint-neutral);
+  color: var(--text-mid);
+  flex: 0 0 auto;
+}
+.tablero-num {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.tablero-num--plata {
+  font-size: inherit;
+}
+.tablero-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  color: var(--text-mid);
+}
+.tablero-txt small {
+  font-size: 10.5px;
+  color: var(--text-gray);
+}
+.tablero--ambar {
+  border-left-color: var(--orange);
+}
+.tablero--ambar .tablero-ic {
+  background: #fff6e6;
+  color: #b5600a;
+}
+.tablero--verde {
+  border-left-color: var(--green-dark);
+}
+.tablero--verde .tablero-ic {
+  background: var(--green-soft);
+  color: var(--green-dark);
+}
+.tablero--rojo {
+  border-left-color: var(--berger-red);
+}
+.tablero--rojo .tablero-ic {
+  background: var(--berger-red-soft);
+  color: var(--berger-red);
+}
+.tablero--azul {
+  border-left-color: var(--primary-blue);
+}
+.tablero--azul .tablero-ic {
+  background: var(--tint-input);
+  color: var(--primary-blue);
+}
+.tablero--violeta {
+  border-left-color: #7c4dff;
+}
+.tablero--violeta .tablero-ic {
+  background: #f1ecff;
+  color: #5b2fd6;
+}
+
+/* ===== Las estadísticas ===== */
+
+.panel-pedidos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 16px;
+}
+.estadisticas {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: #fff;
+}
+.estad-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.estad-tit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+.estad-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--tint-neutral);
+}
+.estad-tab {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.estad-tab--si {
+  background: #fff;
+  color: #0a4f9e;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.12);
+}
+.estad-cifras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.estad-cifra {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: var(--tint-neutral);
+}
+.estad-cifra small {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+.estad-cifra b {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Los gráficos se dibujan a mano con SVG: traerse una librería para dos gráficos son doscientos
+   kilobytes que descargan también los que nunca abren esta pantalla. */
+.grafico svg {
+  width: 100%;
+  height: 180px;
+  display: block;
+}
+.grafico-guia {
+  stroke: var(--border-soft);
+  stroke-width: 1;
+}
+.grafico-barra {
+  fill: rgba(0, 115, 234, 0.18);
+}
+.grafico-barra:hover {
+  fill: rgba(0, 115, 234, 0.34);
+}
+.grafico-linea {
+  fill: none;
+  stroke: var(--green-dark);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.grafico-meses {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  font-size: 10px;
+  color: var(--text-gray);
+  text-align: center;
+}
+
+.ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ranking-tit {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+.ranking-fila {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 32px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--text-dark);
+}
+.ranking-nom {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ranking-barra {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tint-neutral);
+  overflow: hidden;
+}
+.ranking-barra span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary-blue);
+}
+.ranking-num {
+  text-align: right;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Solapas y novedades ===== */
+
+.solapas {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 18px 0 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.solapa {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-gray);
+  cursor: pointer;
+}
+.solapa:hover {
+  color: var(--text-dark);
+}
+.solapa--si {
+  border-bottom-color: var(--primary-blue);
+  color: #0a4f9e;
+}
+.solapas-der {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  padding-bottom: 6px;
+}
+
+.novedades {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.novedades-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.novedades-tit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+.novedades-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.novedad {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+.novedad:hover {
+  border-color: var(--primary-blue);
+}
+.novedad--nueva {
+  background: var(--tint-input);
+  border-color: rgba(0, 115, 234, 0.3);
+}
+/* El punto azul: lo que distingue de un vistazo lo nuevo de lo ya visto. */
+.novedad-punto {
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: transparent;
+  flex: 0 0 auto;
+}
+.novedad--nueva .novedad-punto {
+  background: var(--primary-blue);
+}
+.novedad-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.novedad-pedido {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0a4f9e;
+  overflow-wrap: anywhere;
+}
+.novedad-cuerpo {
+  font-size: 13px;
+  color: var(--text-dark);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.novedad-pie {
+  font-size: 11px;
+  color: var(--text-gray);
+}
+
+/* ===== La ventanita ===== */
+
+.ventanita {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 60;
+  width: min(560px, 92vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(16, 24, 40, 0.3);
+  overflow: hidden;
+}
+.ventanita--ancha {
+  width: min(960px, 94vw);
+}
+.ventanita-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+.ventanita-head button {
+  border: none;
+  background: none;
+  font-size: 17px;
+  color: var(--text-gray);
+  cursor: pointer;
+}
+.ventanita-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+}
+.ventanita-cuerpo--scroll {
+  overflow-y: auto;
+}
+.ventanita-pie {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--tint-neutral);
+}
+
+@media (max-width: 980px) {
+  .pedido-card-cuerpo--doble {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .buscador-pedidos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

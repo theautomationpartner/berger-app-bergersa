@@ -14,6 +14,7 @@
  */
 import { aNumeroEspejo, porId, texto, type ColumnaCruda } from './parse'
 import {
+  APROBACION,
   COL_ENTREGA,
   COL_ENTREGA_SUB,
   COL_INV,
@@ -55,6 +56,24 @@ const nombreEnlazado = (c: ColumnaCruda | undefined): string =>
 
 const numero = (c: ColumnaCruda | undefined): number => aNumeroEspejo(texto(c)) ?? 0
 
+/**
+ * El id de monday de la primera persona de una columna `people`.
+ *
+ * Vive en el JSON crudo de la columna y no en su texto: el texto trae el nombre, y con un nombre
+ * no se puede mencionar a nadie.
+ */
+function idDePersona(c: ColumnaCruda | undefined): string {
+  try {
+    const v = JSON.parse(c?.value ?? '') as {
+      personsAndTeams?: { id: number | string; kind?: string }[]
+    }
+    const persona = (v.personsAndTeams ?? []).find((x) => !x.kind || x.kind === 'person')
+    return persona ? String(persona.id) : ''
+  } catch {
+    return ''
+  }
+}
+
 /* ------------------------------------------------------------------ *
  * Lo que se lee
  * ------------------------------------------------------------------ */
@@ -83,7 +102,11 @@ export interface PedidoLeido {
   cuentaNombre: string
   terceroNombre: string
   comercial: string
+  /** Su id de monday, para mencionarlo cuando el pedido cambia. */
+  comercialId: string
   equipo: string
+  aprobComercial: string
+  aprobFinanciera: string
   fechaSolicitud: string
   fechaAprobacion: string
   motivo: string
@@ -134,6 +157,8 @@ const COLUMNAS_PEDIDO = [
   COL_PEDIDO.equipo,
   COL_PEDIDO.fechaSolicitud,
   COL_PEDIDO.fechaAprobacion,
+  COL_PEDIDO.aprobComercial,
+  COL_PEDIDO.aprobFinanciera,
   COL_PEDIDO.motivo,
   COL_PEDIDO.totalListaSinIva,
   COL_PEDIDO.totalFacturaSinIva,
@@ -189,7 +214,10 @@ export async function pedidosCargados(limite = 200): Promise<PedidoLeido[]> {
       cuentaNombre: nombreEnlazado(c[COL_PEDIDO.cuenta]),
       terceroNombre: nombreEnlazado(c[COL_PEDIDO.tercero]),
       comercial: texto(c[COL_PEDIDO.comercial]),
+      comercialId: idDePersona(c[COL_PEDIDO.comercial]),
       equipo: texto(c[COL_PEDIDO.equipo]),
+      aprobComercial: texto(c[COL_PEDIDO.aprobComercial]) || APROBACION.PENDIENTE,
+      aprobFinanciera: texto(c[COL_PEDIDO.aprobFinanciera]) || APROBACION.PENDIENTE,
       fechaSolicitud: texto(c[COL_PEDIDO.fechaSolicitud]),
       fechaAprobacion: texto(c[COL_PEDIDO.fechaAprobacion]),
       motivo: texto(c[COL_PEDIDO.motivo]),
@@ -319,48 +347,160 @@ const escribirRenglon = (id: string, estado: string) =>
     valores: JSON.stringify({ [COL_PEDIDO_SUB.estado]: { label: estado } }),
   })
 
+/** Cuál de las dos aprobaciones se está contestando. */
+export type Aprobacion = 'comercial' | 'financiera'
+
 /**
- * Aprobar un pedido: el pedido, sus renglones y todas sus unidades.
+ * Qué le pasa al pedido con las dos aprobaciones así.
  *
- * La fecha de aprobación se escribe acá y no la pone una automatización porque es el dato con el
- * que después se mide cuánto tarda BERGER en responder.
+ * Aprobado sólo con las DOS: que el precio cierre no dice que el cliente pueda pagar, y al revés
+ * tampoco. Rechazado con que una diga que no, porque con una sola negativa la venta no se hace.
+ * Mientras alguna esté pendiente, el pedido sigue esperando y no cambia de estado.
  */
+export function estadoSegunAprobaciones(comercial: string, financiera: string): string | null {
+  if (comercial === APROBACION.RECHAZADO || financiera === APROBACION.RECHAZADO) {
+    return ESTADO_PEDIDO.RECHAZADO
+  }
+  if (comercial === APROBACION.APROBADO && financiera === APROBACION.APROBADO) {
+    return ESTADO_PEDIDO.APROBADO
+  }
+  return null
+}
+
+/** Cómo se lee cada aprobación en un update y en la pantalla. */
+const COMO_SE_LLAMA: Record<Aprobacion, string> = {
+  comercial: 'comercial',
+  financiera: 'financiera',
+}
+
+export interface ResultadoResolucion extends Resultado {
+  /** Cómo quedaron las dos después de esta respuesta. */
+  comercial: string
+  financiera: string
+  /** El estado al que pasó el pedido, o `''` si todavía espera la otra aprobación. */
+  estado: string
+}
+
+/**
+ * Contestar UNA de las dos aprobaciones.
+ *
+ * Sólo cuando las dos están contestadas se mueve el estado del pedido, y recién ahí se tocan los
+ * renglones y las unidades: aprobar el precio no aprueba nada todavía, y dejar las unidades en
+ * "Aprobada" con la financiera pendiente sería decirle al concesionario que ya está.
+ */
+export async function resolverAprobacion(
+  pedido: PedidoLeido,
+  unidades: UnidadLeida[],
+  cual: Aprobacion,
+  aprueba: boolean,
+  observacion = '',
+): Promise<ResultadoResolucion> {
+  const advertencias: string[] = []
+  const respuesta = aprueba ? APROBACION.APROBADO : APROBACION.RECHAZADO
+
+  const comercial = cual === 'comercial' ? respuesta : pedido.aprobComercial
+  const financiera = cual === 'financiera' ? respuesta : pedido.aprobFinanciera
+  const estado = estadoSegunAprobaciones(comercial, financiera)
+
+  const valores: Record<string, unknown> = {
+    [cual === 'comercial' ? COL_PEDIDO.aprobComercial : COL_PEDIDO.aprobFinanciera]: {
+      label: respuesta,
+    },
+  }
+  if (estado) valores[COL_PEDIDO.estado] = { label: estado }
+  if (estado === ESTADO_PEDIDO.APROBADO) {
+    valores[COL_PEDIDO.fechaAprobacion] = { date: hoy() }
+    /* El motivo se limpia al aprobar: dejar escrito el de un rechazo anterior haría leer un
+       rechazo donde hay una aprobación. */
+    valores[COL_PEDIDO.motivo] = ''
+  }
+  /* La observación queda escrita siempre que la haya, aunque el pedido todavía no cambie de
+     estado: es lo que explica por qué una de las dos dijo que no. */
+  if (observacion.trim()) {
+    valores[COL_PEDIDO.motivo] = `Aprobación ${COMO_SE_LLAMA[cual]}: ${observacion.trim()}`
+  }
+
+  await mondayApi('resolverPedido', { item: pedido.id, valores: JSON.stringify(valores) })
+
+  /* Los renglones y las unidades se mueven sólo cuando el pedido se movió. */
+  if (estado) {
+    const aUnidad =
+      estado === ESTADO_PEDIDO.APROBADO ? ESTADO_UNIDAD.APROBADA : ESTADO_UNIDAD.RECHAZADA
+
+    for (const r of pedido.renglones) {
+      try {
+        await escribirRenglon(r.id, aUnidad)
+      } catch (e) {
+        advertencias.push(`El renglón ${r.nombre} quedó sin actualizar: ${motivo(e)}`)
+      }
+    }
+    for (const u of unidades) {
+      try {
+        await escribirUnidad(u.id, { [COL_VENTA.estado]: { label: aUnidad } })
+      } catch (e) {
+        advertencias.push(`Una unidad de ${u.catalogoNombre} quedó sin actualizar: ${motivo(e)}`)
+      }
+    }
+  }
+
+  await avisarAlComercial(
+    pedido,
+    estado === ESTADO_PEDIDO.APROBADO
+      ? `Tu pedido **${pedido.nombre}** quedó **aprobado**. Ya se le puede asignar inventario.`
+      : estado === ESTADO_PEDIDO.RECHAZADO
+        ? `Tu pedido **${pedido.nombre}** fue **rechazado** en la aprobación ${COMO_SE_LLAMA[cual]}.${
+            observacion.trim() ? `\n\nMotivo: ${observacion.trim()}` : ''
+          }`
+        : `La aprobación ${COMO_SE_LLAMA[cual]} de **${pedido.nombre}** quedó **${respuesta.toLowerCase()}**. Falta la otra.`,
+    advertencias,
+  )
+
+  return { advertencias, comercial, financiera, estado: estado ?? '' }
+}
+
+/**
+ * Un update en el pedido mencionando a quien lo cargó.
+ *
+ * Es lo que hace que el concesionario se entere sin que nadie lo llame. La mención va en
+ * `mentions_list` y no incrustada en el texto: monday descarta el marcado del cuerpo, el texto
+ * queda y nadie recibe nada.
+ *
+ * Nunca tira: que no se pueda avisar no puede deshacer una aprobación que ya está escrita.
+ */
+async function avisarAlComercial(
+  pedido: PedidoLeido,
+  texto: string,
+  advertencias: string[],
+): Promise<void> {
+  try {
+    await mondayApi('crearUpdate', {
+      item: pedido.id,
+      cuerpo: texto,
+      menciones: pedido.comercialId ? [{ id: pedido.comercialId }] : [],
+    })
+  } catch (e) {
+    advertencias.push(
+      `El pedido quedó resuelto, pero no se pudo avisar al concesionario: ${motivo(e)}`,
+    )
+  }
+}
+
+/** Aprobar las dos de una vez. Queda para los tests y para el circuito de siempre. */
 export async function aprobarPedido(
   pedido: PedidoLeido,
   unidades: UnidadLeida[],
 ): Promise<Resultado> {
-  const advertencias: string[] = []
-
-  await mondayApi('resolverPedido', {
-    item: pedido.id,
-    valores: JSON.stringify({
-      [COL_PEDIDO.estado]: { label: ESTADO_PEDIDO.APROBADO },
-      [COL_PEDIDO.fechaAprobacion]: { date: hoy() },
-      /* El motivo se limpia: si el pedido había sido rechazado y se aprueba, dejar escrito el
-         motivo viejo haría leer un rechazo donde hay una aprobación. */
-      [COL_PEDIDO.motivo]: '',
-    }),
-  })
-
-  for (const r of pedido.renglones) {
-    try {
-      await escribirRenglon(r.id, ESTADO_UNIDAD.APROBADA)
-    } catch (e) {
-      advertencias.push(`El renglón ${r.nombre} quedó sin actualizar: ${motivo(e)}`)
-    }
-  }
-  for (const u of unidades) {
-    try {
-      await escribirUnidad(u.id, { [COL_VENTA.estado]: { label: ESTADO_UNIDAD.APROBADA } })
-    } catch (e) {
-      advertencias.push(`Una unidad de ${u.catalogoNombre} quedó sin aprobar: ${motivo(e)}`)
-    }
-  }
-
-  return { advertencias }
+  const uno = await resolverAprobacion(pedido, unidades, 'comercial', true)
+  const dos = await resolverAprobacion(
+    { ...pedido, aprobComercial: uno.comercial },
+    unidades,
+    'financiera',
+    true,
+  )
+  return { advertencias: [...uno.advertencias, ...dos.advertencias] }
 }
 
-/** Rechazar: lo mismo al revés, y con el motivo, que es lo único que le sirve al concesionario. */
+/** Rechazar: alcanza con que una de las dos diga que no. */
 export async function rechazarPedido(
   pedido: PedidoLeido,
   unidades: UnidadLeida[],
@@ -372,6 +512,7 @@ export async function rechazarPedido(
     item: pedido.id,
     valores: JSON.stringify({
       [COL_PEDIDO.estado]: { label: ESTADO_PEDIDO.RECHAZADO },
+      [COL_PEDIDO.aprobComercial]: { label: APROBACION.RECHAZADO },
       [COL_PEDIDO.motivo]: porQue.trim(),
     }),
   })
@@ -536,4 +677,104 @@ export async function asignarPedido(
   }
 
   return { advertencias, asignadas: asignadas.length, aFabrica, entregaId }
+}
+
+/* ------------------------------------------------------------------ *
+ * Novedades
+ * ------------------------------------------------------------------ */
+
+/** Una novedad: lo que BERGER escribió en un pedido. */
+export interface Novedad {
+  id: string
+  pedidoId: string
+  pedidoNombre: string
+  texto: string
+  autor: string
+  /** ISO con hora, tal como lo devuelve monday. */
+  cuando: string
+  /** Si menciona a quien está mirando. Las suyas van primero. */
+  paraMi: boolean
+}
+
+type ItemConUpdates = ItemCrudo & {
+  updates?: {
+    id: string
+    text_body?: string | null
+    created_at: string
+    creator?: { id: string; name: string } | null
+  }[]
+}
+
+/**
+ * Las novedades de los pedidos de una cuenta.
+ *
+ * Salen de los updates del item, que es donde quedan escritos los cambios de estado: la API de
+ * monday no deja leer las notificaciones de una persona, así que la bandeja se arma con lo que sí
+ * se puede leer. El resultado es el mismo para quien lo mira, y además queda en el tablero.
+ */
+export async function novedadesDePedidos(
+  cuentaIds: string[],
+  miUsuarioId = '',
+  limite = 200,
+): Promise<Novedad[]> {
+  const r = await mondayApi<{ boards: { items_page: { items: ItemConUpdates[] } }[] }>(
+    'novedadesDePedidos',
+    { columnas: [COL_PEDIDO.cuenta, COL_PEDIDO.comercial], limite },
+  )
+
+  const novedades: Novedad[] = []
+  for (const it of r.boards[0]?.items_page.items ?? []) {
+    const c = porId(it.column_values)
+    const cuentaId = enlazados(c[COL_PEDIDO.cuenta])[0] ?? ''
+    if (cuentaIds.length > 0 && !cuentaIds.includes(cuentaId)) continue
+
+    /* "Para mí" es el pedido que cargué yo: es a quien menciona el update que escribe BERGER. */
+    const mio = Boolean(miUsuarioId) && idDePersona(c[COL_PEDIDO.comercial]) === miUsuarioId
+
+    for (const u of it.updates ?? []) {
+      const texto = (u.text_body ?? '').trim()
+      if (!texto) continue
+      novedades.push({
+        id: u.id,
+        pedidoId: it.id,
+        pedidoNombre: it.name,
+        texto,
+        autor: u.creator?.name ?? 'BERGER',
+        cuando: u.created_at,
+        paraMi: mio,
+      })
+    }
+  }
+
+  return novedades.sort((a, b) => b.cuando.localeCompare(a.cuando))
+}
+
+/**
+ * Cuáles ya se leyeron.
+ *
+ * Vive en el navegador y no en monday porque "leído" es de cada persona y de cada máquina, y
+ * escribirlo en el tablero significaría una columna más que nadie mira y una escritura por cada
+ * vez que alguien abre la pantalla. Si se borran los datos del navegador, se vuelven a ver como
+ * nuevas: molesto, no grave.
+ */
+const CLAVE_LEIDAS = 'berger.novedades.leidas'
+
+export function novedadesLeidas(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_LEIDAS) ?? '[]') as unknown
+    return Array.isArray(v) ? v.map(String) : []
+  } catch {
+    return []
+  }
+}
+
+export function marcarLeidas(ids: string[]): void {
+  try {
+    /* Se guardan las últimas 500: la lista crece con cada update y nadie va a volver a mirar una
+       novedad de hace medio año. */
+    const todas = [...new Set([...novedadesLeidas(), ...ids])].slice(-500)
+    localStorage.setItem(CLAVE_LEIDAS, JSON.stringify(todas))
+  } catch {
+    /* Sin localStorage —ventana privada, datos bloqueados— todo se ve como nuevo. */
+  }
 }

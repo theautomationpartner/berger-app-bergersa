@@ -109,7 +109,7 @@ const PASOS = ['El pedido', 'Los tractores', 'El pago', 'Revisar y mandar']
 interface Props {
   /** El equipo de monday del concesionario. Sale de la sesión, no de la pantalla. */
   equipoId?: string
-  /** El usuario de monday que está cargando. Queda como comercial del pedido. */
+  /** El usuario de monday que está cargando. Queda como comercial del pedido y recibe los avisos. */
   comercialId?: string
 }
 
@@ -868,7 +868,7 @@ export function GestionarPedidos({ equipoId = '', comercialId = '' }: Props) {
           </>
         )}
 
-        {trabajo === 'mios' && <MisPedidos equipoId={equipoId} />}
+        {trabajo === 'mios' && <MisPedidos equipoId={equipoId} usuarioId={comercialId} />}
 
         {viendoFotos && (
           <>
