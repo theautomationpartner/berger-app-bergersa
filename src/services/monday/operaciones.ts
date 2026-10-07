@@ -68,6 +68,10 @@ export const MODULOS_APP = [
   'usuarios',
   /** VENTA · el CRM: cuentas y contactos. */
   'ventas',
+  /** VENTA · los pedidos del concesionario. */
+  'pedidos',
+  /** VENTA · aprobar y asignar pedidos. Es de BERGER. */
+  'pedidosBerger',
 ] as const
 
 export type ModuloApp = (typeof MODULOS_APP)[number]
@@ -102,6 +106,8 @@ export type NombreOperacion =
   | 'actividadesDelTablero'
   | 'completarActividadCrm'
   | 'etiquetasDeActividad'
+  | 'catalogoDeVenta'
+  | 'configuracionDeVenta'
   | 'cuentasDelCrm'
   | 'contactosDelCrm'
   | 'concesionariosDelCrm'
@@ -735,6 +741,33 @@ const OPS_CRM = {
     validar: (v: Record<string, unknown>) => ({
       tablero: TABLEROS.actividades,
       columnas: idsDeColumnas(v.columnas),
+    }),
+  },
+
+  /**
+   * El catálogo con el que el concesionario arma su pedido.
+   *
+   * Es del módulo `pedidos` y no de `ventas`: el concesionario tiene que poder ver los productos
+   * y sus precios, que es lo único del CRM a lo que llega.
+   */
+  catalogoDeVenta: {
+    modulo: 'pedidos' as const,
+    query: CONSULTA_ITEMS_CRM,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.catalogo,
+      columnas: idsDeColumnas(v.columnas),
+      limite: entero(v.limite, 'limite', 1, 500),
+    }),
+  },
+
+  /** Los descuentos de contado y el IVA. Sólo se leen: los define BERGER en su tablero. */
+  configuracionDeVenta: {
+    modulo: 'pedidos' as const,
+    query: CONSULTA_ITEMS_CRM,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.configuracion,
+      columnas: idsDeColumnas(v.columnas),
+      limite: entero(v.limite, 'limite', 1, 500),
     }),
   },
 

@@ -34,6 +34,10 @@ export const MODULOS: Modulo[] = [
   'fechas',
   'usuarios',
   'ventas',
+  /** VENTA · los pedidos del concesionario. Es lo ÚNICO que ve un concesionario. */
+  'pedidos',
+  /** VENTA · aprobar y asignar esos pedidos. Es de BERGER. */
+  'pedidosBerger',
 ]
 
 /** Que el valor venga de afuera y sea uno de los módulos conocidos. */
@@ -49,6 +53,17 @@ export const esModulo = (v: unknown): v is Modulo => MODULOS.includes(v as Modul
  */
 const esDespachanteEnLaLista = (perfil: Perfil): boolean =>
   perfil.tipoUsuario === ETIQUETA.INVITADO && perfil.teams.includes(TEAM.DESPACHANTES)
+
+/**
+ * ¿Es el comercial de un concesionario?
+ *
+ * Alcanza con que su fila diga "Concesionario" en la columna de equipo. Se mira que CONTENGA la
+ * palabra y no que sea igual, porque cada concesionario tiene su propia etiqueta —"Concesionario
+ * 1", "Concesionario Rosario"— y van a seguir apareciendo: exigir una lista cerrada obligaría a
+ * tocar el código cada vez que BERGER suma uno.
+ */
+const esConcesionario = (perfil: Perfil): boolean =>
+  perfil.teams.some((t) => t.toLowerCase().includes('concesionario'))
 
 /** ¿Está en el equipo de Administración de BERGER? */
 const esAdministracion = (perfil: Perfil): boolean => perfil.teams.includes(TEAM.ADMINISTRACION)
@@ -70,6 +85,10 @@ const esAdministracion = (perfil: Perfil): boolean => perfil.teams.includes(TEAM
 export function modulosSegunLaLista(perfil: Perfil): Modulo[] {
   if (esDespachanteEnLaLista(perfil)) return ['aduana']
   if (esAdministracion(perfil)) return [...MODULOS]
+  /* El concesionario entra a cargar y seguir SUS pedidos, y a nada más. Va después de
+     Administración a propósito: alguien de Administración que además figure en un concesionario
+     sigue viendo todo. */
+  if (esConcesionario(perfil)) return ['pedidos']
   return ['despacho']
 }
 

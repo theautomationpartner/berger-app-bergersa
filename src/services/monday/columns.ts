@@ -44,6 +44,16 @@ export const TABLEROS = {
   concesionarios: '18428606865',
   /** 🗓️Actividades: cada contacto con un cliente, hecho o por hacer. */
   actividades: '18428421092',
+  /** 🔖Pedidos: un item por pedido del concesionario, con un subitem por modelo. */
+  pedidos: '18428606864',
+  pedidosSubitems: '18428606873',
+  /** 🛍️Ventas: un item por UNIDAD pedida. Es donde se aprueba y se asigna de a uno. */
+  ventas: '18434389854',
+  /** 🚛Entregas: un item por entrega, con un subitem por unidad. */
+  entregas: '18434280125',
+  entregasSubitems: '18434281488',
+  /** ⚙️Configuración: los descuentos de contado y el IVA. */
+  configuracion: '18430163937',
   /**
    * 🔒Lista Blanca — quién entra a la app y a qué.
    *
@@ -265,12 +275,6 @@ export const COL_INV = {
   estadoFechaProd: 'color_mm6sc76v',
   /** Confirmación de DEUTZ que respalda la fecha. Sin esto no se puede confirmar ni proponer. */
   confirmacion: 'board_relation_mm6z1cn9',
-} as const
-
-/** 🚜 Catálogo de Productos (18428421090) — de acá sale el puerto de carga de cada modelo. */
-export const COL_CATALOGO = {
-  /** Puerto(s) de carga del modelo. Es un dropdown: un modelo puede salir por más de uno. */
-  puerto: 'dropdown_mm78jn1v',
 } as const
 
 /**
@@ -1029,3 +1033,183 @@ export const ESTADO_ACTIVIDAD = {
   COMPLETADA: 'Completada',
   PENDIENTE: 'Pendiente',
 } as const
+
+/* ------------------------------------------------------------------ *
+ * VENTA · pedidos, ventas y entregas
+ * ------------------------------------------------------------------ */
+
+/**
+ * 🔖Pedidos (18428606864) — un item por pedido del concesionario.
+ *
+ * El pedido es la solicitud; las UNIDADES viven en 🛍️Ventas, una por tractor. Esa separación es
+ * la que permite aprobar y asignar de a una: un pedido de tres tractores puede terminar con dos
+ * asignados de stock y uno pedido a fábrica.
+ */
+export const COL_PEDIDO = {
+  comercial: 'multiple_person_mm5fphyt',
+  concesionarioPersonas: 'multiple_person_mm5fwapm',
+  /** La cuenta del concesionario en el CRM. De ahí sale la dirección y la línea de crédito. */
+  cuenta: 'board_relation_mm7xm8vj',
+  tipoPedido: 'color_mm7wy0s9',
+  tipoVenta: 'color_mm7wd3d6',
+  estado: 'color_mm5ft345',
+  /** Cómo paga el tercero. Sólo en VENTA A TERCEROS. */
+  condicionVenta: 'dropdown_mm7x7ck2',
+  banco: 'color_mm7ve4c4',
+  plazo: 'color_mm5fwr4e',
+  /** Cómo paga el concesionario. Sólo en COMPRA STOCK. */
+  conceptoPago: 'color_mm7vhh7d',
+  totalListaSinIva: 'numeric_mm5f2sjp',
+  totalListaConIva: 'numeric_mm7wrmah',
+  totalContadoSinIva: 'numeric_mm7xk4pa',
+  totalContadoConIva: 'numeric_mm7x7e5k',
+  totalFacturaSinIva: 'numeric_mm7w9fwf',
+  totalFacturaConIva: 'numeric_mm7wpap4',
+  fechaSolicitud: 'date_mm5fj672',
+  fechaAprobacion: 'date_mm7xs9dt',
+  fechaEstimadaEntrega: 'date_mm5fbbgj',
+  fechaEntregaReal: 'date_mm5fmcf9',
+  motivo: 'long_text_mm7pg8ar',
+  ventas: 'board_relation_mm7xa4vs',
+  idPedido: 'pulse_id_mm7w6fc9',
+} as const
+
+/** Subelementos de 🔖Pedidos (18428606873) — una fila por modelo pedido, con su cantidad. */
+export const COL_PEDIDO_SUB = {
+  catalogo: 'board_relation_mm7pmm50',
+  inventario: 'board_relation_mm5fxnd3',
+  estado: 'color_mm7pxnqn',
+  cantidad: 'numeric_mm5ff93p',
+  listaSinIva: 'numeric_mm5fn16r',
+  listaConIva: 'numeric_mm7xf9zd',
+  dto1: 'numeric_mm7w1n69',
+  dto2: 'numeric_mm7wnnv1',
+  dto3: 'numeric_mm7w6hyw',
+  contadoSinIva: 'numeric_mm5fdsna',
+  contadoConIva: 'numeric_mm7w7bev',
+  facturaSinIva: 'numeric_mm7wytc3',
+  facturaConIva: 'numeric_mm7wy3jb',
+  ventas: 'board_relation_mm7x8fhk',
+} as const
+
+/** 🛍️Ventas (18434389854) — un item por UNIDAD. Es lo que BERGER aprueba y asigna. */
+export const COL_VENTA = {
+  inventario: 'board_relation_mm7x6m1z',
+  comercial: 'multiple_person_mm7xvzr1',
+  concesionarioPersonas: 'multiple_person_mm7x116b',
+  concesionario: 'board_relation_mm7xqezp',
+  catalogo: 'board_relation_mm7xb5ms',
+  /** El subitem del pedido del que salió esta unidad. */
+  subitemPedido: 'board_relation_mm7xz8pv',
+  pedido: 'board_relation_mm7xyya7',
+  estado: 'color_mm7xm6rf',
+  listaSinIva: 'numeric_mm7xxqs5',
+  listaConIva: 'numeric_mm7x6z71',
+  dto1: 'numeric_mm7xyrva',
+  dto2: 'numeric_mm7xqhe9',
+  dto3: 'numeric_mm7xx4mg',
+  contadoSinIva: 'numeric_mm7x3ywe',
+  contadoConIva: 'numeric_mm7xj00a',
+  facturaSinIva: 'numeric_mm7xxrt7',
+  facturaConIva: 'numeric_mm7xhezf',
+  fechaAsignacion: 'date_mm7xm3n1',
+  idVenta: 'pulse_id_mm7xvn3c',
+} as const
+
+/** 🚛Entregas (18434280125) — una por pedido asignado. */
+export const COL_ENTREGA = {
+  estado: 'color_mm7wsphm',
+  concesionario: 'board_relation_mm7xg3sb',
+  pedido: 'board_relation_mm7wes50',
+} as const
+
+/** Subelementos de 🚛Entregas (18434281488) — una fila por unidad asignada. */
+export const COL_ENTREGA_SUB = {
+  inventario: 'board_relation_mm7wfzwq',
+  unidadDeVenta: 'board_relation_mm7wcs5f',
+  estado: 'color_mm7wbd71',
+} as const
+
+/**
+ * 🚜Catálogo de Productos (18428421090).
+ *
+ * Lo usan dos circuitos: el despacho, que de acá saca el puerto de carga de cada modelo, y la
+ * venta, que de acá saca todo lo que el concesionario ve y el precio con el que arma el pedido.
+ */
+export const COL_CATALOGO = {
+  /** Puerto(s) de carga del modelo. Es un dropdown: un modelo puede salir por más de uno. */
+  puerto: 'dropdown_mm78jn1v',
+  modelo: 'dropdown_mm6n2s16',
+  codigo: 'text_mm6n6n7k',
+  traccion: 'dropdown_mm6nhqy5',
+  potenciaKw: 'numeric_mm6nama2',
+  cilindrada: 'numeric_mm6nmytx',
+  marca: 'dropdown_mm6nnvv9',
+  rodado: 'dropdown_mm6zbdvc',
+  linea: 'color_mm72b0kj',
+  gama: 'color_mm6zgxnk',
+  imagen: 'file_mm6zrxnd',
+  precioLista: 'numeric_mm709rhd',
+  /** El IVA de ESTE producto, en porcentaje. No es global: lo define el catálogo. */
+  iva: 'numeric_mm7wbx1g',
+  estadoComercial: 'color_mm6nt6j',
+} as const
+
+/** ⚙️Configuración — los descuentos de contado, en cascada y en orden. */
+export const COL_CONFIG = {
+  porcentaje: 'numeric_mm7wnxcj',
+  que: 'status',
+  /** El orden del descuento: 1, 2, 3… Es el orden en que se aplican, uno sobre el anterior. */
+  orden: 'dropdown_mm7xpq2r',
+} as const
+
+export const CONFIG_DESCUENTO_CONTADO = 'Descuento Contado'
+
+/** Columnas de 🌐Cuentas que usa la venta. */
+export const COL_CUENTA_VENTA = {
+  creditoAsignado: 'numeric_mm7xa1p3',
+  creditoUtilizado: 'numeric_mm7xz7vr',
+  direccion: 'location_mm7ak2f4',
+} as const
+
+/** Los estados que escribe la app en el circuito de pedidos. */
+export const ESTADO_PEDIDO = {
+  CARGADA: 'Solicitud Cargada',
+  APROBADO: 'Aprobado Berger',
+  RECHAZADO: 'Rechazado Berger',
+  ASIGNADO: 'Inventario asignado',
+  A_FABRICA: 'Pedido a Fabrica',
+} as const
+
+/**
+ * El estado de cada unidad, que es el que de verdad se mueve.
+ *
+ * OJO: el mismo estado está escrito distinto en cada tablero. "Pedido a Fabrica" sin tilde en
+ * 🔖Pedidos y "Pedido a Fábrica" con tilde en los subelementos y en 🛍️Ventas. No se puede
+ * unificar desde acá: una etiqueta que no existe hace fallar la escritura ENTERA del item, así
+ * que cada tablero lleva la suya.
+ */
+export const ESTADO_UNIDAD = {
+  PENDIENTE: 'Pendiente',
+  APROBADA: 'Aprobada',
+  RECHAZADA: 'Rechazada',
+  ASIGNADA: 'Asignada - Pend de Entrega',
+  A_FABRICA: 'Pedido a Fábrica',
+  OBSERVACION: 'Observacion',
+} as const
+
+export const ESTADO_ENTREGA_PENDIENTE = 'Pendiente'
+export const ESTADO_UNIDAD_ENTREGA_CARGADA = 'Cargada'
+
+/** Las etiquetas de Tipo de Pedido y Tipo de Venta. */
+export const TIPO_PEDIDO = { STOCK: 'COMPRA STOCK', TERCEROS: 'VENTA A TERCEROS' } as const
+export const TIPO_VENTA = { DIRECTA: 'DIRECTA', INDIRECTA: 'INDIRECTA' } as const
+
+/**
+ * Lo que dispara los descuentos de contado.
+ *
+ * Vale para los dos desplegables de pago: la Condición de Venta del tercero y el Concepto de Pago
+ * del concesionario. En uno dice "CONTADO" y en el otro "Contado", así que se compara sin mirar
+ * mayúsculas.
+ */
+export const esContado = (pago: string): boolean => pago.trim().toUpperCase() === 'CONTADO'
