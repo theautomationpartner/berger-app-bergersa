@@ -341,10 +341,15 @@ export interface Resultado {
 const escribirUnidad = (id: string, valores: Record<string, unknown>) =>
   mondayApi('resolverUnidadDeVenta', { item: id, valores: JSON.stringify(valores) })
 
-const escribirRenglon = (id: string, estado: string) =>
+const escribirRenglon = (id: string, estado: string, tractores?: string[]) =>
   mondayApi('resolverRenglonDePedido', {
     item: id,
-    valores: JSON.stringify({ [COL_PEDIDO_SUB.estado]: { label: estado } }),
+    valores: JSON.stringify({
+      [COL_PEDIDO_SUB.estado]: { label: estado },
+      ...(tractores && tractores.length > 0
+        ? { [COL_PEDIDO_SUB.inventario]: { item_ids: tractores } }
+        : {}),
+    }),
   })
 
 /** Cuál de las dos aprobaciones se está contestando. */
@@ -637,8 +642,21 @@ export async function asignarPedido(
     const suyas = unidades.filter((u) => u.renglonId === r.id)
     const todasAsignadas =
       suyas.length > 0 && suyas.every((u) => asignadas.some((a) => a.unidad.id === u.id))
+    /* El renglón también queda conectado a los tractores que lo cumplen: es lo que se ve desde
+       🔖Pedidos sin tener que ir a 🛍️Ventas. Los que ya tenía se conservan, por si el renglón se
+       asigna en dos veces (una parte de stock ahora, otra cuando llegue de fábrica). */
+    const tractores = [
+      ...new Set([
+        ...suyas.filter((u) => u.inventarioId).map((u) => u.inventarioId),
+        ...asignadas.filter((a) => a.unidad.renglonId === r.id).map((a) => a.tractorId),
+      ]),
+    ]
     try {
-      await escribirRenglon(r.id, todasAsignadas ? ESTADO_UNIDAD.ASIGNADA : ESTADO_UNIDAD.A_FABRICA)
+      await escribirRenglon(
+        r.id,
+        todasAsignadas ? ESTADO_UNIDAD.ASIGNADA : ESTADO_UNIDAD.A_FABRICA,
+        tractores,
+      )
     } catch (e) {
       advertencias.push(`El renglón ${r.nombre} quedó sin actualizar: ${motivo(e)}`)
     }

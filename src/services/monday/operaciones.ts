@@ -768,8 +768,8 @@ const COLUMNAS_DE_UNIDAD = new Set<string>([
   COL_VENTA.fechaAsignacion,
 ])
 
-/** Lo del renglón: sólo su estado, que acompaña al de sus unidades. */
-const COLUMNAS_DE_RENGLON = new Set<string>([COL_PEDIDO_SUB.estado])
+/** Lo del renglón: su estado, que acompaña al de sus unidades, y los tractores que lo cumplen. */
+const COLUMNAS_DE_RENGLON = new Set<string>([COL_PEDIDO_SUB.estado, COL_PEDIDO_SUB.inventario])
 
 /**
  * Lo que la app le escribe a un tractor del inventario: su estado comercial y nada más.

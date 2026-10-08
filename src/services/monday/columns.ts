@@ -1110,6 +1110,7 @@ export const APROBACION = {
 /** Subelementos de 🔖Pedidos (18428606873) — una fila por modelo pedido, con su cantidad. */
 export const COL_PEDIDO_SUB = {
   catalogo: 'board_relation_mm7pmm50',
+  /** Los tractores del inventario con que se cumplió el renglón. Los escribe Asignar pedidos. */
   inventario: 'board_relation_mm5fxnd3',
   estado: 'color_mm7pxnqn',
   cantidad: 'numeric_mm5ff93p',
