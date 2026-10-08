@@ -1,15 +1,18 @@
 /**
  * Unir las unidades de un modelo con tractores del inventario.
  *
- * Dos columnas enfrentadas —lo que se pidió a la izquierda, lo que hay a la derecha— y un botón
- * **Unir** en el medio que se habilita con uno elegido de cada lado. Cada par unido baja a la lista
- * de abajo con una flecha que dice qué unidad se cumple con qué chasis, y se puede deshacer.
+ * Es la "pantalla partida" de Asignar Inventario de Ferrero (`AsignarView`, `Partida`): una caja por
+ * modelo, con la posición arriba; a la izquierda lo vendido que espera tractor, a la derecha lo que
+ * hay en el inventario, y en el medio el botón **Unir**, que se habilita con uno elegido de cada
+ * lado. Cada par unido queda en su lugar, en verde, con un hilo que va de la unidad a su chasis; lo
+ * que se está eligiendo se dibuja con un hilo punteado azul.
  *
- * Es la misma mecánica de "Asignar inventario" de Ferrero, y no un desplegable por unidad, porque
- * acá la decisión es de a pares: con un desplegable, ver qué tractores quedan libres obligaba a
- * abrir cada uno, y la unidad que iba a fábrica no se distinguía de la que todavía nadie miró.
+ * Lo que cambia respecto de Ferrero es cuándo se escribe. Allá cada Unir va a monday en el momento;
+ * acá se une todo el pedido y se guarda junto con "Asignar y crear la entrega", porque el estado del
+ * pedido y la entrega salen de cómo quedaron TODAS sus unidades. Por eso, mientras no se guarde, un
+ * par se puede deshacer.
  */
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { TractorEnStock, UnidadLeida } from '@/services/monday/pedidosBerger'
 
 export interface UnidadNumerada {
@@ -35,16 +38,56 @@ interface Props {
 /** Lo que distingue a un tractor de otro del mismo modelo: el chasis, y si no hay, su nombre. */
 export const chasisDe = (t: TractorEnStock): string => t.chasis || t.nombre
 
-/** Qué conviene hacer con este modelo, en una frase. */
-function accionRecomendada(sinUnir: number, libres: number): { texto: string; tono: string } {
-  if (sinUnir === 0) return { texto: 'Listo', tono: 'chip--verde' }
-  if (libres === 0) return { texto: `Pedir ${sinUnir} a fábrica`, tono: 'chip--rojo' }
-  if (libres >= sinUnir) return { texto: `Unir ${sinUnir}`, tono: 'chip--azul' }
+/**
+ * Qué tractor conviene prometer primero: el que está más cerca de poder entregarse.
+ *
+ * Ferrero ordena por días en stock; acá el dato que distingue un tractor de otro del mismo modelo es
+ * dónde está en el circuito de importación, y uno en el galpón se entrega mañana, uno en tránsito en
+ * semanas. Es una sugerencia de orden, no una decisión: se puede elegir cualquiera.
+ */
+const CERCANIA = [
+  'stock',
+  'nacionalizado',
+  'arribado',
+  'próximo a arribar',
+  'proximo a arribar',
+  'en transito',
+  'en tránsito',
+  'en despachante',
+  'confirmación producción',
+  'orden de pedido emitida',
+]
+const cercania = (t: TractorEnStock): number => {
+  const i = CERCANIA.indexOf(t.estadoImportacion.trim().toLowerCase())
+  return i < 0 ? CERCANIA.length : i
+}
+export const porCercania = (ts: TractorEnStock[]): TractorEnStock[] =>
+  [...ts].sort((a, b) => cercania(a) - cercania(b) || chasisDe(a).localeCompare(chasisDe(b)))
+
+/**
+ * La posición del modelo y, aparte, qué hacer (como en Ferrero: "te lo mezcla con la acción").
+ * Rojo lo que falta, verde lo que alcanza; el color siempre con su palabra al lado.
+ */
+function posicion(sinUnir: number, libres: number) {
+  const diferencia = libres - sinUnir
+  if (sinUnir === 0) return { posicion: 'Cubierto', tonoP: 'chip--verde', accion: null, tonoA: '' }
+  if (diferencia < 0) {
+    return {
+      posicion: 'Vendido',
+      tonoP: 'chip--rojo',
+      accion: `Pedir ${-diferencia} a fábrica`,
+      tonoA: 'chip--rojo',
+    }
+  }
   return {
-    texto: `Unir ${libres} · pedir ${sinUnir - libres} a fábrica`,
-    tono: 'chip--ambar',
+    posicion: diferencia > 0 ? 'Con stock' : 'A la par',
+    tonoP: 'chip--verde',
+    accion: `Unir ${sinUnir}`,
+    tonoA: 'chip--azul',
   }
 }
+
+type Hilo = { d: string; a: [number, number]; b: [number, number]; sel: boolean }
 
 export function UnirUnidades({
   modelo,
@@ -58,186 +101,159 @@ export function UnirUnidades({
   const [unidadElegida, setUnidadElegida] = useState<string | null>(null)
   const [tractorElegido, setTractorElegido] = useState<string | null>(null)
 
-  /* Lo elegido puede dejar de estar: otro modelo u otro pedido se llevó el tractor, o la unidad se
-     unió por "Unir en orden". Elegido y ya no está es lo mismo que no elegido. */
-  const unidadOk = sinUnir.some((u) => u.unidad.id === unidadElegida) ? unidadElegida : null
-  const tractorOk = libres.some((t) => t.id === tractorElegido) ? tractorElegido : null
+  /* Lo elegido puede dejar de estar: otro pedido se llevó el tractor, o la unidad se unió por "Unir
+     en orden". Elegido y ya no está es lo mismo que no elegido. */
+  const selIzq = sinUnir.some((u) => u.unidad.id === unidadElegida) ? unidadElegida : null
+  const selDer = libres.some((t) => t.id === tractorElegido) ? tractorElegido : null
+  const derecha = porCercania(libres)
 
   const unir = () => {
-    if (!unidadOk || !tractorOk) return
-    onUnir(unidadOk, tractorOk)
+    if (!selIzq || !selDer) return
+    onUnir(selIzq, selDer)
     setUnidadElegida(null)
     setTractorElegido(null)
   }
 
-  /* De a uno, en el orden en que aparecen. Es lo que haría cualquiera con veinte unidades del
-     mismo modelo y veinte tractores iguales: elegirlos de a pares sería un trámite. */
+  /* De a uno, la primera unidad con el tractor más cercano. Con veinte unidades iguales y veinte
+     tractores iguales, elegirlos de a pares sería un trámite. */
   const unirEnOrden = () => {
-    const cuantos = Math.min(sinUnir.length, libres.length)
-    for (let i = 0; i < cuantos; i += 1) onUnir(sinUnir[i].unidad.id, libres[i].id)
+    const cuantos = Math.min(sinUnir.length, derecha.length)
+    for (let i = 0; i < cuantos; i += 1) onUnir(sinUnir[i].unidad.id, derecha[i].id)
     setUnidadElegida(null)
     setTractorElegido(null)
   }
 
-  const accion = accionRecomendada(sinUnir.length, libres.length)
-  const total = sinUnir.length + unidas.length
+  /* ── Los hilos ──
+     Se calculan del DOM y no con números fijos, igual que en Ferrero: así siguen a las filas cuando
+     la lista cambia o cambia el ancho. En celular las columnas van una abajo de la otra y no se
+     dibujan; ahí lo unido se lee por el chasis en verde. */
+  const cuerpo = useRef<HTMLDivElement>(null)
+  const [hilos, setHilos] = useState<Hilo[]>([])
+  const [dim, setDim] = useState({ w: 0, h: 0 })
+  /* Qué hay dibujado, en una cadena: si las listas fueran la dependencia del efecto, medir →
+     guardar los hilos → volver a dibujar → medir sería un bucle. */
+  const disposicion = [
+    selIzq,
+    selDer,
+    unidas.map((u) => `${u.unidad.unidad.id}>${u.tractor.id}`).join(','),
+    sinUnir.map((u) => u.unidad.id).join(','),
+    derecha.map((t) => t.id).join(','),
+  ].join('|')
+
+  useLayoutEffect(() => {
+    const el = cuerpo.current
+    if (!el) return
+    const medir = () => {
+      const t = el.getBoundingClientRect()
+      const izq = el.querySelector('.unir-col--izq')?.getBoundingClientRect()
+      const der = el.querySelector('.unir-col--der')?.getBoundingClientRect()
+      if (!izq || !der || der.left < izq.right) {
+        setHilos([])
+        return
+      }
+      const y = (e: Element | null) => {
+        if (!e) return null
+        const r = e.getBoundingClientRect()
+        return r.top - t.top + r.height / 2
+      }
+      const xa = izq.right - t.left
+      const xb = der.left - t.left
+      const tender = (a: number, b: number, sel: boolean): Hilo => ({
+        d: `M ${xa} ${a} C ${xa + 40} ${a}, ${xb - 40} ${b}, ${xb} ${b}`,
+        a: [xa, a],
+        b: [xb, b],
+        sel,
+      })
+      const nuevos: Hilo[] = []
+      for (const u of unidas) {
+        const id = u.unidad.unidad.id
+        const a = y(el.querySelector(`[data-par="${id}"][data-lado="izq"]`))
+        const b = y(el.querySelector(`[data-par="${id}"][data-lado="der"]`))
+        if (a !== null && b !== null) nuevos.push(tender(a, b, false))
+      }
+      const a = y(el.querySelector('.unir-fila--sel[data-lado="izq"]'))
+      const b = y(el.querySelector('.unir-fila--sel[data-lado="der"]'))
+      if (a !== null && b !== null) nuevos.push(tender(a, b, true))
+      setDim({ w: t.width, h: t.height })
+      setHilos(nuevos)
+    }
+    medir()
+    const ro = new ResizeObserver(medir)
+    ro.observe(el)
+    return () => ro.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disposicion])
+
+  const p = posicion(sinUnir.length, libres.length)
+  const listo = Boolean(selIzq && selDer) && !bloqueado
+  const ayuda = listo
+    ? 'tocá Unir'
+    : sinUnir.length === 0
+      ? 'todo unido'
+      : libres.length === 0
+        ? 'sin stock: va a fábrica'
+        : selIzq
+          ? 'ahora elegí el tractor'
+          : selDer
+            ? 'ahora elegí la unidad'
+            : 'elegí uno de cada lado'
 
   return (
-    <div className="unir">
-      <div className="unir-head">
-        <span className="unir-modelo">{modelo}</span>
+    <section className="unir" aria-label={modelo}>
+      <header className="unir-head">
+        <h4 className="unir-modelo">{modelo}</h4>
         <span className="unir-resumen">
           <span className="unir-dato">
-            Pedidas <span className="chip chip--gris">{total}</span>
+            Posición <span className={`chip ${p.tonoP}`}>{p.posicion}</span>
           </span>
-          <span className="unir-dato">
-            Unidas <span className="chip chip--verde">{unidas.length}</span>
-          </span>
-          <span className="unir-dato">
-            Acción recomendada <span className={`chip ${accion.tono}`}>{accion.texto}</span>
-          </span>
-        </span>
-      </div>
-
-      {sinUnir.length > 0 && (
-        <div className="unir-cuerpo">
-          {/* ===== Lo pedido ===== */}
-          <div className="unir-col">
-            <div className="unir-col-head">
-              <b>Del pedido, sin tractor</b>
-              <span>
-                {sinUnir.length} unidad{sinUnir.length === 1 ? '' : 'es'}
-              </span>
-            </div>
-            <ul className="unir-lista" role="radiogroup" aria-label={`Unidades de ${modelo}`}>
-              {sinUnir.map(({ unidad, numero }) => {
-                const elegida = unidadOk === unidad.id
-                return (
-                  <li key={unidad.id}>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={elegida}
-                      className={`unir-item${elegida ? ' unir-item--elegido' : ''}`}
-                      disabled={bloqueado}
-                      onClick={() => setUnidadElegida(elegida ? null : unidad.id)}
-                    >
-                      <span className="unir-radio" aria-hidden="true" />
-                      <span className="unir-item-txt">
-                        <b>Unidad {numero}</b>
-                        <small>{unidad.nombre}</small>
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-
-          {/* ===== El botón del medio ===== */}
-          <div className="unir-medio">
-            <button
-              type="button"
-              className="btn btn--primario unir-btn"
-              disabled={bloqueado || !unidadOk || !tractorOk}
-              onClick={unir}
-            >
-              <i className="fa-solid fa-link" aria-hidden="true" /> Unir
-            </button>
-            <span className="unir-ayuda">
-              {libres.length === 0
-                ? 'sin stock: van a fábrica'
-                : !unidadOk && !tractorOk
-                  ? 'elegí uno de cada lado'
-                  : !unidadOk
-                    ? 'falta la unidad'
-                    : !tractorOk
-                      ? 'falta el tractor'
-                      : 'listo para unir'}
+          {p.accion && (
+            <span className="unir-dato">
+              Acción recomendada <span className={`chip ${p.tonoA}`}>{p.accion}</span>
             </span>
-            {libres.length > 0 && sinUnir.length > 1 && (
-              <button
-                type="button"
-                className="btn btn--texto btn--chico"
-                disabled={bloqueado}
-                onClick={unirEnOrden}
-              >
-                <i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true" /> Unir en orden
-              </button>
-            )}
-          </div>
+          )}
+        </span>
+      </header>
 
-          {/* ===== Lo que hay ===== */}
-          <div className="unir-col">
-            <div className="unir-col-head">
-              <b>En inventario</b>
-              <span>
-                {libres.length} disponible{libres.length === 1 ? '' : 's'}
-              </span>
-            </div>
-            {libres.length === 0 ? (
-              /* Que no haya ninguno no es un error: es que ese modelo hay que pedirlo, y conviene
-                 que se lea así y no como una lista vacía. */
-              <p className="unir-vacio">No hay de este modelo sin dueño. Hay que pedirlo a fábrica.</p>
-            ) : (
-              <ul className="unir-lista" role="radiogroup" aria-label={`Inventario de ${modelo}`}>
-                {libres.map((t) => {
-                  const elegido = tractorOk === t.id
-                  return (
-                    <li key={t.id}>
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={elegido}
-                        className={`unir-item${elegido ? ' unir-item--elegido' : ''}`}
-                        disabled={bloqueado}
-                        onClick={() => setTractorElegido(elegido ? null : t.id)}
-                      >
-                        <span className="unir-radio" aria-hidden="true" />
-                        <span className="unir-item-txt">
-                          <b>{chasisDe(t)}</b>
-                          <small>
-                            {[t.numInterno && `N° interno ${t.numInterno}`, t.modelo]
-                              .filter(Boolean)
-                              .join(' · ') || 'Sin número interno'}
-                          </small>
-                        </span>
-                        {t.estadoImportacion && (
-                          <span className="chip chip--gris unir-item-chip">
-                            {t.estadoImportacion}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
+      <div className="unir-partida" ref={cuerpo}>
+        <svg className="unir-hilos" width={dim.w} height={dim.h} aria-hidden="true">
+          {hilos.map((h, i) => (
+            <g key={i} className={h.sel ? 'unir-hilo unir-hilo--sel' : 'unir-hilo'}>
+              <path d={h.d} />
+              <circle cx={h.a[0]} cy={h.a[1]} r={4.5} />
+              <circle cx={h.b[0]} cy={h.b[1]} r={4.5} />
+            </g>
+          ))}
+        </svg>
 
-      {/* ===== Lo que ya quedó unido ===== */}
-      {unidas.length > 0 && (
-        <ul className="unir-pares">
+        {/* ===== Lo vendido ===== */}
+        <div className="unir-col unir-col--izq">
+          <div className="unir-col-head">
+            <strong>Vendido, pendiente de entrega</strong>
+            <span>
+              {sinUnir.length + unidas.length} unidad{sinUnir.length + unidas.length === 1 ? '' : 'es'}
+            </span>
+          </div>
           {unidas.map(({ unidad, tractor }) => (
-            <li key={unidad.unidad.id} className="unir-par">
-              <span className="unir-par-lado">
-                <b>Unidad {unidad.numero}</b>
+            <div
+              key={unidad.unidad.id}
+              className="unir-fila unir-fila--ok"
+              data-lado="izq"
+              data-par={unidad.unidad.id}
+            >
+              <span className="unir-marca" aria-hidden="true">
+                <i className="fa-solid fa-check" />
+              </span>
+              <span className="unir-cuerpo">
+                <strong>Unidad {unidad.numero}</strong>
                 <small>{unidad.unidad.nombre}</small>
+                <span className="unir-tags">
+                  <span className="chip chip--verde">→ {chasisDe(tractor)}</span>
+                </span>
               </span>
-              <i className="fa-solid fa-arrow-right-long unir-par-flecha" aria-hidden="true" />
-              <span className="unir-par-lado">
-                <b>{chasisDe(tractor)}</b>
-                <small>
-                  {[tractor.numInterno && `N° interno ${tractor.numInterno}`, tractor.estadoImportacion]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </small>
-              </span>
+              {/* Todavía no se guardó: un par mal unido se suelta acá, sin ir a monday. */}
               <button
                 type="button"
-                className="unir-par-quitar"
+                className="unir-quitar"
                 disabled={bloqueado}
                 aria-label={`Desunir la unidad ${unidad.numero}`}
                 title="Desunir"
@@ -245,10 +261,113 @@ export function UnirUnidades({
               >
                 <i className="fa-solid fa-link-slash" aria-hidden="true" />
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
-      )}
-    </div>
+          {sinUnir.map(({ unidad, numero }) => {
+            const sel = selIzq === unidad.id
+            return (
+              <button
+                key={unidad.id}
+                type="button"
+                className={`unir-fila${sel ? ' unir-fila--sel' : ''}`}
+                data-lado="izq"
+                aria-pressed={sel}
+                disabled={bloqueado}
+                onClick={() => setUnidadElegida(sel ? null : unidad.id)}
+              >
+                <span className="unir-marca" aria-hidden="true">
+                  {sel && <i className="fa-solid fa-circle" />}
+                </span>
+                <span className="unir-cuerpo">
+                  <strong>Unidad {numero}</strong>
+                  <small>{unidad.nombre}</small>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ===== El botón del medio ===== */}
+        <div className="unir-medio">
+          <button type="button" className="btn btn--primario unir-btn" disabled={!listo} onClick={unir}>
+            <i className="fa-solid fa-link" aria-hidden="true" /> Unir
+          </button>
+          <small aria-live="polite">{ayuda}</small>
+          {derecha.length > 0 && sinUnir.length > 1 && (
+            <button
+              type="button"
+              className="btn btn--texto btn--chico"
+              disabled={bloqueado}
+              onClick={unirEnOrden}
+            >
+              Unir en orden
+            </button>
+          )}
+        </div>
+
+        {/* ===== El inventario ===== */}
+        <div className="unir-col unir-col--der">
+          <div className="unir-col-head">
+            <strong>En inventario</strong>
+            <span>
+              {derecha.length} disponible{derecha.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          {unidas.map(({ unidad, tractor }) => (
+            <div
+              key={unidad.unidad.id}
+              className="unir-fila unir-fila--ok"
+              data-lado="der"
+              data-par={unidad.unidad.id}
+            >
+              <span className="unir-marca" aria-hidden="true">
+                <i className="fa-solid fa-check" />
+              </span>
+              <span className="unir-cuerpo">
+                <strong>{chasisDe(tractor)}</strong>
+                <span className="unir-tags">
+                  {tractor.numInterno && (
+                    <span className="chip chip--gris">N° interno {tractor.numInterno}</span>
+                  )}
+                  <span className="chip chip--verde">unido · sin guardar</span>
+                </span>
+              </span>
+            </div>
+          ))}
+          {derecha.map((t) => {
+            const sel = selDer === t.id
+            return (
+              <button
+                key={t.id}
+                type="button"
+                className={`unir-fila${sel ? ' unir-fila--sel' : ''}`}
+                data-lado="der"
+                aria-pressed={sel}
+                disabled={bloqueado}
+                onClick={() => setTractorElegido(sel ? null : t.id)}
+              >
+                <span className="unir-marca" aria-hidden="true">
+                  {sel && <i className="fa-solid fa-circle" />}
+                </span>
+                <span className="unir-cuerpo">
+                  <strong>{chasisDe(t)}</strong>
+                  <span className="unir-tags">
+                    {t.numInterno && <span className="chip chip--gris">N° interno {t.numInterno}</span>}
+                    {t.estadoImportacion && (
+                      <span className="chip chip--azul">{t.estadoImportacion}</span>
+                    )}
+                  </span>
+                </span>
+              </button>
+            )
+          })}
+          {derecha.length === 0 && unidas.length === 0 && (
+            /* Que no haya ninguno no es un error: es que ese modelo hay que pedirlo, y conviene que
+               se lea así y no como una lista vacía. */
+            <p className="unir-vacio">No hay de este modelo sin dueño. Hay que pedirlo a fábrica.</p>
+          )}
+        </div>
+      </div>
+    </section>
   )
 }

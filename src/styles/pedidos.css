@@ -901,243 +901,256 @@
 }
 
 /* ===== Unir unidades con el inventario =====
-   Dos columnas enfrentadas y el botón Unir en el medio: lo pedido a la izquierda, lo que hay a la
-   derecha. Lo unido baja a una lista de pares con flecha. */
+   La pantalla partida de Ferrero (Asignar Inventario): una caja por modelo, lo vendido a la
+   izquierda, el inventario a la derecha, Unir en el medio, y un hilo de cada unidad a su chasis. */
 
-.unir {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
-  background: #fff;
+.unir + .unir {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
 }
 .unir-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px 16px;
   flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-bottom: 10px;
 }
 .unir-modelo {
+  margin: 0;
   font-size: 15px;
   font-weight: 800;
   color: var(--text-dark);
+  overflow-wrap: anywhere;
 }
 .unir-resumen {
   display: flex;
-  align-items: center;
-  gap: 8px 14px;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  font-size: 12.5px;
+  color: var(--text-gray);
 }
 .unir-dato {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
-  color: var(--text-gray);
+  white-space: nowrap;
 }
-.unir-cuerpo {
+.unir-dato .chip {
+  font-weight: 700;
+}
+
+.unir-partida {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 128px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 116px minmax(0, 1fr);
   align-items: start;
 }
+.unir-hilos {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+}
+.unir-hilo path {
+  fill: none;
+  stroke: var(--green-dark);
+  stroke-width: 2.5;
+}
+.unir-hilo circle {
+  fill: var(--green-dark);
+}
+.unir-hilo--sel path {
+  stroke: var(--primary-blue);
+  stroke-dasharray: 7 5;
+}
+.unir-hilo--sel circle {
+  fill: var(--primary-blue);
+}
+
 .unir-col {
-  display: flex;
-  flex-direction: column;
   min-width: 0;
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: 10px;
+  background: #fff;
   overflow: hidden;
 }
 .unir-col-head {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: baseline;
   gap: 10px;
   padding: 11px 14px;
   border-bottom: 1px solid var(--border-soft);
+}
+.unir-col-head strong {
   font-size: 13.5px;
   color: var(--text-dark);
 }
 .unir-col-head span {
   font-size: 12px;
   color: var(--text-gray);
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.unir-lista {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 320px;
-  overflow-y: auto;
-}
-.unir-lista li + li {
-  border-top: 1px solid var(--border-soft);
-}
-.unir-item {
+
+.unir-fila {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 10px;
   width: 100%;
-  min-height: var(--toque);
   padding: 10px 14px;
-  border: none;
-  background: #fff;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: none;
+  color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background 0.12s ease;
 }
-.unir-item:hover:not(:disabled) {
+.unir-fila:last-child {
+  border-bottom: 0;
+}
+.unir-fila:hover:not(:disabled):not(.unir-fila--ok):not(.unir-fila--sel) {
   background: var(--tint-neutral);
 }
-.unir-item:focus-visible {
+.unir-fila:focus-visible {
   outline: 2px solid var(--primary-blue);
   outline-offset: -2px;
 }
-.unir-item:disabled {
+.unir-fila:disabled {
   cursor: default;
-  opacity: 0.6;
 }
-.unir-item--elegido,
-.unir-item--elegido:hover:not(:disabled) {
+.unir-fila--sel {
   background: var(--tint-input);
+  box-shadow: inset 3px 0 0 var(--primary-blue);
 }
-/* El círculo de la izquierda: vacío, o lleno del azul de "elegido". */
-.unir-radio {
-  flex: 0 0 auto;
-  width: 20px;
-  height: 20px;
-  border: 2px solid #c3c8d4;
+.unir-fila--ok {
+  background: var(--green-soft);
+  box-shadow: inset 3px 0 0 var(--green-dark);
+  cursor: default;
+}
+.unir-marca {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border: 2px solid var(--border);
   border-radius: 50%;
-  background: #fff;
-  transition:
-    border-color 0.12s ease,
-    box-shadow 0.12s ease;
+  color: #fff;
+  font-size: 8px;
 }
-.unir-item--elegido .unir-radio {
+.unir-fila--sel .unir-marca {
   border-color: var(--primary-blue);
-  box-shadow: inset 0 0 0 4px #fff;
   background: var(--primary-blue);
 }
-.unir-item-txt {
+.unir-fila--ok .unir-marca {
+  border-color: var(--green-dark);
+  background: var(--green-dark);
+  font-size: 10px;
+}
+.unir-cuerpo {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
-  flex: 1;
 }
-.unir-item-txt b {
-  font-size: 13.5px;
+.unir-cuerpo strong {
+  font-size: 13px;
   color: var(--text-dark);
   overflow-wrap: anywhere;
 }
-.unir-item-txt small {
+.unir-cuerpo small {
   font-size: 11.5px;
   color: var(--text-gray);
   overflow-wrap: anywhere;
 }
-.unir-item-chip {
-  flex: 0 0 auto;
-}
-.unir-vacio {
-  margin: 0;
-  padding: 26px 16px;
-  font-size: 13px;
-  text-align: center;
-  color: var(--text-mid);
-}
-.unir-medio {
+.unir-tags {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding-top: 52px;
-  text-align: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
 }
-.unir-btn {
-  width: 100%;
-  justify-content: center;
+/* En pantalla ancha el chasis ya lo dice el hilo; en celular, sin hilos, lo dice esta etiqueta. */
+.unir-col--izq .unir-fila--ok .unir-tags {
+  display: none;
 }
-.unir-ayuda {
-  font-size: 12px;
-  line-height: 1.35;
-  color: var(--text-gray);
-}
-
-/* Los pares ya unidos: unidad → tractor. */
-.unir-pares {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.unir-par {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 12px;
-  border: 1px solid var(--green-bd);
-  border-radius: 10px;
-  background: var(--green-soft);
-}
-.unir-par-lado {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.unir-par-lado b {
-  font-size: 13px;
-  color: var(--text-dark);
-  overflow-wrap: anywhere;
-}
-.unir-par-lado small {
-  font-size: 11px;
-  color: var(--text-gray);
-  overflow-wrap: anywhere;
-}
-.unir-par-flecha {
-  font-size: 18px;
-  color: var(--green-dark);
-}
-.unir-par-quitar {
+.unir-quitar {
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: none;
   color: var(--text-gray);
   cursor: pointer;
 }
-.unir-par-quitar:hover:not(:disabled) {
+.unir-quitar:hover:not(:disabled) {
   border-color: var(--berger-red-bd);
   background: var(--berger-red-soft);
   color: var(--berger-red);
 }
 
-@media (max-width: 860px) {
-  .unir-cuerpo {
+.unir-medio {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-top: 52px;
+}
+.unir-btn {
+  justify-content: center;
+}
+.unir-medio small {
+  max-width: 104px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #fff;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-gray);
+  text-align: center;
+}
+.unir-vacio {
+  margin: 0;
+  padding: 22px 14px;
+  font-size: 12.5px;
+  color: var(--text-gray);
+  text-align: center;
+}
+
+/* En celular una columna abajo de la otra, sin hilos, y el botón de unir entre las dos. */
+@media (max-width: 900px) {
+  .unir-partida {
     grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .unir-hilos {
+    display: none;
+  }
+  .unir-col--izq .unir-fila--ok .unir-tags {
+    display: flex;
   }
   .unir-medio {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
     padding-top: 0;
   }
-  .unir-par {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .unir-par-flecha {
-    transform: rotate(90deg);
-    justify-self: start;
+  .unir-medio small {
+    max-width: none;
   }
 }
 

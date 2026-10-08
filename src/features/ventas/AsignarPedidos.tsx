@@ -62,6 +62,9 @@ export function AsignarPedidos() {
   const [trabajando, setTrabajando] = useState<string | null>(null)
   const [hecho, setHecho] = useState<string | null>(null)
   const [avisos, setAvisos] = useState<string[]>([])
+  /* Guardar pide el sí antes de escribir, como el "¿Asignar esta máquina?" de Ferrero: desde la
+     app no se desasigna, y lo que quede sin tractor se pide a fábrica. */
+  const [confirmando, setConfirmando] = useState<string | null>(null)
 
   const recargar = useCallback(async () => {
     setCargando(true)
@@ -314,7 +317,7 @@ export function AsignarPedidos() {
                     type="button"
                     className="btn btn--primario"
                     disabled={trabajando === p.id || suyas.length === 0}
-                    onClick={() => void asignar(p)}
+                    onClick={() => setConfirmando(p.id)}
                   >
                     <i className="fa-solid fa-truck-ramp-box" aria-hidden="true" />{' '}
                     {trabajando === p.id ? 'Asignando…' : 'Asignar y crear la entrega'}
@@ -324,6 +327,80 @@ export function AsignarPedidos() {
             )
           })}
         </div>
+
+        {(() => {
+          const p = aprobados.find((x) => x.id === confirmando)
+          if (!p) return null
+          const suyas = unidades.filter((u) => u.pedidoId === p.id)
+          const pares = suyas.flatMap((u, i) => {
+            const t = stock.find((x) => x.id === elegido[u.id])
+            return t ? [{ numero: i + 1, modelo: u.catalogoNombre, chasis: t.chasis || t.nombre }] : []
+          })
+          const aFabrica = suyas.length - pares.length
+          return (
+            <>
+              <button
+                className="lateral-fondo"
+                aria-label="Cancelar"
+                onClick={() => setConfirmando(null)}
+              />
+              <div className="ventanita" role="dialog" aria-modal="true">
+                <div className="ventanita-head">
+                  <span>¿Asignar el pedido?</span>
+                  <button type="button" onClick={() => setConfirmando(null)} aria-label="Cerrar">
+                    <i className="fa-solid fa-xmark" aria-hidden="true" />
+                  </button>
+                </div>
+                <div className="ventanita-cuerpo">
+                  <span className="campo-lbl">{p.nombre}</span>
+                  {pares.length > 0 && (
+                    <ul className="lista-compacta">
+                      {pares.map((x) => (
+                        <li key={x.numero}>
+                          Unidad {x.numero} {x.modelo && `(${x.modelo})`} → <b>{x.chasis}</b>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {aFabrica > 0 && (
+                    <div className="aviso aviso--alerta">
+                      <i className="fa-solid fa-industry" aria-hidden="true" />
+                      <span>
+                        {aFabrica === 1
+                          ? 'Una unidad queda sin tractor y se pide a fábrica.'
+                          : `${aFabrica} unidades quedan sin tractor y se piden a fábrica.`}
+                      </span>
+                    </div>
+                  )}
+                  <span className="campo-ayuda">
+                    Los tractores salen del stock, se crea la entrega y queda guardado en monday.
+                    Desde la app no se deshace.
+                  </span>
+                </div>
+                <div className="ventanita-pie">
+                  <button
+                    type="button"
+                    className="btn btn--borde btn--chico"
+                    autoFocus
+                    onClick={() => setConfirmando(null)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--primario btn--chico"
+                    onClick={() => {
+                      setConfirmando(null)
+                      void asignar(p)
+                    }}
+                  >
+                    Sí, asignar
+                  </button>
+                </div>
+              </div>
+            </>
+          )
+        })()}
       </div>
     </div>
   )
