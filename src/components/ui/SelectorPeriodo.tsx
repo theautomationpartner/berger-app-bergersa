@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useClickAfuera } from '@/hooks/useClickAfuera'
+import { usePanelQueEntra } from '@/hooks/usePanelQueEntra'
 import { buscarPeriodos } from '@/lib/periodos'
 
 interface Props {
@@ -36,6 +37,10 @@ export function SelectorPeriodo({ valor, onElegir, vacio = 'Elegir período…',
   const [resaltado, setResaltado] = useState(0)
 
   const caja = useRef<HTMLDivElement>(null)
+
+  /* Si abajo no hay lugar, el panel se abre para arriba (o hacia el otro costado). */
+
+  const panel = usePanelQueEntra<HTMLDivElement>(abierto)
   const campo = useRef<HTMLInputElement>(null)
   const lista = useRef<HTMLDivElement>(null)
 
@@ -113,7 +118,7 @@ export function SelectorPeriodo({ valor, onElegir, vacio = 'Elegir período…',
       </button>
 
       {abierto && (
-        <div className="combo-panel">
+        <div ref={panel} className="combo-panel">
           <div className="combo-buscador">
             <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
             <input

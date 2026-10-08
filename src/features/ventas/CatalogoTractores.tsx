@@ -13,6 +13,7 @@
  */
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useClickAfuera } from '@/hooks/useClickAfuera'
+import { usePanelQueEntra } from '@/hooks/usePanelQueEntra'
 import { importe as aMoneda, normalizar } from '@/lib/format'
 import type { ProductoDeCatalogo } from '@/services/monday/catalogoVenta'
 
@@ -47,6 +48,8 @@ function FiltroDesplegable({
   onLimpiar,
 }: FiltroProps) {
   const caja = useRef<HTMLDivElement>(null)
+  /* Si abajo no hay lugar, el panel se abre para arriba (o hacia el otro costado). */
+  const panel = usePanelQueEntra<HTMLDivElement>(abierto)
   useClickAfuera(caja, abierto, onCerrar)
 
   return (
@@ -63,7 +66,7 @@ function FiltroDesplegable({
       </button>
 
       {abierto && (
-        <div className="filtro-panel">
+        <div ref={panel} className="filtro-panel">
           <div className="filtro-opciones">
             {valores.map((v) => {
               const marcado = marcados.includes(v)

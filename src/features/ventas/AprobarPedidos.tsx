@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Desplegable } from '@/components/ui/Desplegable'
 import { Plata } from '@/components/ui/Plata'
+import { useSalidaProtegida } from '@/hooks/useSalidaProtegida'
 import { normalizar } from '@/lib/format'
 import { catalogoDeVenta, type ProductoDeCatalogo } from '@/services/monday/catalogoVenta'
 import { APROBACION, ESTADO_PEDIDO } from '@/services/monday/columns'
@@ -145,6 +146,16 @@ export function AprobarPedidos() {
   ).length
   const enJuego = visibles.reduce((a, p) => a + p.totalFacturaSinIva, 0)
   const hayFiltros = Boolean(texto.trim() || concesionario || modelo)
+
+  /* Contestar una aprobación escribe el pedido, sus renglones, cada unidad y el aviso al
+     concesionario: salir en el medio puede dejar el pedido aprobado y las unidades no. */
+  useSalidaProtegida(
+    trabajando
+      ? 'Se está guardando la aprobación en monday: el pedido, sus unidades y el aviso al concesionario. Si salís ahora puede quedar a medias.'
+      : rechazando && observacion.trim()
+        ? 'Tenés un rechazo a medio escribir que todavía no se guardó. Si salís, se pierde la observación.'
+        : null,
+  )
 
   const contestar = async (p: PedidoLeido, cual: Aprobacion, aprueba: boolean, obs: string) => {
     setTrabajando(p.id)

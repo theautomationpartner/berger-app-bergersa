@@ -13,6 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Desplegable } from '@/components/ui/Desplegable'
+import { useSalidaProtegida } from '@/hooks/useSalidaProtegida'
 import { importe as aMoneda } from '@/lib/format'
 import {
   descuentoTotalEnPorcentaje,
@@ -193,6 +194,18 @@ export function GestionarPedidos({ equipoId = '', comercialId = '' }: Props) {
   const totales = useMemo(() => totalesDePedido(renglones), [renglones])
   const faltan = faltaParaElPedido({ ...datos, equipoId })
   const terceros = cuentas.filter((c) => datos.clientes.some((x) => x.id === c.id))
+
+  /* Salir a mitad de camino pregunta antes. Mientras se escribe en monday, porque el pedido son tres
+     tableros y cortarlo deja uno cargado y los otros no; y con un pedido armado sin mandar, porque
+     todo lo elegido vive sólo en esta pantalla. */
+  const armado = Boolean(datos.tipoPedido) || datos.renglones.length > 0
+  useSalidaProtegida(
+    enviando
+      ? 'Se está cargando el pedido en monday: el pedido, sus renglones y una unidad por tractor. Si salís ahora puede quedar cargado a medias, y no vas a ver qué faltó.'
+      : armado
+        ? 'Tenés un pedido a medio armar que todavía no mandaste. Si salís, se pierde todo lo que cargaste.'
+        : null,
+  )
 
   const cantidadDe = (id: string) => datos.renglones.find((r) => r.productoId === id)?.cantidad ?? 0
   const productoDe = (id: string) => catalogo.find((p) => p.id === id)
@@ -551,7 +564,9 @@ export function GestionarPedidos({ equipoId = '', comercialId = '' }: Props) {
                         cuentas={cuentas}
                         condicionesFiscales={condicionesFiscales}
                         elegidos={datos.clientes}
-                        onCambiar={(clientes) => setDatos({ ...datos, clientes })}
+                        /* Con la función y no con `datos`: el alta de un cliente nuevo espera a
+                           monday, y para cuando vuelve `datos` puede ser el de un render anterior. */
+                        onCambiar={(clientes) => setDatos((d) => ({ ...d, clientes }))}
                         excluirId={datos.cuentaId}
                         cargando={cargando}
                         onCuentaNueva={(c) => setCuentas((v) => [...v, c])}

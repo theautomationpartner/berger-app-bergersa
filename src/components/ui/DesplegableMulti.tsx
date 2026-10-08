@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useClickAfuera } from '@/hooks/useClickAfuera'
+import { usePanelQueEntra } from '@/hooks/usePanelQueEntra'
 import type { OpcionDesplegable } from './Desplegable'
 
 interface Props {
@@ -52,6 +53,10 @@ export function DesplegableMulti({
   const [foco, setFoco] = useState(0)
 
   const caja = useRef<HTMLDivElement>(null)
+
+  /* Si abajo no hay lugar, el panel se abre para arriba (o hacia el otro costado). */
+
+  const panel = usePanelQueEntra<HTMLDivElement>(abierto)
   const cerrar = useCallback(() => {
     setAbierto(false)
     setBusqueda('')
@@ -124,7 +129,7 @@ export function DesplegableMulti({
       </button>
 
       {abierto && (
-        <div className="desp-panel">
+        <div ref={panel} className="desp-panel">
           {buscable && (
             <input
               className="input desp-buscar"

@@ -184,6 +184,10 @@ function preciosDeLaUnidad(p: PrecioDeUnidad): Record<string, unknown> {
     [COL_VENTA.dto3]: aTextoMonday(p.descuentos[2] ?? 0),
     [COL_VENTA.contadoSinIva]: aTextoMonday(p.contadoSinIva),
     [COL_VENTA.contadoConIva]: aTextoMonday(p.contadoConIva),
+    /* El total de una unidad es su precio por uno: es la misma cuenta que en 🔖Pedidos, donde se
+       suma cada renglón por su cantidad. */
+    [COL_VENTA.totalContadoSinIva]: aTextoMonday(p.contadoSinIva),
+    [COL_VENTA.totalContadoConIva]: aTextoMonday(p.contadoConIva),
     [COL_VENTA.facturaSinIva]: aTextoMonday(p.facturaSinIva),
     [COL_VENTA.facturaConIva]: aTextoMonday(p.facturaConIva),
   }
@@ -237,7 +241,12 @@ export async function crearPedido(
     [COL_PEDIDO.totalFacturaSinIva]: aTextoMonday(totales.facturaSinIva),
     [COL_PEDIDO.totalFacturaConIva]: aTextoMonday(totales.facturaConIva),
   }
-  const clienteIds = d.clientes.map((c) => c.id)
+  /* El cliente final va sólo en la venta DIRECTA, que es la única donde se pide: en las otras dos
+     BERGER le factura al concesionario. Escribirlo igual dejaría en el pedido —y en cada unidad— un
+     tercero que la pantalla ya no mostraba. Se escribe con el mismo id en 🔖Pedidos y en 🛍️Ventas,
+     sea una cuenta que ya estaba o una creada en el momento desde el pedido. */
+  const directa = d.tipoPedido === TIPO_PEDIDO.TERCEROS && d.tipoVenta === TIPO_VENTA.DIRECTA
+  const clienteIds = directa ? [...new Set(d.clientes.map((c) => c.id).filter(Boolean))] : []
   if (clienteIds.length > 0) valores[COL_PEDIDO.tercero] = { item_ids: clienteIds }
   if (comercialId) {
     valores[COL_PEDIDO.comercial] = { personsAndTeams: [{ id: comercialId, kind: 'person' }] }
@@ -257,7 +266,7 @@ export async function crearPedido(
   }
   if (d.plazo) valores[COL_PEDIDO.plazo] = { label: d.plazo }
 
-  const nombre = nombreDelPedido(d.cuentaNombre, d.clientes)
+  const nombre = nombreDelPedido(d.cuentaNombre, directa ? d.clientes : [])
   const creado = await mondayApi<{ create_item: { id: string } }>('crearPedido', {
     nombre,
     valores: JSON.stringify(valores),

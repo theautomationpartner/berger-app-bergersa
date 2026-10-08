@@ -5,16 +5,17 @@
  * a una y no de a pedido porque la realidad es de a una: dos unidades del mismo modelo, una que
  * sale del galpón y otra que hay que pedirle a fábrica, es el caso normal.
  *
- * Lo que se ofrece para cada unidad son los tractores del mismo modelo que todavía no tienen dueño,
- * descontando los que se eligieron recién acá arriba: sin eso, un pedido de dos se llevaría dos
- * veces el mismo chasis y el error aparecería el día de la entrega.
+ * Se unen de a pares, modelo por modelo: las unidades pedidas de un lado, los tractores del
+ * inventario del otro, y un botón Unir en el medio (ver UnirUnidades). Lo que se ofrece son los
+ * tractores del mismo modelo que todavía no tienen dueño, descontando los que ya se unieron en esta
+ * pantalla —en este pedido o en otro—: sin eso, dos unidades se llevarían el mismo chasis y el error
+ * aparecería el día de la entrega.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Desplegable } from '@/components/ui/Desplegable'
+import { useSalidaProtegida } from '@/hooks/useSalidaProtegida'
 import { ESTADO_PEDIDO } from '@/services/monday/columns'
 import {
   asignarPedido,
-  candidatosPara,
   pedidosCargados,
   sePuedePrometer,
   tractoresEnStock,
@@ -25,15 +26,29 @@ import {
 } from '@/services/monday/pedidosBerger'
 import { SinAcceso } from '@/services/monday/sdk'
 import { TarjetaPedido } from './TarjetaPedido'
+import { UnirUnidades, type UnidadNumerada } from './UnirUnidades'
 
 const mensaje = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
 /** Qué se eligió para cada unidad: el id de un tractor, o `''` para pedirla a fábrica. */
 type Eleccion = Record<string, string>
 
-/** Cómo se lee un tractor en la lista: lo que lo distingue de otro del mismo modelo. */
-const rotuloDe = (t: TractorEnStock): string =>
-  [t.chasis || t.nombre, t.numInterno && `N° ${t.numInterno}`].filter(Boolean).join(' · ')
+/** Las unidades de un pedido agrupadas por modelo, en el orden en que aparecen. */
+function porModelo(unidades: UnidadLeida[]): { catalogoId: string; modelo: string; unidades: UnidadNumerada[] }[] {
+  const grupos = new Map<string, { catalogoId: string; modelo: string; unidades: UnidadNumerada[] }>()
+  unidades.forEach((unidad, i) => {
+    /* Sin conexión al catálogo no hay con qué compararla: va sola, para que se vea y vaya a fábrica. */
+    const clave = unidad.catalogoId || `sin-modelo-${unidad.id}`
+    const g = grupos.get(clave) ?? {
+      catalogoId: unidad.catalogoId,
+      modelo: unidad.catalogoNombre || 'Sin modelo del catálogo',
+      unidades: [],
+    }
+    g.unidades.push({ unidad, numero: i + 1 })
+    grupos.set(clave, g)
+  })
+  return [...grupos.values()]
+}
 
 export function AsignarPedidos() {
   const [pedidos, setPedidos] = useState<PedidoLeido[]>([])
@@ -88,6 +103,21 @@ export function AsignarPedidos() {
   )
 
   const libres = useMemo(() => stock.filter(sePuedePrometer), [stock])
+  const porId = useMemo(() => new Map(stock.map((t) => [t.id, t])), [stock])
+
+  /* Los tractores que ya se unieron acá, en cualquier pedido: no se ofrecen de nuevo. */
+  const tomados = useMemo(() => new Set(Object.values(elegido).filter(Boolean)), [elegido])
+  const hayUnidas = tomados.size > 0
+
+  /* Salir con pares unidos y sin guardar los pierde; salir mientras se escribe deja unidades
+     asignadas sin su tractor marcado, o sin la entrega. Las dos cosas se preguntan antes. */
+  useSalidaProtegida(
+    trabajando
+      ? 'Se está asignando en monday: cada unidad, su tractor en el inventario y la entrega. Si salís ahora puede quedar a medias.'
+      : hayUnidas
+        ? 'Tenés tractores unidos que todavía no se guardaron. Si salís, se pierden y hay que volver a unirlos.'
+        : null,
+  )
 
   /* Las unidades que todavía no tienen tractor: es el trabajo que queda, y no se ve sumando
      pedidos porque un pedido puede tener una asignada y otra no. */
@@ -118,7 +148,12 @@ export function AsignarPedidos() {
           .join(', ') + '.',
       )
       setAvisos(r.advertencias)
-      setElegido({})
+      /* Sólo lo de este pedido: lo unido en los otros sigue esperando su propio botón. */
+      setElegido((e) => {
+        const quedan = { ...e }
+        for (const u of suyas) delete quedan[u.id]
+        return quedan
+      })
       await recargar()
     } catch (e) {
       setError(mensaje(e))
@@ -226,8 +261,6 @@ export function AsignarPedidos() {
         <div className="pedidos-lista">
           {aprobados.map((p) => {
             const suyas = unidades.filter((u) => u.pedidoId === p.id)
-            /* Lo elegido en ESTE pedido, para no ofrecer dos veces el mismo chasis. */
-            const tomados = suyas.map((u) => elegido[u.id]).filter(Boolean)
             const conTractor = suyas.filter((u) => elegido[u.id]).length
 
             return (
@@ -241,46 +274,35 @@ export function AsignarPedidos() {
                 <div className="unidades">
                   <span className="unidades-tit">Con qué tractor se cumple cada unidad</span>
 
-                  {suyas.map((u, i) => {
-                    const candidatos = candidatosPara(
-                      u,
-                      stock,
-                      tomados.filter((t) => t !== elegido[u.id]),
-                    )
-                    return (
-                      <div key={u.id} className="unidad unidad--asignar">
-                        <span className="unidad-nom">
-                          {u.catalogoNombre || u.nombre}
-                          <small>unidad {i + 1}</small>
-                        </span>
-
-                        <div className="unidad-elegir">
-                          <Desplegable
-                            valor={elegido[u.id] ?? ''}
-                            opciones={[
-                              { valor: '', rotulo: 'Pedir a fábrica' },
-                              ...candidatos.map((t) => ({
-                                valor: t.id,
-                                rotulo: rotuloDe(t),
-                                detalle: t.estadoImportacion,
-                              })),
-                            ]}
-                            vacio="Pedir a fábrica"
-                            buscable={candidatos.length > 8}
-                            bloqueado={trabajando === p.id}
-                            onCambiar={(v) => setElegido((e) => ({ ...e, [u.id]: v }))}
-                          />
-                          {/* Que no haya ninguno no es un error: significa que ese modelo hay que
-                              pedirlo, y conviene que se lea así y no como una lista vacía. */}
-                          <span className="campo-ayuda">
-                            {candidatos.length === 0
-                              ? 'No hay ninguno de este modelo sin dueño: va a fábrica.'
-                              : `${candidatos.length} disponible${candidatos.length === 1 ? '' : 's'} de este modelo`}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
+                  {porModelo(suyas).map((g) => (
+                    <UnirUnidades
+                      key={g.catalogoId || g.unidades[0].unidad.id}
+                      modelo={g.modelo}
+                      sinUnir={g.unidades.filter((x) => !elegido[x.unidad.id])}
+                      unidas={g.unidades.flatMap((x) => {
+                        const t = porId.get(elegido[x.unidad.id] ?? '')
+                        return t ? [{ unidad: x, tractor: t }] : []
+                      })}
+                      /* Mismo modelo por la conexión al catálogo —no por el texto, que se escribe
+                         distinto—, sin dueño, y que nadie haya unido todavía en esta pantalla. */
+                      libres={
+                        g.catalogoId
+                          ? libres.filter((t) => t.catalogoId === g.catalogoId && !tomados.has(t.id))
+                          : []
+                      }
+                      bloqueado={trabajando === p.id}
+                      onUnir={(unidadId, tractorId) =>
+                        setElegido((e) => ({ ...e, [unidadId]: tractorId }))
+                      }
+                      onDesunir={(unidadId) =>
+                        setElegido((e) => {
+                          const sin = { ...e }
+                          delete sin[unidadId]
+                          return sin
+                        })
+                      }
+                    />
+                  ))}
                 </div>
 
                 <div className="pedido-acciones">

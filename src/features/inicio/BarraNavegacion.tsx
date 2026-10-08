@@ -15,6 +15,7 @@
  */
 import { useCallback, useRef, useState } from 'react'
 import { useClickAfuera } from '@/hooks/useClickAfuera'
+import { usePanelQueEntra } from '@/hooks/usePanelQueEntra'
 import { destinosDe, RUTA_INICIO, type Destino, type Ruta } from '@/lib/catalogo'
 import {
   AREAS,
@@ -53,6 +54,8 @@ interface PropsSelector {
 function SelectorNav({ etiqueta, actual, opciones, onElegir }: PropsSelector) {
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
+  /* Si abajo no hay lugar, el panel se abre para arriba (o hacia el otro costado). */
+  const panel = usePanelQueEntra<HTMLUListElement>(abierto)
   const cerrar = useCallback(() => setAbierto(false), [])
   useClickAfuera(caja, abierto, cerrar)
 
@@ -82,7 +85,7 @@ function SelectorNav({ etiqueta, actual, opciones, onElegir }: PropsSelector) {
         </button>
 
         {abierto && (
-          <ul className="topnav-panel" role="listbox">
+          <ul ref={panel} className="topnav-panel" role="listbox">
             {opciones.map((o, i) => (
               <li key={o.valor} className={o.aparte ? 'topnav-op-aparte' : undefined}>
                 {/* El encabezado del grupo se dibuja sólo cuando cambia: con una línea por opción

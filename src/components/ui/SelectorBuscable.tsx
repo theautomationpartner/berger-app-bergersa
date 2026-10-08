@@ -14,6 +14,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useClickAfuera } from '@/hooks/useClickAfuera'
+import { usePanelQueEntra } from '@/hooks/usePanelQueEntra'
 
 export interface OpcionBuscable {
   valor: string
@@ -88,6 +89,8 @@ export function SelectorBuscable({
   const [abierto, setAbierto] = useState(false)
   const [foco, setFoco] = useState(0)
   const caja = useRef<HTMLDivElement>(null)
+  /* Si abajo no hay lugar, el panel se abre para arriba (o hacia el otro costado). */
+  const panel = usePanelQueEntra<HTMLDivElement>(abierto && Boolean(texto.trim()))
   const campo = useRef<HTMLInputElement>(null)
 
   useClickAfuera(caja, abierto, () => setAbierto(false))
@@ -182,7 +185,7 @@ export function SelectorBuscable({
       </div>
 
       {abierto && texto.trim() && (
-        <div className="buscable-lista">
+        <div ref={panel} className="buscable-lista">
           {resultados.length === 0 ? (
             <div className="buscable-vacio">No hay ninguno que coincida con «{texto.trim()}».</div>
           ) : (
@@ -239,6 +242,8 @@ export function SelectorBuscableMulti({
   const [abierto, setAbierto] = useState(false)
   const [foco, setFoco] = useState(0)
   const caja = useRef<HTMLDivElement>(null)
+  /* Si abajo no hay lugar, el panel se abre para arriba (o hacia el otro costado). */
+  const panel = usePanelQueEntra<HTMLDivElement>(abierto && Boolean(texto.trim()))
 
   useClickAfuera(caja, abierto, () => setAbierto(false))
 
@@ -335,7 +340,7 @@ export function SelectorBuscableMulti({
       </div>
 
       {abierto && texto.trim() && (
-        <div className="buscable-lista">
+        <div ref={panel} className="buscable-lista">
           {resultados.length === 0 ? (
             <div className="buscable-vacio">No hay ninguno que coincida con «{texto.trim()}».</div>
           ) : (

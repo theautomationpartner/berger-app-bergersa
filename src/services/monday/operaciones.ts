@@ -737,6 +737,8 @@ const COLUMNAS_DE_VENTA = new Set<string>([
   COL_VENTA.dto3,
   COL_VENTA.contadoSinIva,
   COL_VENTA.contadoConIva,
+  COL_VENTA.totalContadoSinIva,
+  COL_VENTA.totalContadoConIva,
   COL_VENTA.facturaSinIva,
   COL_VENTA.facturaConIva,
 ])
@@ -754,6 +756,8 @@ const COLUMNAS_DE_RESOLUCION = new Set<string>([
   COL_PEDIDO.aprobFinanciera,
   COL_PEDIDO.motivo,
   COL_PEDIDO.fechaAprobacion,
+  COL_PEDIDO.fechaAprobComercial,
+  COL_PEDIDO.fechaAprobFinanciera,
   COL_PEDIDO.fechaEstimadaEntrega,
 ])
 

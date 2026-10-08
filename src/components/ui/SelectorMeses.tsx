@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useClickAfuera } from '@/hooks/useClickAfuera'
+import { usePanelQueEntra } from '@/hooks/usePanelQueEntra'
 import { claveMes, mesActual, rotuloMes } from '@/lib/meses'
 import type { MesAnio } from '@/types'
 
@@ -27,6 +28,8 @@ interface Props {
 export function SelectorMeses({ meses, elegidos, onCambiar, conteos }: Props) {
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
+  /* Si abajo no hay lugar, el panel se abre para arriba (o hacia el otro costado). */
+  const panel = usePanelQueEntra<HTMLDivElement>(abierto)
   const opcionActual = useRef<HTMLButtonElement>(null)
 
   const cerrar = useCallback(() => setAbierto(false), [])
@@ -80,7 +83,7 @@ export function SelectorMeses({ meses, elegidos, onCambiar, conteos }: Props) {
       </button>
 
       {abierto && (
-        <div className="meses-panel" role="listbox" aria-multiselectable="true">
+        <div ref={panel} className="meses-panel" role="listbox" aria-multiselectable="true">
           {[...porAnio.entries()].map(([anio, delAnio]) => (
             <div key={anio} className="meses-grupo">
               <div className="meses-anio">{anio}</div>

@@ -407,6 +407,13 @@ export async function resolverAprobacion(
       label: respuesta,
     },
   }
+  /* Cada aprobación deja su propia fecha el día que dice que sí: es lo que permite ver cuánto tardó
+     cada una, que son dos personas distintas y dos esperas distintas. */
+  if (aprueba) {
+    valores[
+      cual === 'comercial' ? COL_PEDIDO.fechaAprobComercial : COL_PEDIDO.fechaAprobFinanciera
+    ] = { date: hoy() }
+  }
   if (estado) valores[COL_PEDIDO.estado] = { label: estado }
   if (estado === ESTADO_PEDIDO.APROBADO) {
     valores[COL_PEDIDO.fechaAprobacion] = { date: hoy() }

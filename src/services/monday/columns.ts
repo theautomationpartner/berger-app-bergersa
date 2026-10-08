@@ -1079,7 +1079,11 @@ export const COL_PEDIDO = {
   totalFacturaSinIva: 'numeric_mm7w9fwf',
   totalFacturaConIva: 'numeric_mm7wpap4',
   fechaSolicitud: 'date_mm5fj672',
+  /** La aprobación general: se escribe recién cuando las dos están en Aprobado. */
   fechaAprobacion: 'date_mm7xs9dt',
+  /** El día en que se aprobó cada una de las dos. La general sale de la última que faltaba. */
+  fechaAprobComercial: 'date_mm7ym6f2',
+  fechaAprobFinanciera: 'date_mm7yg7t8',
   fechaEstimadaEntrega: 'date_mm5fbbgj',
   fechaEntregaReal: 'date_mm5fmcf9',
   motivo: 'long_text_mm7pg8ar',
@@ -1142,6 +1146,12 @@ export const COL_VENTA = {
   dto3: 'numeric_mm7xx4mg',
   contadoSinIva: 'numeric_mm7x3ywe',
   contadoConIva: 'numeric_mm7xj00a',
+  /**
+   * Los totales con descuento de contado, igual que en 🔖Pedidos. Una unidad es un tractor, así que
+   * el total es el precio de esa unidad por uno.
+   */
+  totalContadoSinIva: 'numeric_mm7x1wby',
+  totalContadoConIva: 'numeric_mm7xb3d7',
   facturaSinIva: 'numeric_mm7xxrt7',
   facturaConIva: 'numeric_mm7xhezf',
   fechaAsignacion: 'date_mm7xm3n1',

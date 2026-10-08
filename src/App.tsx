@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BarraMarca } from '@/components/ui/BarraMarca'
+import { ConfirmarSalida } from '@/components/ui/ConfirmarSalida'
 import { PantallaSinAcceso, PantallaVerificando } from '@/components/ui/PantallaSinAcceso'
 import { clienteVistaPrevia } from '@/features/acceso/clienteVistaPrevia'
 import { Ingreso, type SesionIngreso } from '@/features/acceso/Ingreso'
@@ -26,6 +27,7 @@ import { GestionarPedidos } from '@/features/ventas/GestionarPedidos'
 import { PanelOpciones } from '@/features/inicio/PanelOpciones'
 import { DespachoVista } from '@/features/vista/DespachoVista'
 import { useAccesoMonday } from '@/hooks/useAccesoMonday'
+import { motivoParaNoSalir } from '@/hooks/useSalidaProtegida'
 import {
   aduanaDeModulos,
   areasDeModulos,
@@ -116,6 +118,17 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
      a cualquier pantalla con un `setRuta`, sin tener que acordarse de limpiar los otros cuatro. */
   const [ruta, setRuta] = useState<Ruta>(RUTA_INICIO)
   const [lateralAbierto, setLateralAbierto] = useState(false)
+  /** La salida que quedó esperando confirmación, con el porqué de la pantalla que se deja. */
+  const [saliendo, setSaliendo] = useState<{ motivo: string; seguir: () => void } | null>(null)
+
+  /* Toda salida de una pantalla pasa por acá: si la operación abierta pidió que no se la deje sin
+     preguntar —está escribiendo en monday, o tiene algo armado sin guardar— primero se pregunta. */
+  const salirSiSePuede = (seguir: () => void) => {
+    const motivo = motivoParaNoSalir()
+    if (motivo) setSaliendo({ motivo, seguir })
+    else seguir()
+  }
+  const navegar = (r: Ruta) => salirSiSePuede(() => setRuta(r))
 
   const {
     area,
@@ -135,8 +148,8 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
      abrir: a un despachante no le sirve que una diga "5 operaciones" si él entra a dos. */
   const cuantasEn = (filtro: (d: Destino) => boolean) => destinos.filter(filtro).length
 
-  const irA = (d: Destino) => setRuta(d.ruta)
-  const irAlArea = (id: AreaApp) => setRuta({ ...RUTA_INICIO, area: id })
+  const irA = (d: Destino) => navegar(d.ruta)
+  const irAlArea = (id: AreaApp) => navegar({ ...RUTA_INICIO, area: id })
   const elegirPrincipal = (id: (typeof OPERACIONES_PRINCIPALES)[number]['id']) =>
     setRuta((v) => ({ ...RUTA_INICIO, area: v.area, principal: id }))
 
@@ -146,12 +159,16 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
         <BarraNavegacion
           ruta={ruta}
           modulos={sesion.modulos}
-          onIr={setRuta}
+          onIr={navegar}
           onAbrirPanel={() => setLateralAbierto(true)}
         />
       }
       perfil={sesion.perfil.nombre}
-      onSalir={import.meta.env.DEV && !VISTA_PREVIA_INGRESO ? undefined : sesion.salir}
+      onSalir={
+        import.meta.env.DEV && !VISTA_PREVIA_INGRESO
+          ? undefined
+          : () => salirSiSePuede(sesion.salir)
+      }
     />
   )
 
@@ -362,6 +379,17 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
       {principal === 'aduana' &&
         operacionAduana === 'dashboard' &&
         puedeEnAduana(sesion.modulos, 'dashboard') && <DashboardDespachos />}
+
+      {saliendo && (
+        <ConfirmarSalida
+          motivo={saliendo.motivo}
+          onQuedarse={() => setSaliendo(null)}
+          onSalir={() => {
+            setSaliendo(null)
+            saliendo.seguir()
+          }}
+        />
+      )}
     </div>
   )
 }
