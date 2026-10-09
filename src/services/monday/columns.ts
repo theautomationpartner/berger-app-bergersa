@@ -44,11 +44,18 @@ export const TABLEROS = {
   concesionarios: '18428606865',
   /** 🗓️Actividades: cada contacto con un cliente, hecho o por hacer. */
   actividades: '18428421092',
+  /**
+   * Los tableros de pedidos viven en el workspace **Concesionarios BERGER SA** (17940785), no en
+   * Berger SA: es el único workspace al que entran los concesionarios. Se movieron el 09/10/2026
+   * duplicando la estructura, así que los IDs de columna, grupos y etiquetas son los mismos que en
+   * los tableros viejos (18428606864 / 18428606873 / 18434389854). Las conexiones hacia Cuentas,
+   * Catálogo, Inventario y Garantías siguen apuntando a Berger SA.
+   */
   /** 🔖Pedidos: un item por pedido del concesionario, con un subitem por modelo. */
-  pedidos: '18428606864',
-  pedidosSubitems: '18428606873',
-  /** 🛍️Ventas: un item por UNIDAD pedida. Es donde se aprueba y se asigna de a uno. */
-  ventas: '18434389854',
+  pedidos: '18434782355',
+  pedidosSubitems: '18434782367',
+  /** 🛍️Pedidos x UNIDAD (antes "Ventas"): un item por UNIDAD pedida. Ahí se aprueba y se asigna de a uno. */
+  ventas: '18434782402',
   /** 🚛Entregas: un item por entrega, con un subitem por unidad. */
   entregas: '18434280125',
   entregasSubitems: '18434281488',
@@ -1049,7 +1056,7 @@ export const ESTADO_ACTIVIDAD = {
  * ------------------------------------------------------------------ */
 
 /**
- * 🔖Pedidos (18428606864) — un item por pedido del concesionario.
+ * 🔖Pedidos (18434782355, workspace Concesionarios) — un item por pedido del concesionario.
  *
  * El pedido es la solicitud; las UNIDADES viven en 🛍️Ventas, una por tractor. Esa separación es
  * la que permite aprobar y asignar de a una: un pedido de tres tractores puede terminar con dos
@@ -1107,7 +1114,7 @@ export const APROBACION = {
   RECHAZADO: 'Rechazado',
 } as const
 
-/** Subelementos de 🔖Pedidos (18428606873) — una fila por modelo pedido, con su cantidad. */
+/** Subelementos de 🔖Pedidos (18434782367) — una fila por modelo pedido, con su cantidad. */
 export const COL_PEDIDO_SUB = {
   catalogo: 'board_relation_mm7pmm50',
   /** Los tractores del inventario con que se cumplió el renglón. Los escribe Asignar pedidos. */
@@ -1126,7 +1133,7 @@ export const COL_PEDIDO_SUB = {
   ventas: 'board_relation_mm7x8fhk',
 } as const
 
-/** 🛍️Ventas (18434389854) — un item por UNIDAD. Es lo que BERGER aprueba y asigna. */
+/** 🛍️Pedidos x UNIDAD (18434782402, antes "Ventas") — un item por UNIDAD. Es lo que BERGER aprueba y asigna. */
 export const COL_VENTA = {
   inventario: 'board_relation_mm7x6m1z',
   comercial: 'multiple_person_mm7xvzr1',
@@ -1171,7 +1178,7 @@ export const COL_ENTREGA_SUB = {
   inventario: 'board_relation_mm7wfzwq',
   /**
    * Se llama "🤖Pedido de venta (unidad)" pero está conectada a los SUBELEMENTOS de 🔖Pedidos
-   * (18428606873), no a 🛍️Ventas.
+   * (18434782367), no a 🛍️Pedidos x UNIDAD.
    *
    * Así que lo que se le escribe es el renglón del pedido —el modelo con su cantidad— y no la
    * unidad. Escribirle el id de una unidad de Ventas hace fallar la creación entera del
