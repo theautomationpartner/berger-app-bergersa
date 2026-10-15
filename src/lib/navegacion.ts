@@ -327,26 +327,13 @@ export const MODALIDADES_DESPACHO: OpcionPanel<ModalidadDespacho>[] = [
  * PEDIDOS, del lado de BERGER: aprobar y asignar.
  *
  * Cargar y seguir los pedidos es del concesionario, y desde el 15/10/2026 vive en su propia app
- * (CONCESIONARIOS BERGER S.A., en el workspace Concesionarios BERGER SA). Acá queda sólo lo que
- * decide BERGER.
+ * (CONCESIONARIOS BERGER S.A.). Acá sólo entra BERGER, así que las dos operaciones van sueltas,
+ * sin sección que diga de quién son.
  */
-export const SECCIONES_PEDIDOS: SeccionPanel[] = [
-  {
-    id: 'berger',
-    titulo: 'BERGER S.A.',
-    detalle: 'Lo que decide BERGER: qué se aprueba y con qué unidad se cumple.',
-    tono: 'naranja',
-    icono: 'fa-solid fa-building',
-  },
-]
-
-SECCIONES_POR_PRINCIPAL.pedidos = SECCIONES_PEDIDOS
-
 /** Las pantallas de PEDIDOS. */
 export const OPERACIONES_PEDIDOS: (OpcionPanel<OperacionPedidos> & { modulo: ModuloApp })[] = [
   {
     id: 'aprobar',
-    seccion: 'berger',
     modulo: 'pedidosBerger',
     titulo: 'APROBAR PEDIDOS',
     corto: 'Aprobar pedidos',
@@ -355,7 +342,6 @@ export const OPERACIONES_PEDIDOS: (OpcionPanel<OperacionPedidos> & { modulo: Mod
   },
   {
     id: 'asignar',
-    seccion: 'berger',
     modulo: 'pedidosBerger',
     titulo: 'ASIGNAR PEDIDOS',
     corto: 'Asignar pedidos',

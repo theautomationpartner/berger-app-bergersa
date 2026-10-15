@@ -12,7 +12,9 @@
  * aparecería el día de la entrega.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { DesplegableMulti } from '@/components/ui/DesplegableMulti'
 import { useSalidaProtegida } from '@/hooks/useSalidaProtegida'
+import { normalizar } from '@/lib/format'
 import { ESTADO_PEDIDO } from '@/services/monday/columns'
 import {
   asignarPedido,
@@ -26,12 +28,26 @@ import {
 } from '@/services/monday/pedidosBerger'
 import { SinAcceso } from '@/services/monday/sdk'
 import { TarjetaPedido } from './TarjetaPedido'
-import { UnirUnidades, type UnidadNumerada } from './UnirUnidades'
+import { chasisDe, porCercania, UnirUnidades, type UnidadNumerada } from './UnirUnidades'
 
 const mensaje = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
 /** Qué se eligió para cada unidad: el id de un tractor, o `''` para pedirla a fábrica. */
 type Eleccion = Record<string, string>
+
+/** Lo que quedó de una asignación, para el resumen que se muestra al terminar. */
+interface Resultado {
+  pedidoId: string
+  nombre: string
+  estado: string
+  porcentaje: number
+  pares: { numero: number; modelo: string; chasis: string }[]
+  aFabrica: number
+  entrega: boolean
+  advertencias: string[]
+}
+
+type Vista = 'pedidos' | 'tractores'
 
 /** Las unidades de un pedido agrupadas por modelo, en el orden en que aparecen. */
 function porModelo(unidades: UnidadLeida[]): { catalogoId: string; modelo: string; unidades: UnidadNumerada[] }[] {
@@ -65,6 +81,17 @@ export function AsignarPedidos() {
   /* Guardar pide el sí antes de escribir, como el "¿Asignar esta máquina?" de Ferrero: desde la
      app no se desasigna, y lo que quede sin tractor se pide a fábrica. */
   const [confirmando, setConfirmando] = useState<string | null>(null)
+  /* El resumen de lo que se acaba de asignar. Va en una ventana y no sólo en el aviso de arriba:
+     así se lee qué tractor quedó con qué unidad, y se elige si seguir con otro o mirar ese mismo. */
+  const [resultado, setResultado] = useState<Resultado | null>(null)
+
+  const [vista, setVista] = useState<Vista>('pedidos')
+  const [texto, setTexto] = useState('')
+  const [concesionarios, setConcesionarios] = useState<string[]>([])
+  const [modelos, setModelos] = useState<string[]>([])
+  const [buscarTractor, setBuscarTractor] = useState('')
+  const [modelosTractor, setModelosTractor] = useState<string[]>([])
+  const [tractorAbierto, setTractorAbierto] = useState<string | null>(null)
 
   const recargar = useCallback(async () => {
     setCargando(true)
@@ -137,12 +164,74 @@ export function AsignarPedidos() {
     [unidades, aprobados],
   )
 
+  /* Los filtros salen de lo que hay esperando: ofrecer un concesionario o un modelo que no tiene
+     nada para asignar sólo sirve para llegar a una lista vacía. */
+  const opcionesConcesionario = useMemo(() => {
+    const vistos = new Map<string, string>()
+    for (const p of aprobados) if (p.cuentaId) vistos.set(p.cuentaId, p.cuentaNombre || p.nombre)
+    return [...vistos].map(([valor, rotulo]) => ({ valor, rotulo })).sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'es'))
+  }, [aprobados])
+
+  const opcionesModelo = useMemo(() => {
+    const vistos = new Map<string, string>()
+    for (const u of unidades) {
+      if (u.catalogoId && !u.inventarioId && aprobados.some((p) => p.id === u.pedidoId)) {
+        vistos.set(u.catalogoId, u.catalogoNombre || u.catalogoId)
+      }
+    }
+    return [...vistos].map(([valor, rotulo]) => ({ valor, rotulo })).sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'es'))
+  }, [unidades, aprobados])
+
+  /* Varios concesionarios o varios modelos a la vez: aparece cualquier pedido de alguno de ellos. */
+  const visibles = useMemo(() => {
+    const q = normalizar(texto)
+    return aprobados.filter((p) => {
+      if (concesionarios.length > 0 && !concesionarios.includes(p.cuentaId)) return false
+      const suyas = unidades.filter((u) => u.pedidoId === p.id)
+      if (modelos.length > 0 && !suyas.some((u) => modelos.includes(u.catalogoId))) return false
+      if (!q) return true
+      const donde = [p.nombre, p.cuentaNombre, p.terceroNombre, ...suyas.map((u) => u.catalogoNombre)].join(' ')
+      return normalizar(donde).includes(q)
+    })
+  }, [aprobados, unidades, texto, concesionarios, modelos])
+  const hayFiltros = Boolean(texto.trim() || concesionarios.length || modelos.length)
+
+  /* Los tractores sin dueño, para la pestaña que se abre desde la cajita. */
+  const opcionesModeloStock = useMemo(() => {
+    const vistos = new Map<string, string>()
+    for (const t of libres) if (t.catalogoId) vistos.set(t.catalogoId, t.modelo || t.catalogoId)
+    return [...vistos].map(([valor, rotulo]) => ({ valor, rotulo })).sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'es'))
+  }, [libres])
+  const tractoresVisibles = useMemo(() => {
+    const q = normalizar(buscarTractor)
+    return porCercania(libres).filter((t) => {
+      if (modelosTractor.length > 0 && !modelosTractor.includes(t.catalogoId)) return false
+      return !q || normalizar([t.nombre, t.modelo, t.chasis, t.numInterno].join(' ')).includes(q)
+    })
+  }, [libres, buscarTractor, modelosTractor])
+  /** Cuántas unidades esperando tractor hay de cada modelo: dice si un tractor ya tiene a quién ir. */
+  const esperanPorModelo = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const u of unidades) {
+      if (u.catalogoId && !u.inventarioId && aprobados.some((p) => p.id === u.pedidoId)) {
+        m.set(u.catalogoId, (m.get(u.catalogoId) ?? 0) + 1)
+      }
+    }
+    return m
+  }, [unidades, aprobados])
+
   const asignar = async (p: PedidoLeido) => {
     setTrabajando(p.id)
     setHecho(null)
     setAvisos([])
     try {
       const suyas = unidades.filter((u) => u.pedidoId === p.id)
+      /* Los pares, antes de escribir: después de recargar, las unidades ya no están sin tractor. */
+      const pendientes = suyas.filter((u) => !u.inventarioId)
+      const pares = pendientes.flatMap((u, i) => {
+        const t = porId.get(elegido[u.id] ?? '')
+        return t ? [{ numero: i + 1, modelo: u.catalogoNombre, chasis: chasisDe(t) }] : []
+      })
       const r = await asignarPedido(
         p,
         suyas,
@@ -160,6 +249,16 @@ export function AsignarPedidos() {
           '.',
       )
       setAvisos(r.advertencias)
+      setResultado({
+        pedidoId: p.id,
+        nombre: p.nombre,
+        estado: r.estado,
+        porcentaje: r.porcentaje,
+        pares,
+        aFabrica: r.aFabrica,
+        entrega: Boolean(r.entregaId),
+        advertencias: r.advertencias,
+      })
       /* Sólo lo de este pedido: lo unido en los otros sigue esperando su propio botón. */
       setElegido((e) => {
         const quedan = { ...e }
@@ -189,37 +288,38 @@ export function AsignarPedidos() {
           </span>
         </div>
 
+        {/* Dos números y no tres: los pedidos aprobados y sus unidades por asignar son el mismo
+            trabajo contado de dos maneras, así que van juntos en una sola cajita. */}
         <div className="tableros">
           <div className="tablero tablero--verde">
             <span className="tablero-ic">
               <i className="fa-solid fa-circle-check" aria-hidden="true" />
             </span>
-            <span className="tablero-num">{aprobados.length}</span>
+            <span className="tablero-num">{porAsignar}</span>
             <span className="tablero-txt">
-              aprobados
-              <small>esperando inventario</small>
+              unidades por asignar
+              <small>
+                de {aprobados.length} pedido{aprobados.length === 1 ? '' : 's'} aprobado
+                {aprobados.length === 1 ? '' : 's'}
+              </small>
             </span>
           </div>
-          <div className="tablero tablero--azul">
+          {/* Ésta sí se toca: abre la pestaña con los tractores sin dueño. */}
+          <button
+            type="button"
+            className={`tablero tablero--azul tablero--boton${vista === 'tractores' ? ' tablero--activo' : ''}`}
+            disabled={cargando}
+            onClick={() => setVista((v) => (v === 'tractores' ? 'pedidos' : 'tractores'))}
+          >
             <span className="tablero-ic">
               <i className="fa-solid fa-warehouse" aria-hidden="true" />
             </span>
             <span className="tablero-num">{libres.length}</span>
             <span className="tablero-txt">
               tractores sin dueño
-              <small>de {stock.length} en el inventario</small>
+              <small>de {stock.length} en el inventario · tocá para verlos</small>
             </span>
-          </div>
-          <div className="tablero tablero--violeta">
-            <span className="tablero-ic">
-              <i className="fa-solid fa-boxes-stacked" aria-hidden="true" />
-            </span>
-            <span className="tablero-num">{porAsignar}</span>
-            <span className="tablero-txt">
-              unidades por asignar
-              <small>de todos los pedidos aprobados</small>
-            </span>
-          </div>
+          </button>
           <button
             type="button"
             className="btn btn--texto btn--chico"
@@ -263,15 +363,160 @@ export function AsignarPedidos() {
           </div>
         )}
 
-        {!cargando && aprobados.length === 0 && !error && (
-          <div className="aviso aviso--ok">
-            <i className="fa-solid fa-circle-check" aria-hidden="true" />
-            <span>No hay ningún pedido aprobado esperando inventario.</span>
-          </div>
+        <div className="solapas">
+          <button
+            type="button"
+            className={`solapa${vista === 'pedidos' ? ' solapa--si' : ''}`}
+            onClick={() => setVista('pedidos')}
+          >
+            <i className="fa-solid fa-link" aria-hidden="true" /> Pedidos por asignar
+            <span className="solapa-num">{aprobados.length}</span>
+          </button>
+          <button
+            type="button"
+            className={`solapa${vista === 'tractores' ? ' solapa--si' : ''}`}
+            onClick={() => setVista('tractores')}
+          >
+            <i className="fa-solid fa-warehouse" aria-hidden="true" /> Tractores sin dueño
+            <span className="solapa-num">{libres.length}</span>
+          </button>
+        </div>
+
+        {vista === 'pedidos' && (
+          <>
+            {/* Igual que en Aprobar: texto libre, y varios concesionarios o varios modelos a la vez. */}
+            <div className="buscador-pedidos">
+              <input
+                className="input"
+                placeholder="Buscar por concesionario, cliente o modelo…"
+                value={texto}
+                onChange={(e) => setTexto(e.target.value)}
+              />
+              <DesplegableMulti
+                valores={concesionarios}
+                opciones={opcionesConcesionario}
+                vacio="Todos los concesionarios"
+                buscable
+                onCambiar={setConcesionarios}
+              />
+              <DesplegableMulti
+                valores={modelos}
+                opciones={opcionesModelo}
+                vacio="Todos los modelos"
+                buscable={opcionesModelo.length > 8}
+                onCambiar={setModelos}
+              />
+            </div>
+
+            {!cargando && visibles.length === 0 && !error && (
+              <div className="aviso aviso--ok">
+                <i className="fa-solid fa-circle-check" aria-hidden="true" />
+                <span>
+                  {hayFiltros
+                    ? 'Ningún pedido por asignar coincide con lo que buscaste.'
+                    : 'No hay ningún pedido aprobado esperando inventario.'}
+                </span>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Los tractores sin dueño, resumidos: el Name en negrita y lo demás al desplegar. */}
+        {vista === 'tractores' && (
+          <>
+            <div className="buscador-pedidos">
+              <input
+                className="input"
+                placeholder="Buscar por Name (con el número de draft), chasis o N° interno…"
+                value={buscarTractor}
+                onChange={(e) => setBuscarTractor(e.target.value)}
+              />
+              <DesplegableMulti
+                valores={modelosTractor}
+                opciones={opcionesModeloStock}
+                vacio="Todos los modelos"
+                buscable={opcionesModeloStock.length > 8}
+                onCambiar={setModelosTractor}
+              />
+            </div>
+            {!cargando && tractoresVisibles.length === 0 && (
+              <div className="aviso aviso--neutro">
+                <i className="fa-solid fa-circle-info" aria-hidden="true" />
+                <span>
+                  {libres.length === 0
+                    ? 'No hay tractores sin dueño en el inventario.'
+                    : 'Ningún tractor coincide con lo que buscaste.'}
+                </span>
+              </div>
+            )}
+            <div className="stock-lista">
+              {tractoresVisibles.map((t) => {
+                const esperan = esperanPorModelo.get(t.catalogoId) ?? 0
+                const abiertoT = tractorAbierto === t.id
+                return (
+                  <div key={t.id} className={`stock-fila${abiertoT ? ' stock-fila--abierta' : ''}`}>
+                    <button
+                      type="button"
+                      className="stock-fila-head"
+                      aria-expanded={abiertoT}
+                      onClick={() => setTractorAbierto(abiertoT ? null : t.id)}
+                    >
+                      <span className="stock-fila-nom">
+                        <b>{t.nombre}</b>
+                        <small>{t.modelo || 'Sin modelo'}</small>
+                      </span>
+                      <span className="stock-fila-chips">
+                        {t.estadoImportacion && (
+                          <span className="chip chip--azul">{t.estadoImportacion}</span>
+                        )}
+                        {esperan > 0 && (
+                          <span className="chip chip--verde">
+                            {esperan} unidad{esperan === 1 ? '' : 'es'} lo esperan
+                          </span>
+                        )}
+                        <i
+                          className={`fa-solid fa-chevron-${abiertoT ? 'up' : 'down'}`}
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </button>
+                    {abiertoT && (
+                      <dl className="datos-pares stock-fila-cuerpo">
+                        <div>
+                          <dt>Chasis</dt>
+                          <dd>{t.chasis || '—'}</dd>
+                        </div>
+                        <div>
+                          <dt>N° interno</dt>
+                          <dd>{t.numInterno || '—'}</dd>
+                        </div>
+                        <div>
+                          <dt>Estado comercial</dt>
+                          <dd>{t.estadoComercial || '—'}</dd>
+                        </div>
+                        <div>
+                          <dt>Importación</dt>
+                          <dd>{t.estadoImportacion || '—'}</dd>
+                        </div>
+                        <div>
+                          <dt>Unidades que lo esperan</dt>
+                          <dd>
+                            {esperan > 0
+                              ? `${esperan} aprobada${esperan === 1 ? '' : 's'} de este modelo`
+                              : 'Ninguna por ahora'}
+                          </dd>
+                        </div>
+                      </dl>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </>
         )}
 
         <div className="pedidos-lista">
-          {aprobados.map((p) => {
+          {(vista === 'pedidos' ? visibles : []).map((p) => {
             const todas = unidades.filter((u) => u.pedidoId === p.id)
             /* Sólo las que todavía no tienen tractor se unen acá; las de una vez anterior ya están. */
             const suyas = todas.filter((u) => !u.inventarioId)
@@ -424,6 +669,83 @@ export function AsignarPedidos() {
             </>
           )
         })()}
+
+        {/* Lo que quedó, en una ventana: se lee qué tractor fue a cada unidad y se sigue con otro
+            pedido, o se vuelve a mirar éste si le quedan unidades. */}
+        {resultado && (
+          <>
+            <button className="lateral-fondo" aria-label="Cerrar" onClick={() => setResultado(null)} />
+            <div className="ventanita" role="dialog" aria-modal="true">
+              <div className="ventanita-head">
+                <span>
+                  <i className="fa-solid fa-circle-check texto-verde" aria-hidden="true" /> Asignación
+                  guardada
+                </span>
+                <button type="button" onClick={() => setResultado(null)} aria-label="Cerrar">
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="ventanita-cuerpo">
+                <span className="campo-lbl">{resultado.nombre}</span>
+                <span className="resumen-chips">
+                  <span
+                    className={`chip ${resultado.porcentaje >= 100 ? 'chip--azul' : 'chip--teal'}`}
+                  >
+                    {resultado.estado}
+                  </span>
+                  <span className="chip chip--gris">{resultado.porcentaje}% con tractor</span>
+                  {resultado.entrega && <span className="chip chip--verde">Entrega creada</span>}
+                </span>
+                {resultado.pares.length > 0 && (
+                  <ul className="lista-compacta">
+                    {resultado.pares.map((x) => (
+                      <li key={x.numero}>
+                        Unidad {x.numero} {x.modelo && `(${x.modelo})`} → <b>{x.chasis}</b>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {resultado.aFabrica > 0 && (
+                  <span className="campo-ayuda">
+                    <i className="fa-solid fa-industry" aria-hidden="true" />{' '}
+                    {resultado.aFabrica === 1
+                      ? 'Una unidad quedó pedida a fábrica.'
+                      : `${resultado.aFabrica} unidades quedaron pedidas a fábrica.`}
+                  </span>
+                )}
+                {resultado.advertencias.length > 0 && (
+                  <div className="aviso aviso--alerta">
+                    <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+                    <span>Quedó algo a medias: {resultado.advertencias.join(' · ')}</span>
+                  </div>
+                )}
+              </div>
+              <div className="ventanita-pie">
+                {aprobados.some((x) => x.id === resultado.pedidoId) && (
+                  <button
+                    type="button"
+                    className="btn btn--borde btn--chico"
+                    onClick={() => {
+                      setVista('pedidos')
+                      setAbierto(resultado.pedidoId)
+                      setResultado(null)
+                    }}
+                  >
+                    Ver este pedido
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn--primario btn--chico"
+                  autoFocus
+                  onClick={() => setResultado(null)}
+                >
+                  Seguir asignando
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

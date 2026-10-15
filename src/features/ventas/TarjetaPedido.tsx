@@ -8,7 +8,7 @@
  */
 import type { ReactNode } from 'react'
 import { Plata } from '@/components/ui/Plata'
-import { APROBACION, ESTADO_PEDIDO, TIPO_PEDIDO, TIPO_VENTA } from '@/services/monday/columns'
+import { APROBACION, ESTADO_PEDIDO, PEDIDO_PARA, TIPO_PEDIDO } from '@/services/monday/columns'
 import type { PedidoLeido, UnidadLeida } from '@/services/monday/pedidosBerger'
 
 /** El color del estado. Es lo primero que se mira, y conviene no tener que leerlo para saberlo. */
@@ -40,12 +40,12 @@ export const tonoDeAprobacion = (v: string): string =>
 /**
  * A quién le factura BERGER.
  *
- * En la venta directa, al cliente final; en la indirecta y en la compra de stock, al concesionario.
+ * En la venta directa, al cliente final; en la compra de stock, al concesionario.
  * Es la pregunta que se hace quien aprueba —"¿a quién le estoy dando crédito?"— y hasta ahora había
  * que deducirla cruzando dos etiquetas.
  */
 export function aQuienSeLeFactura(pedido: PedidoLeido): string {
-  if (pedido.tipoPedido === TIPO_PEDIDO.TERCEROS && pedido.tipoVenta === TIPO_VENTA.DIRECTA) {
+  if (pedido.pedidoPara === PEDIDO_PARA.DIRECTA) {
     return pedido.terceroNombre || 'el cliente final'
   }
   return pedido.cuentaNombre || 'el concesionario'
@@ -92,8 +92,9 @@ export function TarjetaPedido({
         <span className="pedido-card-tit">
           <span className="pedido-card-nom">{pedido.nombre}</span>
           <span className="pedido-card-sub">
-            {pedido.tipoPedido}
-            {pedido.tipoVenta ? ` · ${pedido.tipoVenta}` : ''}
+            {[pedido.tipoPedido, pedido.pedidoPara, pedido.tipoFactura && `Factura ${pedido.tipoFactura.toLowerCase()}`]
+              .filter(Boolean)
+              .join(' · ')}
             {pedido.pago ? ` · ${pedido.pago}` : ''}
             {pedido.fechaSolicitud ? ` · pedido el ${pedido.fechaSolicitud}` : ''}
           </span>
@@ -103,6 +104,12 @@ export function TarjetaPedido({
           <span className={`chip ${tonoDeEstado(pedido.estado)}`}>
             {pedido.estado || 'Sin estado'}
           </span>
+          {pedido.tipoPedido === TIPO_PEDIDO.CONCESION && (
+            <span className="chip chip--violeta">En concesión</span>
+          )}
+          {pedido.politicaContado === 'Operatoria Especial' && (
+            <span className="chip chip--ambar">Operatoria especial</span>
+          )}
           {pedido.estado === ESTADO_PEDIDO.ASIGNADO_PARCIAL && (
             <span className="chip chip--teal">{pedido.porcentajeAsignacion}% con tractor</span>
           )}
@@ -221,6 +228,21 @@ export function TarjetaPedido({
                 <Plata valor={pedido.totalFacturaConIva} grande />
               </div>
             </div>
+
+            {/* La venta directa factura al cliente final con el precio que puso el concesionario: ese
+                número, y la comisión que sale de él, no son los de arriba. */}
+            {pedido.pedidoPara === PEDIDO_PARA.DIRECTA && pedido.totalClienteFinal > 0 && (
+              <div className="totales-pedido totales-pedido--dos">
+                <div className="total-cuadro">
+                  <small>Factura al cliente final s/IVA</small>
+                  <Plata valor={pedido.totalClienteFinal} />
+                </div>
+                <div className="total-cuadro">
+                  <small>Comisión</small>
+                  <Plata valor={pedido.totalComision} />
+                </div>
+              </div>
+            )}
 
             {children}
           </div>

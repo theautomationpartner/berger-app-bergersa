@@ -38,7 +38,6 @@ import {
   pedidosDeModulos,
   principalesDeArea,
   puedeEnPedidos,
-  SECCIONES_PEDIDOS,
   SECCIONES_ADUANA,
   puedeEnAduana,
 } from '@/lib/navegacion'
@@ -313,9 +312,8 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
       {principal === 'pedidos' && operacionPedidos === null && (
         <PanelOpciones
           titulo="Pedidos"
-          detalle="Los pedidos de los concesionarios, de los dos lados del mostrador."
+          detalle="Aprobar los pedidos de los concesionarios y asignarles tractores."
           opciones={pedidosDeModulos(sesion.modulos)}
-          secciones={SECCIONES_PEDIDOS}
           onElegir={(id) => setRuta((v) => ({ ...v, pedidos: id }))}
         />
       )}

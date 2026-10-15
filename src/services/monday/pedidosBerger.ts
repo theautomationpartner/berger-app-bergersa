@@ -26,9 +26,19 @@ import {
   ESTADO_PEDIDO,
   ESTADO_UNIDAD,
   ESTADO_UNIDAD_ENTREGA_CARGADA,
+  TIPO_PEDIDO,
 } from './columns'
-import { hoy } from './pedidos'
 import { mondayApi } from './sdk'
+
+/** Hoy, en Argentina. */
+export function hoy(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
 
 const motivo = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
@@ -92,8 +102,14 @@ export interface PedidoLeido {
   id: string
   nombre: string
   estado: string
+  /** COMPRA o CONCESIÓN. */
   tipoPedido: string
-  tipoVenta: string
+  /** COMPRA STOCK o VENTA DIRECTA. */
+  pedidoPara: string
+  /** INMEDIATA o DIFERIDA. Vacío en concesión. */
+  tipoFactura: string
+  /** Política Estándar u Operatoria Especial, si pagó contado. */
+  politicaContado: string
   /** Cómo se paga: la condición de venta o el concepto, según el tipo. */
   pago: string
   banco: string
@@ -113,6 +129,9 @@ export interface PedidoLeido {
   totalListaSinIva: number
   totalFacturaSinIva: number
   totalFacturaConIva: number
+  /** VENTA DIRECTA: lo que BERGER le factura al cliente final, y la comisión del concesionario. */
+  totalClienteFinal: number
+  totalComision: number
   /** Qué porcentaje de las unidades ya tiene tractor (0 a 100), según lo dejó Asignar. */
   porcentajeAsignacion: number
   renglones: RenglonLeido[]
@@ -148,7 +167,11 @@ export interface TractorEnStock {
 const COLUMNAS_PEDIDO = [
   COL_PEDIDO.estado,
   COL_PEDIDO.tipoPedido,
-  COL_PEDIDO.tipoVenta,
+  COL_PEDIDO.pedidoPara,
+  COL_PEDIDO.tipoFactura,
+  COL_PEDIDO.politicaContado,
+  COL_PEDIDO.totalClienteFinal,
+  COL_PEDIDO.totalComision,
   COL_PEDIDO.condicionVenta,
   COL_PEDIDO.conceptoPago,
   COL_PEDIDO.banco,
@@ -208,7 +231,9 @@ export async function pedidosCargados(limite = 200): Promise<PedidoLeido[]> {
       nombre: it.name,
       estado: texto(c[COL_PEDIDO.estado]),
       tipoPedido,
-      tipoVenta: texto(c[COL_PEDIDO.tipoVenta]),
+      pedidoPara: texto(c[COL_PEDIDO.pedidoPara]),
+      tipoFactura: texto(c[COL_PEDIDO.tipoFactura]),
+      politicaContado: texto(c[COL_PEDIDO.politicaContado]),
       /* Según el tipo de pedido, la forma de pago vive en una columna o en la otra. */
       pago: texto(c[COL_PEDIDO.condicionVenta]) || texto(c[COL_PEDIDO.conceptoPago]),
       banco: texto(c[COL_PEDIDO.banco]),
@@ -227,6 +252,8 @@ export async function pedidosCargados(limite = 200): Promise<PedidoLeido[]> {
       totalListaSinIva: numero(c[COL_PEDIDO.totalListaSinIva]),
       totalFacturaSinIva: numero(c[COL_PEDIDO.totalFacturaSinIva]),
       totalFacturaConIva: numero(c[COL_PEDIDO.totalFacturaConIva]),
+      totalClienteFinal: numero(c[COL_PEDIDO.totalClienteFinal]),
+      totalComision: numero(c[COL_PEDIDO.totalComision]),
       porcentajeAsignacion: numero(c[COL_PEDIDO.porcentajeAsignacion]),
       renglones: (it.subitems ?? []).map((s) => {
         const sc = porId(s.column_values)
@@ -241,6 +268,31 @@ export async function pedidosCargados(limite = 200): Promise<PedidoLeido[]> {
       }),
     }
   })
+}
+
+/**
+ * La línea de crédito frente a un pedido.
+ *
+ * Se mide con el total CON IVA: es lo que el concesionario va a deber. Un pedido en concesión no
+ * se factura, así que no usa línea. Sin línea asignada, lo disponible es cero: no hay crédito que
+ * alcance.
+ */
+export function creditoParaPedido(
+  cuenta: { creditoAsignado: number | null; creditoUtilizado: number | null } | null,
+  p: PedidoLeido,
+) {
+  const asignado = cuenta?.creditoAsignado ?? 0
+  const disponible = asignado - (cuenta?.creditoUtilizado ?? 0)
+  const monto = p.totalFacturaConIva
+  const enConcesion = p.tipoPedido === TIPO_PEDIDO.CONCESION
+  return {
+    asignado,
+    disponible,
+    monto,
+    quedaria: disponible - monto,
+    insuficiente: !enConcesion && monto > disponible,
+    enConcesion,
+  }
 }
 
 /** Las unidades, todas. Se agrupan por pedido del lado de la pantalla. */

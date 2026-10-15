@@ -13,6 +13,7 @@
  * par se puede deshacer.
  */
 import { useLayoutEffect, useRef, useState } from 'react'
+import { normalizar } from '@/lib/format'
 import type { TractorEnStock, UnidadLeida } from '@/services/monday/pedidosBerger'
 
 export interface UnidadNumerada {
@@ -107,6 +108,14 @@ export function UnirUnidades({
   const selDer = libres.some((t) => t.id === tractorElegido) ? tractorElegido : null
   const derecha = porCercania(libres)
 
+  /* El buscador del inventario. Con dos tractores no hace falta; con cuarenta del mismo modelo, el
+     que se busca se encuentra por su Name —que ya trae el número de draft— y no recorriendo. */
+  const [buscar, setBuscar] = useState('')
+  const q = normalizar(buscar)
+  const derechaVisible = q
+    ? derecha.filter((t) => normalizar([t.nombre, t.chasis, t.numInterno].join(' ')).includes(q))
+    : derecha
+
   const unir = () => {
     if (!selIzq || !selDer) return
     onUnir(selIzq, selDer)
@@ -137,7 +146,7 @@ export function UnirUnidades({
     selDer,
     unidas.map((u) => `${u.unidad.unidad.id}>${u.tractor.id}`).join(','),
     sinUnir.map((u) => u.unidad.id).join(','),
-    derecha.map((t) => t.id).join(','),
+    derechaVisible.map((t) => t.id).join(','),
   ].join('|')
 
   useLayoutEffect(() => {
@@ -313,6 +322,17 @@ export function UnirUnidades({
               {derecha.length} disponible{derecha.length === 1 ? '' : 's'}
             </span>
           </div>
+          {derecha.length > 4 && (
+            <div className="unir-buscar">
+              <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
+              <input
+                className="input input--chico"
+                placeholder="Buscar por Name, draft o chasis…"
+                value={buscar}
+                onChange={(e) => setBuscar(e.target.value)}
+              />
+            </div>
+          )}
           {unidas.map(({ unidad, tractor }) => (
             <div
               key={unidad.unidad.id}
@@ -334,7 +354,7 @@ export function UnirUnidades({
               </span>
             </div>
           ))}
-          {derecha.map((t) => {
+          {derechaVisible.map((t) => {
             const sel = selDer === t.id
             return (
               <button
@@ -361,6 +381,9 @@ export function UnirUnidades({
               </button>
             )
           })}
+          {q && derechaVisible.length === 0 && derecha.length > 0 && (
+            <p className="unir-vacio">Ningún tractor coincide con «{buscar}».</p>
+          )}
           {derecha.length === 0 && unidas.length === 0 && (
             /* Que no haya ninguno no es un error: es que ese modelo hay que pedirlo, y conviene que
                se lea así y no como una lista vacía. */

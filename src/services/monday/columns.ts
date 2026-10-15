@@ -1070,8 +1070,20 @@ export const COL_PEDIDO = {
   cuenta: 'board_relation_mm7xm8vj',
   /** El cliente final, cuando el pedido es una venta a terceros. Es otra columna, a propósito. */
   tercero: 'board_relation_mm7x3p4w',
-  tipoPedido: 'color_mm7wy0s9',
-  tipoVenta: 'color_mm7wd3d6',
+  /** Para quién es: COMPRA STOCK (para el concesionario) o VENTA DIRECTA (a un cliente final). */
+  pedidoPara: 'color_mm7wy0s9',
+  /** INMEDIATA o DIFERIDA. No va en los pedidos en concesión: ahí no hay factura. */
+  tipoFactura: 'color_mm7wd3d6',
+  /** COMPRA o CONCESIÓN. Lo primero que se elige. */
+  tipoPedido: 'color_mm85etj4',
+  /** El contrato firmado, obligatorio en los pedidos en concesión. */
+  contratoConcesion: 'file_mm85s1x6',
+  /** Política Estándar u Operatoria Especial. Sólo en pedidos de contado. */
+  politicaContado: 'color_mm853ftc',
+  /** VENTA DIRECTA: la suma de las comisiones de los renglones. */
+  totalComision: 'numeric_mm85mqv3',
+  /** VENTA DIRECTA: lo que BERGER le factura al cliente final, con el precio que puso el concesionario. */
+  totalClienteFinal: 'numeric_mm8529yd',
   estado: 'color_mm5ft345',
   /** Cómo paga el tercero. Sólo en VENTA A TERCEROS. */
   condicionVenta: 'dropdown_mm7x7ck2',
@@ -1128,10 +1140,18 @@ export const COL_PEDIDO_SUB = {
   dto1: 'numeric_mm7w1n69',
   dto2: 'numeric_mm7wnnv1',
   dto3: 'numeric_mm7w6hyw',
+  /** El de la Operatoria Especial, si se usó. */
+  dto4: 'numeric_mm85h1nm',
   contadoSinIva: 'numeric_mm5fdsna',
   contadoConIva: 'numeric_mm7w7bev',
   facturaSinIva: 'numeric_mm7wytc3',
   facturaConIva: 'numeric_mm7wy3jb',
+  /** VENTA DIRECTA: el precio por unidad al que el concesionario le vende al cliente final. */
+  precioClienteFinal: 'numeric_mm853rvr',
+  /** El precio a facturar s/IVA de UNA unidad, con descuentos: el piso del precio al cliente final. */
+  precioMaximoUnidad: 'numeric_mm853vt4',
+  /** Cantidad × (lista − precio al cliente final). */
+  comision: 'numeric_mm858bsh',
   ventas: 'board_relation_mm7x8fhk',
 } as const
 
@@ -1154,6 +1174,7 @@ export const COL_VENTA = {
   dto1: 'numeric_mm7xyrva',
   dto2: 'numeric_mm7xqhe9',
   dto3: 'numeric_mm7xx4mg',
+  dto4: 'numeric_mm85e6jy',
   contadoSinIva: 'numeric_mm7x3ywe',
   contadoConIva: 'numeric_mm7xj00a',
   /**
@@ -1164,6 +1185,8 @@ export const COL_VENTA = {
   totalContadoConIva: 'numeric_mm7xb3d7',
   facturaSinIva: 'numeric_mm7xxrt7',
   facturaConIva: 'numeric_mm7xhezf',
+  precioClienteFinal: 'numeric_mm85217h',
+  precioMaximoUnidad: 'numeric_mm85cbbs',
   fechaAsignacion: 'date_mm7xm3n1',
   idVenta: 'pulse_id_mm7xvn3c',
 } as const
@@ -1225,11 +1248,20 @@ export const COL_CONFIG = {
 } as const
 
 export const CONFIG_DESCUENTO_CONTADO = 'Descuento Contado'
+/**
+ * El tope del cuarto descuento, el de la Operatoria Especial. No se aplica solo: el concesionario
+ * lo tilda y tipea cuánto, entre 0 y este porcentaje.
+ */
+export const CONFIG_OPERATORIA_ESPECIAL = 'Operatoria Especial'
 
 /** Columnas de 🌐Cuentas que usa la venta. */
 export const COL_CUENTA_VENTA = {
   creditoAsignado: 'numeric_mm7xa1p3',
   creditoUtilizado: 'numeric_mm7xz7vr',
+  /** El nombre del equipo de monday del concesionario. Así se sabe de qué concesionario es cada usuario. */
+  equipoNombre: 'text_mm7zv4dh',
+  /** Cuántos pedidos en concesión puede tener a la vez. 0 o vacío: ninguno. */
+  concesionLimite: 'numeric_mm85atg8',
   direccion: 'location_mm7ak2f4',
 } as const
 
@@ -1281,9 +1313,17 @@ export const ESTADO_COMERCIAL = {
   DEMO: 'Demo',
 } as const
 
-/** Las etiquetas de Tipo de Pedido y Tipo de Venta. */
-export const TIPO_PEDIDO = { STOCK: 'COMPRA STOCK', TERCEROS: 'VENTA A TERCEROS' } as const
-export const TIPO_VENTA = { DIRECTA: 'DIRECTA', INDIRECTA: 'INDIRECTA' } as const
+/**
+ * Las etiquetas de las tres preguntas del pedido.
+ *
+ * Desde el 15/10/2026: "Pedido Para" es la vieja columna de tipo (ya no existe VENTA A TERCEROS:
+ * la venta directa es la que le factura a un cliente final), la vieja de tipo de venta pasó a ser
+ * el Tipo de Factura, y Tipo de Pedido es una columna nueva —COMPRA o CONCESIÓN—.
+ */
+export const PEDIDO_PARA = { STOCK: 'COMPRA STOCK', DIRECTA: 'VENTA DIRECTA' } as const
+export const TIPO_FACTURA = { INMEDIATA: 'INMEDIATA', DIFERIDA: 'DIFERIDA' } as const
+export const TIPO_PEDIDO = { COMPRA: 'COMPRA', CONCESION: 'CONCESIÓN' } as const
+export const POLITICA_CONTADO = { ESTANDAR: 'Política Estándar', ESPECIAL: 'Operatoria Especial' } as const
 
 /**
  * Lo que dispara los descuentos de contado.
