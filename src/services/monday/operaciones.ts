@@ -759,6 +759,7 @@ const COLUMNAS_DE_RESOLUCION = new Set<string>([
   COL_PEDIDO.fechaAprobComercial,
   COL_PEDIDO.fechaAprobFinanciera,
   COL_PEDIDO.fechaEstimadaEntrega,
+  COL_PEDIDO.porcentajeAsignacion,
 ])
 
 /** Lo que se le toca a una unidad al aprobarla o asignarla. */

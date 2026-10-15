@@ -20,6 +20,8 @@ export function tonoDeEstado(estado: string): string {
       return 'chip--rojo'
     case ESTADO_PEDIDO.ASIGNADO:
       return 'chip--azul'
+    case ESTADO_PEDIDO.ASIGNADO_PARCIAL:
+      return 'chip--teal'
     case ESTADO_PEDIDO.A_FABRICA:
       return 'chip--violeta'
     default:
@@ -101,6 +103,9 @@ export function TarjetaPedido({
           <span className={`chip ${tonoDeEstado(pedido.estado)}`}>
             {pedido.estado || 'Sin estado'}
           </span>
+          {pedido.estado === ESTADO_PEDIDO.ASIGNADO_PARCIAL && (
+            <span className="chip chip--teal">{pedido.porcentajeAsignacion}% con tractor</span>
+          )}
           {conAprobaciones && (
             <>
               <span className={`chip ${tonoDeAprobacion(pedido.aprobComercial)}`}>

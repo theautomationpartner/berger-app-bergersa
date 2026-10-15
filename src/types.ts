@@ -35,7 +35,7 @@ export type OperacionPrincipal =
 export type OperacionFechas = 'confirmar' | 'enviar'
 
 /** Operaciones dentro de "Pedidos". */
-export type OperacionPedidos = 'gestionar' | 'aprobar' | 'asignar'
+export type OperacionPedidos = 'aprobar' | 'asignar'
 
 /** Operaciones dentro de "Despacho de Aduana". */
 export type OperacionAduana = 'actualizar' | 'turnos' | 'berger' | 'contenedores' | 'dashboard'

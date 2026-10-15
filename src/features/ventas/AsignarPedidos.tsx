@@ -93,16 +93,23 @@ export function AsignarPedidos() {
     void recargar()
   }, [recargar])
 
-  /* Sólo los aprobados: asignarle inventario a un pedido que todavía no se aprobó sería
-     comprometer tractores por una venta que puede no existir. */
+  /* Los aprobados, y los que se asignaron en parte o se pidieron a fábrica y todavía tienen
+     unidades sin tractor: un pedido se puede completar en varias veces, a medida que llega stock.
+     Nunca uno sin aprobar: asignarle inventario sería comprometer tractores por una venta que puede
+     no existir. */
   const aprobados = useMemo(
     () =>
       pedidos
-        .filter((p) => p.estado === ESTADO_PEDIDO.APROBADO)
+        .filter(
+          (p) =>
+            p.estado === ESTADO_PEDIDO.APROBADO ||
+            ((p.estado === ESTADO_PEDIDO.ASIGNADO_PARCIAL || p.estado === ESTADO_PEDIDO.A_FABRICA) &&
+              unidades.some((u) => u.pedidoId === p.id && !u.inventarioId)),
+        )
         .sort(
           (a, b) => a.fechaAprobacion.localeCompare(b.fechaAprobacion) || a.id.localeCompare(b.id),
         ),
-    [pedidos],
+    [pedidos, unidades],
   )
 
   const libres = useMemo(() => stock.filter(sePuedePrometer), [stock])
@@ -142,13 +149,15 @@ export function AsignarPedidos() {
         suyas.map((u) => ({ unidadId: u.id, tractorId: elegido[u.id] ?? '' })),
       )
       setHecho(
-        [
-          r.asignadas > 0 && `${r.asignadas} unidad${r.asignadas === 1 ? '' : 'es'} con tractor`,
-          r.aFabrica > 0 && `${r.aFabrica} pedida${r.aFabrica === 1 ? '' : 's'} a fábrica`,
-          r.entregaId && 'y la entrega creada',
-        ]
-          .filter(Boolean)
-          .join(', ') + '.',
+        `${p.nombre}: ${r.estado} (${r.porcentaje}% con tractor). ` +
+          [
+            r.asignadas > 0 && `${r.asignadas} unidad${r.asignadas === 1 ? '' : 'es'} con tractor`,
+            r.aFabrica > 0 && `${r.aFabrica} pedida${r.aFabrica === 1 ? '' : 's'} a fábrica`,
+            r.entregaId && 'y la entrega creada',
+          ]
+            .filter(Boolean)
+            .join(', ') +
+          '.',
       )
       setAvisos(r.advertencias)
       /* Sólo lo de este pedido: lo unido en los otros sigue esperando su propio botón. */
@@ -263,19 +272,33 @@ export function AsignarPedidos() {
 
         <div className="pedidos-lista">
           {aprobados.map((p) => {
-            const suyas = unidades.filter((u) => u.pedidoId === p.id)
+            const todas = unidades.filter((u) => u.pedidoId === p.id)
+            /* Sólo las que todavía no tienen tractor se unen acá; las de una vez anterior ya están. */
+            const suyas = todas.filter((u) => !u.inventarioId)
+            const yaAsignadas = todas.length - suyas.length
             const conTractor = suyas.filter((u) => elegido[u.id]).length
 
             return (
               <TarjetaPedido
                 key={p.id}
                 pedido={p}
-                unidades={suyas}
+                unidades={todas}
                 abierto={abierto === p.id}
                 onAbrir={() => setAbierto((v) => (v === p.id ? null : p.id))}
               >
                 <div className="unidades">
                   <span className="unidades-tit">Con qué tractor se cumple cada unidad</span>
+                  {yaAsignadas > 0 && (
+                    <div className="aviso aviso--neutro">
+                      <i className="fa-solid fa-circle-check" aria-hidden="true" />
+                      <span>
+                        {yaAsignadas === 1
+                          ? 'Una unidad ya tiene tractor de una asignación anterior.'
+                          : `${yaAsignadas} unidades ya tienen tractor de una asignación anterior.`}{' '}
+                        Acá quedan las {suyas.length} que faltan.
+                      </span>
+                    </div>
+                  )}
 
                   {porModelo(suyas).map((g) => (
                     <UnirUnidades
@@ -331,7 +354,7 @@ export function AsignarPedidos() {
         {(() => {
           const p = aprobados.find((x) => x.id === confirmando)
           if (!p) return null
-          const suyas = unidades.filter((u) => u.pedidoId === p.id)
+          const suyas = unidades.filter((u) => u.pedidoId === p.id && !u.inventarioId)
           const pares = suyas.flatMap((u, i) => {
             const t = stock.find((x) => x.id === elegido[u.id])
             return t ? [{ numero: i + 1, modelo: u.catalogoNombre, chasis: t.chasis || t.nombre }] : []

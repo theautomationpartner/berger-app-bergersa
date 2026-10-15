@@ -113,6 +113,8 @@ export interface PedidoLeido {
   totalListaSinIva: number
   totalFacturaSinIva: number
   totalFacturaConIva: number
+  /** Qué porcentaje de las unidades ya tiene tractor (0 a 100), según lo dejó Asignar. */
+  porcentajeAsignacion: number
   renglones: RenglonLeido[]
 }
 
@@ -163,6 +165,7 @@ const COLUMNAS_PEDIDO = [
   COL_PEDIDO.totalListaSinIva,
   COL_PEDIDO.totalFacturaSinIva,
   COL_PEDIDO.totalFacturaConIva,
+  COL_PEDIDO.porcentajeAsignacion,
 ]
 
 const COLUMNAS_RENGLON = [
@@ -224,6 +227,7 @@ export async function pedidosCargados(limite = 200): Promise<PedidoLeido[]> {
       totalListaSinIva: numero(c[COL_PEDIDO.totalListaSinIva]),
       totalFacturaSinIva: numero(c[COL_PEDIDO.totalFacturaSinIva]),
       totalFacturaConIva: numero(c[COL_PEDIDO.totalFacturaConIva]),
+      porcentajeAsignacion: numero(c[COL_PEDIDO.porcentajeAsignacion]),
       renglones: (it.subitems ?? []).map((s) => {
         const sc = porId(s.column_values)
         return {
@@ -555,6 +559,9 @@ export interface AsignacionDeUnidad {
 }
 
 export interface ResultadoAsignacion extends Resultado {
+  /** Cómo quedó el pedido y qué porcentaje de sus unidades tiene tractor. */
+  estado: string
+  porcentaje: number
   asignadas: number
   aFabrica: number
   /** El id de la entrega creada, si se creó. */
@@ -580,10 +587,21 @@ export async function asignarPedido(
   const asignadas: { unidad: UnidadLeida; tractorId: string }[] = []
   let aFabrica = 0
 
-  for (const u of unidades) {
+  /* Un pedido se puede asignar en varias veces: una parte de stock hoy y el resto cuando llegue de
+     fábrica. Las unidades que ya tienen tractor de una vez anterior no se tocan: reescribirlas las
+     mandaría a fábrica por no venir en las decisiones de ahora. */
+  const yaTenian = unidades.filter((u) => u.inventarioId)
+  const pendientes = unidades.filter((u) => !u.inventarioId)
+
+  for (const u of pendientes) {
     const tractorId = porUnidad.get(u.id) ?? ''
 
     if (!tractorId) {
+      /* Ya estaba pedida a fábrica de una vez anterior: no hace falta volver a escribirla. */
+      if (u.estado === ESTADO_UNIDAD.A_FABRICA) {
+        aFabrica += 1
+        continue
+      }
       try {
         await escribirUnidad(u.id, { [COL_VENTA.estado]: { label: ESTADO_UNIDAD.A_FABRICA } })
         aFabrica += 1
@@ -622,17 +640,24 @@ export async function asignarPedido(
     asignadas.push({ unidad: u, tractorId })
   }
 
-  /* El estado del pedido lo decide cómo quedaron sus unidades, no cuál fue la intención. */
+  /* El estado del pedido lo decide cómo quedaron TODAS sus unidades —las de antes y las de
+     ahora—, no cuál fue la intención: todas con tractor es Asignación Completa, algunas es
+     Asignado Parcialmente, ninguna es Pedido a Fábrica. */
+  const conTractor = yaTenian.length + asignadas.length
+  const porcentaje = unidades.length > 0 ? Math.round((conTractor / unidades.length) * 100) : 0
   const estadoPedido =
-    asignadas.length === 0
-      ? ESTADO_PEDIDO.A_FABRICA
-      : aFabrica > 0
-        ? ESTADO_PEDIDO.A_FABRICA
-        : ESTADO_PEDIDO.ASIGNADO
+    unidades.length > 0 && conTractor === unidades.length
+      ? ESTADO_PEDIDO.ASIGNADO
+      : conTractor > 0
+        ? ESTADO_PEDIDO.ASIGNADO_PARCIAL
+        : ESTADO_PEDIDO.A_FABRICA
   try {
     await mondayApi('resolverPedido', {
       item: pedido.id,
-      valores: JSON.stringify({ [COL_PEDIDO.estado]: { label: estadoPedido } }),
+      valores: JSON.stringify({
+        [COL_PEDIDO.estado]: { label: estadoPedido },
+        [COL_PEDIDO.porcentajeAsignacion]: String(porcentaje),
+      }),
     })
   } catch (e) {
     advertencias.push(`El pedido quedó con su estado anterior: ${motivo(e)}`)
@@ -641,7 +666,8 @@ export async function asignarPedido(
   for (const r of pedido.renglones) {
     const suyas = unidades.filter((u) => u.renglonId === r.id)
     const todasAsignadas =
-      suyas.length > 0 && suyas.every((u) => asignadas.some((a) => a.unidad.id === u.id))
+      suyas.length > 0 &&
+      suyas.every((u) => u.inventarioId || asignadas.some((a) => a.unidad.id === u.id))
     /* El renglón también queda conectado a los tractores que lo cumplen: es lo que se ve desde
        🔖Pedidos sin tener que ir a 🛍️Ventas. Los que ya tenía se conservan, por si el renglón se
        asigna en dos veces (una parte de stock ahora, otra cuando llegue de fábrica). */
@@ -701,7 +727,7 @@ export async function asignarPedido(
     }
   }
 
-  return { advertencias, asignadas: asignadas.length, aFabrica, entregaId }
+  return { advertencias, asignadas: asignadas.length, aFabrica, entregaId, estado: estadoPedido, porcentaje }
 }
 
 /* ------------------------------------------------------------------ *

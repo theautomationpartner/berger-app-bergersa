@@ -85,10 +85,11 @@ const esAdministracion = (perfil: Perfil): boolean => perfil.teams.includes(TEAM
 export function modulosSegunLaLista(perfil: Perfil): Modulo[] {
   if (esDespachanteEnLaLista(perfil)) return ['aduana']
   if (esAdministracion(perfil)) return [...MODULOS]
-  /* El concesionario entra a cargar y seguir SUS pedidos, y a nada más. Va después de
-     Administración a propósito: alguien de Administración que además figure en un concesionario
-     sigue viendo todo. */
-  if (esConcesionario(perfil)) return ['pedidos']
+  /* El concesionario ya no entra a esta app: desde el 15/10/2026 carga y sigue sus pedidos en la
+     de CONCESIONARIOS BERGER S.A. Sin módulos, el ingreso lo rechaza con el cartel genérico. Va
+     después de Administración a propósito: alguien de Administración que además figure en un
+     concesionario sigue viendo todo. */
+  if (esConcesionario(perfil)) return []
   return ['despacho']
 }
 

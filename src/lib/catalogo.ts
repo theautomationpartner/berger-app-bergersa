@@ -91,8 +91,6 @@ export const normalizar = (texto: string): string =>
  * de para qué sirve.
  */
 const SINONIMOS: Record<string, string> = {
-  'venta/pedidos/gestionar':
-    'pedido pedidos nuevo cargar solicitar concesionario tractor tractores compra stock venta terceros carrito orden',
   'venta/pedidos/aprobar':
     'aprobar autorizar pedido pedidos credito linea de credito rechazar concesionario pendiente',
   'venta/pedidos/asignar':

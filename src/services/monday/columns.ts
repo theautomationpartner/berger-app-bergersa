@@ -1094,6 +1094,8 @@ export const COL_PEDIDO = {
   fechaEstimadaEntrega: 'date_mm5fbbgj',
   fechaEntregaReal: 'date_mm5fmcf9',
   motivo: 'long_text_mm7pg8ar',
+  /** Qué porcentaje de las unidades del pedido ya tiene tractor (0 a 100). Lo escribe Asignar. */
+  porcentajeAsignacion: 'numeric_mm85np51',
   /**
    * Las dos aprobaciones, que son dos preguntas distintas y las contesta gente distinta.
    *
@@ -1236,7 +1238,11 @@ export const ESTADO_PEDIDO = {
   CARGADA: 'Solicitud Cargada',
   APROBADO: 'Aprobado Berger',
   RECHAZADO: 'Rechazado Berger',
-  ASIGNADO: 'Inventario asignado',
+  /** Todas las unidades del pedido tienen tractor. Antes se llamaba "Inventario asignado". */
+  ASIGNADO: 'Asignación Completa',
+  /** Algunas unidades tienen tractor y otras todavía no: el porcentaje dice cuántas. */
+  ASIGNADO_PARCIAL: 'Asignado Parcialmente',
+  /** Ninguna unidad tiene tractor: todas se pidieron a fábrica. */
   A_FABRICA: 'Pedido a Fábrica',
 } as const
 

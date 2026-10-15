@@ -23,7 +23,6 @@ import { CuentasYContactos } from '@/features/ventas/CuentasYContactos'
 import { Actividades } from '@/features/ventas/Actividades'
 import { AprobarPedidos } from '@/features/ventas/AprobarPedidos'
 import { AsignarPedidos } from '@/features/ventas/AsignarPedidos'
-import { GestionarPedidos } from '@/features/ventas/GestionarPedidos'
 import { PanelOpciones } from '@/features/inicio/PanelOpciones'
 import { DespachoVista } from '@/features/vista/DespachoVista'
 import { useAccesoMonday } from '@/hooks/useAccesoMonday'
@@ -320,15 +319,6 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
           onElegir={(id) => setRuta((v) => ({ ...v, pedidos: id }))}
         />
       )}
-
-      {principal === 'pedidos' &&
-        operacionPedidos === 'gestionar' &&
-        puedeEnPedidos(sesion.modulos, 'gestionar') && (
-          <GestionarPedidos
-            equipoId={sesion.perfil.equipoId}
-            comercialId={sesion.perfil.usuarioId}
-          />
-        )}
 
       {principal === 'pedidos' &&
         operacionPedidos === 'aprobar' &&
