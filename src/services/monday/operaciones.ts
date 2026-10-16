@@ -35,6 +35,8 @@ import {
   COL_INV,
   COL_ENTREGA_SUB,
   COL_ENTREGA,
+  COL_FACTURA,
+  COL_FACTURA_SUB,
   COL_LISTA_BLANCA,
   COL_PAGO,
   COL_PAGO_SUB,
@@ -126,6 +128,9 @@ export type NombreOperacion =
   | 'reservarEnInventario'
   | 'crearEntrega'
   | 'crearSubitemDeEntrega'
+  | 'crearFactura'
+  | 'crearSubitemDeFactura'
+  | 'completarSubitemDeFactura'
   | 'catalogoDeVenta'
   | 'configuracionDeVenta'
   | 'cuentasDelCrm'
@@ -349,6 +354,7 @@ export const COLUMNAS_ARCHIVO = new Set<string>([
   COL_DESPACHANTE.vepTerminal,
   COL_DESPACHANTE.comprobanteVepArca,
   COL_DESPACHANTE.comprobanteVepTerminal,
+  COL_FACTURA.pdf,
 ])
 
 /**
@@ -375,6 +381,8 @@ export const MODULO_DE_ARCHIVO: Record<string, ModuloApp> = {
   [COL_DESPACHANTE.vepTerminal]: 'aduana',
   [COL_DESPACHANTE.comprobanteVepArca]: 'aduanaBerger',
   [COL_DESPACHANTE.comprobanteVepTerminal]: 'aduanaBerger',
+  /* La factura de un pedido la sube BERGER, desde Cargar factura. */
+  [COL_FACTURA.pdf]: 'pedidosBerger',
 }
 
 /**
@@ -765,6 +773,7 @@ const COLUMNAS_DE_RESOLUCION = new Set<string>([
   COL_PEDIDO.fechaAprobFinanciera,
   COL_PEDIDO.fechaEstimadaEntrega,
   COL_PEDIDO.porcentajeAsignacion,
+  COL_PEDIDO.facturaVinculada,
 ])
 
 /** Lo que se le toca a una unidad al aprobarla o asignarla. */
@@ -798,6 +807,28 @@ const COLUMNAS_DE_ENTREGA_SUB = new Set<string>([
   COL_ENTREGA_SUB.inventario,
   COL_ENTREGA_SUB.renglonDelPedido,
 ])
+
+/**
+ * Lo que se carga al dar de alta una factura. El PDF va aparte, por el proxy de archivos.
+ *
+ * No hay estado "Cobrada" ni "Anulada" desde acá: la app da de alta lo que se emitió, y el resto
+ * de la vida de la factura se maneja en el tablero.
+ */
+const COLUMNAS_DE_FACTURA = new Set<string>([
+  COL_FACTURA.concesionario,
+  COL_FACTURA.equipo,
+  COL_FACTURA.estado,
+  COL_FACTURA.fechaEmision,
+  COL_FACTURA.fechaVencimiento,
+  COL_FACTURA.montoNeto,
+  COL_FACTURA.montoIva,
+  COL_FACTURA.ivaPorcentaje,
+  COL_FACTURA.montoTotal,
+  COL_FACTURA.notas,
+])
+
+/** Cada tractor de la factura: la copia de su unidad de 🛍️Pedidos x UNIDAD. */
+const COLUMNAS_DE_FACTURA_SUB = new Set<string>(Object.values(COL_FACTURA_SUB))
 
 /** Todos los contenedores del tablero. La usan BERGER y el despachante, cada uno con su módulo. */
 const CONSULTA_CONTENEDORES = `
@@ -1181,6 +1212,63 @@ const OPS_CRM = {
       padre: idMonday(v.padre, 'padre'),
       nombre: nombre(v.nombre),
       valores: valoresAcotados(v.valores, COLUMNAS_DE_ENTREGA_SUB, 'una unidad de la entrega'),
+    }),
+  },
+
+  /**
+   * Una factura de BERGER por tractores ya asignados.
+   *
+   * Es de `pedidosBerger`: la emite BERGER, y el concesionario la ve en el tablero. Qué tractores
+   * van y de qué pedidos lo decide la pantalla; acá sólo se acota qué columnas se escriben.
+   */
+  crearFactura: {
+    modulo: 'pedidosBerger' as const,
+    query: `
+      mutation ($tablero: ID!, $nombre: String!, $valores: JSON!) {
+        create_item(board_id: $tablero, item_name: $nombre, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.facturas,
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_FACTURA, 'el alta de una factura'),
+    }),
+  },
+
+  /** Un tractor dentro de esa factura. */
+  crearSubitemDeFactura: {
+    modulo: 'pedidosBerger' as const,
+    query: `
+      mutation ($padre: ID!, $nombre: String!, $valores: JSON!) {
+        create_subitem(parent_item_id: $padre, item_name: $nombre, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      padre: idMonday(v.padre, 'padre'),
+      nombre: nombre(v.nombre),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_FACTURA_SUB, 'un tractor de la factura'),
+    }),
+  },
+
+  /**
+   * Las conexiones de ese tractor, en un segundo paso.
+   *
+   * monday no deja crear el subitem con el team del concesionario y las conexiones juntas: si el
+   * team tiene invitados, el subitem se crea pero sin ninguna conexión, sin avisar. Y al revés
+   * —conexiones primero, team después— contesta "prevent_team_of_guests_in_forbidden_item". Lo
+   * único que funciona es el team al crear y las conexiones después.
+   */
+  completarSubitemDeFactura: {
+    modulo: 'pedidosBerger' as const,
+    query: `
+      mutation ($tablero: ID!, $item: ID!, $valores: JSON!) {
+        change_multiple_column_values(board_id: $tablero, item_id: $item, column_values: $valores) { id }
+      }
+    `,
+    validar: (v: Record<string, unknown>) => ({
+      tablero: TABLEROS.facturasSubitems,
+      item: idMonday(v.item, 'item'),
+      valores: valoresAcotados(v.valores, COLUMNAS_DE_FACTURA_SUB, 'un tractor de la factura'),
     }),
   },
 

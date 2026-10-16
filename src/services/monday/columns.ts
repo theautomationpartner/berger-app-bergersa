@@ -56,6 +56,12 @@ export const TABLEROS = {
   pedidosSubitems: '18434782367',
   /** 🛍️Pedidos x UNIDAD (antes "Ventas"): un item por UNIDAD pedida. Ahí se aprueba y se asigna de a uno. */
   ventas: '18434782402',
+  /**
+   * 📄Facturas de Pedidos (workspace Berger SA): una factura por item, con un subitem por tractor
+   * facturado. La carga la operación Cargar factura.
+   */
+  facturas: '18428606870',
+  facturasSubitems: '18435841515',
   /** 🚛Entregas: un item por entrega, con un subitem por unidad. */
   entregas: '18434280125',
   entregasSubitems: '18434281488',
@@ -1127,6 +1133,8 @@ export const COL_PEDIDO = {
   aprobComercial: 'color_mm7xbjw6',
   aprobFinanciera: 'color_mm7xx12z',
   ventas: 'board_relation_mm7xa4vs',
+  /** Las facturas del pedido. La escribe Cargar factura, sumando a las que ya tenía. */
+  facturaVinculada: 'board_relation_mm5f2jtm',
   idPedido: 'pulse_id_mm7w6fc9',
 } as const
 
@@ -1177,6 +1185,8 @@ export const COL_VENTA = {
   /** El subitem del pedido del que salió esta unidad. */
   subitemPedido: 'board_relation_mm7xz8pv',
   pedido: 'board_relation_mm7xyya7',
+  /** Mirror del chasis del tractor asignado. Sólo lectura. */
+  chasis: 'lookup_mm7x2rh0',
   estado: 'color_mm7xm6rf',
   listaSinIva: 'numeric_mm7xxqs5',
   listaConIva: 'numeric_mm7x6z71',
@@ -1198,6 +1208,57 @@ export const COL_VENTA = {
   precioMaximoUnidad: 'numeric_mm85cbbs',
   fechaAsignacion: 'date_mm7xm3n1',
   idVenta: 'pulse_id_mm7xvn3c',
+} as const
+
+/** 📄Facturas de Pedidos (18428606870) — una por factura que BERGER emite. */
+export const COL_FACTURA = {
+  /** La cuenta del concesionario en 🌐Cuentas. Sale del pedido. */
+  concesionario: 'board_relation_mm86qa5x',
+  /** El equipo de monday del concesionario. Sale del pedido. */
+  equipo: 'multiple_person_mm86as06',
+  pdf: 'file_mm86c5he',
+  estado: 'color_mm5fme59',
+  fechaEmision: 'date_mm5fhgyv',
+  fechaVencimiento: 'date_mm5f6vse',
+  montoNeto: 'numeric_mm5fjgms',
+  montoIva: 'numeric_mm86rm1n',
+  ivaPorcentaje: 'numeric_mm5fwh9z',
+  montoTotal: 'numeric_mm5f6yat',
+  notas: 'long_text_mm5fsb17',
+} as const
+
+/** El estado con que nace una factura cargada desde la app. */
+export const ESTADO_FACTURA_EMITIDA = 'Emitida'
+
+/**
+ * Subelementos de 📄Facturas de Pedidos (18435841515) — un tractor facturado por fila.
+ *
+ * Son casi las mismas columnas que la unidad de 🛍️Pedidos x UNIDAD, y se copian de ella al
+ * facturar: la factura queda con el precio con que se vendió aunque después la unidad cambie.
+ */
+export const COL_FACTURA_SUB = {
+  inventario: 'board_relation_mm86m1z6',
+  equipo: 'multiple_person_mm866vqe',
+  tercero: 'board_relation_mm8669kk',
+  concesionario: 'board_relation_mm86bt9e',
+  catalogo: 'board_relation_mm86ms93',
+  renglonDelPedido: 'board_relation_mm86ckdn',
+  pedido: 'board_relation_mm86d0ss',
+  listaSinIva: 'numeric_mm86e1xx',
+  listaConIva: 'numeric_mm86dm88',
+  dto1: 'numeric_mm86h1s3',
+  dto2: 'numeric_mm86etj0',
+  dto3: 'numeric_mm86w58j',
+  dto4: 'numeric_mm86wdn8',
+  contadoSinIva: 'numeric_mm864dnn',
+  contadoConIva: 'numeric_mm86vv6n',
+  totalContadoSinIva: 'numeric_mm86f2vz',
+  totalContadoConIva: 'numeric_mm8636gz',
+  precioClienteFinal: 'numeric_mm86haw',
+  precioMaximoUnidad: 'numeric_mm86avzn',
+  facturaSinIva: 'numeric_mm868kj5',
+  facturaConIva: 'numeric_mm86m7y6',
+  fechaAsignacion: 'date_mm869qpq',
 } as const
 
 /** 🚛Entregas (18434280125) — una por pedido asignado. */
@@ -1285,6 +1346,20 @@ export const ESTADO_PEDIDO = {
   ASIGNADO_PARCIAL: 'Asignado Parcialmente',
   /** Ninguna unidad tiene tractor: todas se pidieron a fábrica. */
   A_FABRICA: 'Pedido a Fábrica',
+  /** Todas las unidades del pedido están facturadas. Lo escribe Cargar factura. */
+  FACTURADO: 'Facturado',
+  /** Alguna unidad está facturada y otra todavía no. */
+  FACTURADO_PARCIAL: 'Facturado Parcialmente',
+  CANCELADO: 'Cancelado',
+} as const
+
+/**
+ * Las dos etiquetas que tiene el renglón (subitem de 🔖Pedidos) y no la unidad: el renglón junta
+ * varias unidades del mismo modelo, y puede tener una parte hecha y otra no.
+ */
+export const ESTADO_RENGLON = {
+  ASIGNADO_PARCIAL: 'Asignado Parcialmente',
+  FACTURADO_PARCIAL: 'Facturado Parcialmente',
 } as const
 
 /**
@@ -1302,6 +1377,7 @@ export const ESTADO_UNIDAD = {
   ASIGNADA: 'Asignada - Pend de Entrega',
   A_FABRICA: 'Pedido a Fábrica',
   OBSERVACION: 'Observacion',
+  FACTURADA: 'Facturada',
 } as const
 
 export const ESTADO_ENTREGA_PENDIENTE = 'Pendiente'
@@ -1317,7 +1393,9 @@ export const ESTADO_COMERCIAL = {
   DISPONIBLE: 'Disponible',
   RESERVADA: 'Reservada',
   ASIGNADA: 'Asignada',
-  FACTURADA: 'Facturada',
+  /* "Facturado", en masculino: así está la etiqueta en el tablero. Con "Facturada" la escritura
+     entera del tractor falla. */
+  FACTURADA: 'Facturado',
   ENTREGADA: 'Entregada',
   DEMO: 'Demo',
 } as const

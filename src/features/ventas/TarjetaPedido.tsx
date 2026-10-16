@@ -24,6 +24,10 @@ export function tonoDeEstado(estado: string): string {
       return 'chip--teal'
     case ESTADO_PEDIDO.A_FABRICA:
       return 'chip--violeta'
+    case ESTADO_PEDIDO.FACTURADO:
+      return 'chip--azul'
+    case ESTADO_PEDIDO.FACTURADO_PARCIAL:
+      return 'chip--teal'
     default:
       return 'chip--ambar'
   }
@@ -64,6 +68,8 @@ interface Props {
   onAbrir?: () => void
   /** Las dos aprobaciones en la cabecera. Sólo le sirven a BERGER. */
   conAprobaciones?: boolean
+  /** Etiquetas de más en la cabecera, las que sólo le importan a una pantalla. */
+  chips?: ReactNode
 }
 
 export function TarjetaPedido({
@@ -74,6 +80,7 @@ export function TarjetaPedido({
   abierto = true,
   onAbrir,
   conAprobaciones,
+  chips,
 }: Props) {
   const asignadas = unidades.filter((u) => u.inventarioId).length
   const iva = pedido.totalFacturaConIva - pedido.totalFacturaSinIva
@@ -123,6 +130,7 @@ export function TarjetaPedido({
               </span>
             </>
           )}
+          {chips}
           <span className="chip chip--gris">
             {unidades.length} unidad{unidades.length === 1 ? '' : 'es'}
           </span>

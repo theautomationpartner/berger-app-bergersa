@@ -324,7 +324,7 @@ export const MODALIDADES_DESPACHO: OpcionPanel<ModalidadDespacho>[] = [
 ]
 
 /**
- * PEDIDOS, del lado de BERGER: aprobar y asignar.
+ * PEDIDOS, del lado de BERGER: aprobar, asignar y facturar.
  *
  * Cargar y seguir los pedidos es del concesionario, y desde el 15/10/2026 vive en su propia app
  * (CONCESIONARIOS BERGER S.A.). Acá sólo entra BERGER, así que las dos operaciones van sueltas,
@@ -347,6 +347,15 @@ export const OPERACIONES_PEDIDOS: (OpcionPanel<OperacionPedidos> & { modulo: Mod
     corto: 'Asignar pedidos',
     detalle: 'Unir cada unidad aprobada con un tractor del inventario, o pedirla a fábrica.',
     icono: 'fa-solid fa-link',
+  },
+  {
+    id: 'facturar',
+    modulo: 'pedidosBerger',
+    titulo: 'CARGAR FACTURA',
+    corto: 'Cargar factura',
+    detalle:
+      'Subir la factura en PDF y elegir, tractor por tractor, cuáles de los pedidos asignados de un concesionario entran en ella.',
+    icono: 'fa-solid fa-file-invoice-dollar',
   },
 ]
 

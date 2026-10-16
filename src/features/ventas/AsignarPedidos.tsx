@@ -130,7 +130,9 @@ export function AsignarPedidos() {
         .filter(
           (p) =>
             p.estado === ESTADO_PEDIDO.APROBADO ||
-            ((p.estado === ESTADO_PEDIDO.ASIGNADO_PARCIAL || p.estado === ESTADO_PEDIDO.A_FABRICA) &&
+            ((p.estado === ESTADO_PEDIDO.ASIGNADO_PARCIAL ||
+              p.estado === ESTADO_PEDIDO.A_FABRICA ||
+              p.estado === ESTADO_PEDIDO.FACTURADO_PARCIAL) &&
               unidades.some((u) => u.pedidoId === p.id && !u.inventarioId)),
         )
         .sort(

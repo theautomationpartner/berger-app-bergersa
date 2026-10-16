@@ -95,6 +95,8 @@ const SINONIMOS: Record<string, string> = {
     'aprobar autorizar pedido pedidos credito linea de credito rechazar concesionario pendiente',
   'venta/pedidos/asignar':
     'asignar inventario unidad unidades stock fabrica pedido a fabrica chasis entrega',
+  'venta/pedidos/facturar':
+    'factura facturar facturacion cargar factura pdf tractor tractores chasis facturado concesionario',
   'venta/actividades':
     'actividad actividades llamada llamado whatsapp visita reunion meeting email mail agenda tarea pendiente cliente contacto seguimiento',
   'venta/clientes':

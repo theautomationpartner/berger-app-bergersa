@@ -23,6 +23,7 @@ import { CuentasYContactos } from '@/features/ventas/CuentasYContactos'
 import { Actividades } from '@/features/ventas/Actividades'
 import { AprobarPedidos } from '@/features/ventas/AprobarPedidos'
 import { AsignarPedidos } from '@/features/ventas/AsignarPedidos'
+import { CargarFactura } from '@/features/ventas/CargarFactura'
 import { PanelOpciones } from '@/features/inicio/PanelOpciones'
 import { DespachoVista } from '@/features/vista/DespachoVista'
 import { useAccesoMonday } from '@/hooks/useAccesoMonday'
@@ -312,7 +313,7 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
       {principal === 'pedidos' && operacionPedidos === null && (
         <PanelOpciones
           titulo="Pedidos"
-          detalle="Aprobar los pedidos de los concesionarios y asignarles tractores."
+          detalle="Aprobar los pedidos de los concesionarios, asignarles tractores y cargar sus facturas."
           opciones={pedidosDeModulos(sesion.modulos)}
           onElegir={(id) => setRuta((v) => ({ ...v, pedidos: id }))}
         />
@@ -325,6 +326,12 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
       {principal === 'pedidos' &&
         operacionPedidos === 'asignar' &&
         puedeEnPedidos(sesion.modulos, 'asignar') && <AsignarPedidos />}
+
+      {principal === 'pedidos' &&
+        operacionPedidos === 'facturar' &&
+        puedeEnPedidos(sesion.modulos, 'facturar') && (
+          <CargarFactura onInicio={() => navegar(RUTA_INICIO)} />
+        )}
 
       {principal === 'fechas' && operacionFechas === 'confirmar' && <ConfirmarProponerFecha />}
       {principal === 'fechas' && operacionFechas === 'enviar' && <EnviarConfirmacion />}

@@ -24,6 +24,7 @@ import {
   ESTADO_COMERCIAL,
   ESTADO_ENTREGA_PENDIENTE,
   ESTADO_PEDIDO,
+  ESTADO_RENGLON,
   ESTADO_UNIDAD,
   ESTADO_UNIDAD_ENTREGA_CARGADA,
   TIPO_PEDIDO,
@@ -123,6 +124,10 @@ export interface PedidoLeido {
   /** Su id de monday, para mencionarlo cuando el pedido cambia. */
   comercialId: string
   equipo: string
+  /** El JSON crudo de la columna del equipo: Cargar factura lo copia tal cual a la factura. */
+  equipoValor: string
+  /** Las facturas que ya tiene. Se suman, no se reemplazan. */
+  facturaIds: string[]
   aprobComercial: string
   aprobFinanciera: string
   fechaSolicitud: string
@@ -192,6 +197,7 @@ const COLUMNAS_PEDIDO = [
   COL_PEDIDO.totalFacturaSinIva,
   COL_PEDIDO.totalFacturaConIva,
   COL_PEDIDO.porcentajeAsignacion,
+  COL_PEDIDO.facturaVinculada,
 ]
 
 const COLUMNAS_RENGLON = [
@@ -248,6 +254,8 @@ export async function pedidosCargados(limite = 200): Promise<PedidoLeido[]> {
       comercial: texto(c[COL_PEDIDO.comercial]),
       comercialId: idDePersona(c[COL_PEDIDO.comercial]),
       equipo: texto(c[COL_PEDIDO.equipo]),
+      equipoValor: c[COL_PEDIDO.equipo]?.value ?? '',
+      facturaIds: enlazados(c[COL_PEDIDO.facturaVinculada]),
       aprobComercial: texto(c[COL_PEDIDO.aprobComercial]) || APROBACION.PENDIENTE,
       aprobFinanciera: texto(c[COL_PEDIDO.aprobFinanciera]) || APROBACION.PENDIENTE,
       fechaSolicitud: texto(c[COL_PEDIDO.fechaSolicitud]),
@@ -701,8 +709,12 @@ export async function asignarPedido(
      Asignado Parcialmente, ninguna es Pedido a Fábrica. */
   const conTractor = yaTenian.length + asignadas.length
   const porcentaje = unidades.length > 0 ? Math.round((conTractor / unidades.length) * 100) : 0
-  const estadoPedido =
-    unidades.length > 0 && conTractor === unidades.length
+  /* Un pedido que ya se facturó en parte se queda en "Facturado Parcialmente": volver a
+     "Asignado Parcialmente" escondería que hay una factura. Lo que sí cambia es el porcentaje. */
+  const yaFacturado = pedido.estado === ESTADO_PEDIDO.FACTURADO_PARCIAL
+  const estadoPedido = yaFacturado
+    ? ESTADO_PEDIDO.FACTURADO_PARCIAL
+    : unidades.length > 0 && conTractor === unidades.length
       ? ESTADO_PEDIDO.ASIGNADO
       : conTractor > 0
         ? ESTADO_PEDIDO.ASIGNADO_PARCIAL
@@ -711,7 +723,7 @@ export async function asignarPedido(
     await mondayApi('resolverPedido', {
       item: pedido.id,
       valores: JSON.stringify({
-        [COL_PEDIDO.estado]: { label: estadoPedido },
+        ...(yaFacturado ? {} : { [COL_PEDIDO.estado]: { label: estadoPedido } }),
         [COL_PEDIDO.porcentajeAsignacion]: String(porcentaje),
       }),
     })
@@ -721,9 +733,13 @@ export async function asignarPedido(
 
   for (const r of pedido.renglones) {
     const suyas = unidades.filter((u) => u.renglonId === r.id)
-    const todasAsignadas =
-      suyas.length > 0 &&
-      suyas.every((u) => u.inventarioId || asignadas.some((a) => a.unidad.id === u.id))
+    const tieneTractor = (u: UnidadLeida) =>
+      Boolean(u.inventarioId) || asignadas.some((a) => a.unidad.id === u.id)
+    const todasAsignadas = suyas.length > 0 && suyas.every(tieneTractor)
+    /* Igual que el pedido: algunas con tractor y otras no es "Asignado Parcialmente" también en
+       el renglón. Antes quedaba en "Pedido a Fábrica", y un renglón de cinco con cuatro asignadas
+       parecía no tener ninguna. */
+    const algunaAsignada = suyas.some(tieneTractor)
     /* El renglón también queda conectado a los tractores que lo cumplen: es lo que se ve desde
        🔖Pedidos sin tener que ir a 🛍️Ventas. Los que ya tenía se conservan, por si el renglón se
        asigna en dos veces (una parte de stock ahora, otra cuando llegue de fábrica). */
@@ -733,10 +749,19 @@ export async function asignarPedido(
         ...asignadas.filter((a) => a.unidad.renglonId === r.id).map((a) => a.tractorId),
       ]),
     ]
+    /* El renglón facturado en parte conserva ese estado; sólo suma los tractores nuevos. */
+    const facturadoEnParte =
+      r.estado === ESTADO_RENGLON.FACTURADO_PARCIAL || r.estado === ESTADO_UNIDAD.FACTURADA
     try {
       await escribirRenglon(
         r.id,
-        todasAsignadas ? ESTADO_UNIDAD.ASIGNADA : ESTADO_UNIDAD.A_FABRICA,
+        facturadoEnParte
+          ? r.estado
+          : todasAsignadas
+            ? ESTADO_UNIDAD.ASIGNADA
+            : algunaAsignada
+              ? ESTADO_RENGLON.ASIGNADO_PARCIAL
+              : ESTADO_UNIDAD.A_FABRICA,
         tractores,
       )
     } catch (e) {
