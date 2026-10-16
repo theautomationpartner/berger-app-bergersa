@@ -1080,6 +1080,8 @@ export const COL_PEDIDO = {
   contratoConcesion: 'file_mm85s1x6',
   /** Política Estándar u Operatoria Especial. Sólo en pedidos de contado. */
   politicaContado: 'color_mm853ftc',
+  /** Por qué se usó la Operatoria Especial. La escribe el concesionario al cargar. */
+  observacionEspecial: 'long_text_mm853g4x',
   /** VENTA DIRECTA: la suma de las comisiones de los renglones. */
   totalComision: 'numeric_mm85mqv3',
   /** VENTA DIRECTA: lo que BERGER le factura al cliente final, con el precio que puso el concesionario. */
@@ -1150,7 +1152,7 @@ export const COL_PEDIDO_SUB = {
   precioClienteFinal: 'numeric_mm853rvr',
   /** El precio a facturar s/IVA de UNA unidad, con descuentos: el piso del precio al cliente final. */
   precioMaximoUnidad: 'numeric_mm853vt4',
-  /** Cantidad × (lista − precio al cliente final). */
+  /** Cantidad × (precio al cliente final − lo que BERGER le factura por unidad). */
   comision: 'numeric_mm858bsh',
   ventas: 'board_relation_mm7x8fhk',
 } as const

@@ -180,6 +180,16 @@ export function TarjetaPedido({
               )}
             </dl>
 
+            {/* Por qué el concesionario pidió la operatoria especial: es lo que mira quien aprueba. */}
+            {pedido.observacionEspecial && (
+              <div className="aviso aviso--neutro">
+                <i className="fa-solid fa-star" aria-hidden="true" />
+                <span>
+                  <b>Operatoria especial:</b> {pedido.observacionEspecial}
+                </span>
+              </div>
+            )}
+
             {/* El motivo del rechazo es lo único que le sirve a quien tiene que volver a cargarlo. */}
             {pedido.motivo && (
               <div className="aviso aviso--alerta">

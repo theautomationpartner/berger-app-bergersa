@@ -110,6 +110,8 @@ export interface PedidoLeido {
   tipoFactura: string
   /** Política Estándar u Operatoria Especial, si pagó contado. */
   politicaContado: string
+  /** Por qué se usó la Operatoria Especial. */
+  observacionEspecial: string
   /** Cómo se paga: la condición de venta o el concepto, según el tipo. */
   pago: string
   banco: string
@@ -170,6 +172,7 @@ const COLUMNAS_PEDIDO = [
   COL_PEDIDO.pedidoPara,
   COL_PEDIDO.tipoFactura,
   COL_PEDIDO.politicaContado,
+  COL_PEDIDO.observacionEspecial,
   COL_PEDIDO.totalClienteFinal,
   COL_PEDIDO.totalComision,
   COL_PEDIDO.condicionVenta,
@@ -234,6 +237,7 @@ export async function pedidosCargados(limite = 200): Promise<PedidoLeido[]> {
       pedidoPara: texto(c[COL_PEDIDO.pedidoPara]),
       tipoFactura: texto(c[COL_PEDIDO.tipoFactura]),
       politicaContado: texto(c[COL_PEDIDO.politicaContado]),
+      observacionEspecial: texto(c[COL_PEDIDO.observacionEspecial]),
       /* Según el tipo de pedido, la forma de pago vive en una columna o en la otra. */
       pago: texto(c[COL_PEDIDO.condicionVenta]) || texto(c[COL_PEDIDO.conceptoPago]),
       banco: texto(c[COL_PEDIDO.banco]),
