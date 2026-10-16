@@ -98,7 +98,31 @@ const SOLAPAS: { id: Trabajo; icono: string; titulo: string }[] = [
   { id: 'editar', icono: 'fa-solid fa-pen-to-square', titulo: 'Modificar Cuenta/Contacto' },
 ]
 
+/**
+ * Lo que quedó guardado, para la ventana final.
+ *
+ * Una ventana y no una franja arriba: con el formulario largo, la franja quedaba fuera de la
+ * pantalla y no se sabía si la app había terminado. Además ofrece lo que suele venir después.
+ */
+interface Resultado {
+  que: 'cuenta' | 'contacto' | 'editarCuenta' | 'editarContacto'
+  /** "La cuenta X con 2 contactos fue cargada de manera exitosa!" */
+  mensaje: string
+  /** Renglones de detalle: los contactos creados, la cuenta del contacto. */
+  detalle: string[]
+  /** Lo que no salió, sin deshacer lo que sí. */
+  advertencia?: string
+  /** El item guardado: la cuenta o el contacto. */
+  id: string
+  /** La cuenta, cuando lo guardado es un contacto. */
+  cuentaId?: string
+}
+
+const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios)
+
 interface Props {
+  /** Volver al inicio de la app, desde la ventana final. */
+  onInicio?: () => void
   /**
    * Abierta desde una actividad: la cuenta que se cree acá vuelve elegida. `null` = se vuelve sin
    * haber creado ninguna.
@@ -110,7 +134,7 @@ interface Props {
   }
 }
 
-export function CuentasYContactos({ desdeActividad }: Props = {}) {
+export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
   const [trabajo, setTrabajo] = useState<Trabajo>('cuenta')
   /** La última cuenta creada en esta visita. Es la que vuelve a la actividad. */
   const [creada, setCreada] = useState<{ id: string; nombre: string } | null>(null)
@@ -130,7 +154,7 @@ export function CuentasYContactos({ desdeActividad }: Props = {}) {
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
-  const [hecho, setHecho] = useState<string | null>(null)
+  const [hecho, setHecho] = useState<Resultado | null>(null)
 
   const [cuenta, setCuenta] = useState<DatosCuenta>(CUENTA_VACIA)
   const [contacto, setContacto] = useState<DatosContacto>(CONTACTO_VACIO)
@@ -300,11 +324,29 @@ export function CuentasYContactos({ desdeActividad }: Props = {}) {
             fallados.push(nombreDeContacto(n.nombres, n.apellidos, n.otro))
           }
         }
-        const cuantos = nuevos.length - fallados.length + cuenta.contactoIds.length
-        setHecho(
-          `${r.nombre} quedó creada${cuantos > 0 ? ` con ${cuantos} contacto${cuantos === 1 ? '' : 's'}` : ''}.` +
-            (fallados.length > 0 ? ` No se pudieron crear: ${fallados.join(', ')}.` : ''),
-        )
+        const creados = nuevos
+          .map((n) => nombreDeContacto(n.nombres, n.apellidos, n.otro))
+          .filter((n) => !fallados.includes(n))
+        const enganchados = contactos
+          .filter((c) => cuenta.contactoIds.includes(c.id))
+          .map((c) => c.nombre)
+        const cuantos = creados.length + enganchados.length
+        setHecho({
+          que: 'cuenta',
+          id: r.id,
+          mensaje:
+            cuantos > 0
+              ? `La cuenta ${r.nombre} con ${cuantos} ${plural(cuantos, 'contacto', 'contactos')} fue cargada de manera exitosa!`
+              : `La cuenta ${r.nombre} fue cargada de manera exitosa!`,
+          detalle: [
+            ...creados.map((n) => `Contacto nuevo: ${n}`),
+            ...enganchados.map((n) => `Contacto que ya existía, enganchado: ${n}`),
+          ],
+          advertencia:
+            fallados.length > 0
+              ? `La cuenta quedó, pero no se pudieron crear estos contactos: ${fallados.join(', ')}.`
+              : undefined,
+        })
         setCuenta(CUENTA_VACIA)
         setNuevos([])
         setArmando(null)
@@ -314,20 +356,38 @@ export function CuentasYContactos({ desdeActividad }: Props = {}) {
         setCuentaElegida(r.id)
       } else if (trabajo === 'contacto') {
         const r = await crearContacto(datosDeContacto(contacto, cuentaElegida))
-        const nombreCuenta = cuentas.find((c) => c.id === cuentaElegida)?.nombre ?? 'la cuenta'
-        setHecho(`${r.nombre} quedó creado en ${nombreCuenta}.`)
+        const nombreCuenta = cuentas.find((c) => c.id === cuentaElegida)?.nombre
+        setHecho({
+          que: 'contacto',
+          id: r.id,
+          cuentaId: cuentaElegida,
+          mensaje: `El contacto ${r.nombre} fue cargado de manera exitosa!`,
+          detalle: nombreCuenta ? [`En la cuenta ${nombreCuenta}`] : [],
+        })
         setContacto(CONTACTO_VACIO)
       } else if (queEditar === 'cuenta' && editandoCuenta) {
         await actualizarCuenta(editandoCuenta, paraMonday(formCuenta))
-        setHecho(`Los cambios de ${formCuenta.razonSocial.trim()} quedaron guardados.`)
+        setHecho({
+          que: 'editarCuenta',
+          id: editandoCuenta,
+          mensaje: `La cuenta ${formCuenta.razonSocial.trim()} fue modificada de manera exitosa!`,
+          detalle: [],
+        })
       } else if (editandoContacto) {
         await actualizarContacto(editandoContacto, {
           ...datosDeContacto(formContacto, cuentasDelContacto[0] ?? ''),
           cuentaIds: cuentasDelContacto,
+          emailAnterior: contactos.find((c) => c.id === editandoContacto)?.email ?? '',
         })
-        setHecho(
-          `Los cambios de ${nombreDeContacto(formContacto.nombres, formContacto.apellidos, formContacto.otro)} quedaron guardados.`,
-        )
+        setHecho({
+          que: 'editarContacto',
+          id: editandoContacto,
+          mensaje: `El contacto ${nombreDeContacto(formContacto.nombres, formContacto.apellidos, formContacto.otro)} fue modificado de manera exitosa!`,
+          detalle: cuentasDelContacto
+            .map((id) => cuentas.find((c) => c.id === id)?.nombre)
+            .filter(Boolean)
+            .map((n) => `En la cuenta ${n}`),
+        })
       }
       await recargar()
     } catch (e) {
@@ -399,19 +459,6 @@ export function CuentasYContactos({ desdeActividad }: Props = {}) {
           </div>
         )}
 
-        {hecho && (
-          <div className="aviso aviso--ok" style={{ marginTop: 14 }}>
-            <i className="fa-solid fa-circle-check" aria-hidden="true" />
-            <span>{hecho}</span>
-          </div>
-        )}
-
-        {errorEnvio && (
-          <div className="aviso aviso--error" style={{ marginTop: 14 }}>
-            <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
-            <span>{errorEnvio}</span>
-          </div>
-        )}
 
         {/* ================= ALTA DE CUENTA ================= */}
         {trabajo === 'cuenta' && (
@@ -965,6 +1012,190 @@ export function CuentasYContactos({ desdeActividad }: Props = {}) {
               )}
             </div>
           </div>
+        )}
+
+        {/* Mientras guarda, fijo abajo: el botón que dice "Creando…" puede haber quedado fuera de la
+            pantalla, y en la app de concesionarios un contacto con mail tarda unos segundos más. */}
+        {enviando && (
+          <div className="guardando-aviso" role="status">
+            <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Guardando en monday… no
+            cierres la pantalla.
+          </div>
+        )}
+
+        {hecho && (
+          <>
+            <button className="lateral-fondo" aria-label="Cerrar" onClick={() => setHecho(null)} />
+            <div className="ventanita" role="dialog" aria-modal="true">
+              <div className="ventanita-head">
+                <span>
+                  <i className="fa-solid fa-circle-check texto-verde" aria-hidden="true" />{' '}
+                  {hecho.que === 'cuenta'
+                    ? 'Cuenta creada'
+                    : hecho.que === 'contacto'
+                      ? 'Contacto creado'
+                      : 'Cambios guardados'}
+                </span>
+                <button type="button" onClick={() => setHecho(null)} aria-label="Cerrar">
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="ventanita-cuerpo">
+                <span className="exito-titulo">{hecho.mensaje}</span>
+                {hecho.detalle.length > 0 && (
+                  <ul className="exito-lista">
+                    {hecho.detalle.map((d) => (
+                      <li key={d}>
+                        <i className="fa-solid fa-check" aria-hidden="true" />
+                        <span>{d}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {hecho.advertencia && (
+                  <div className="aviso aviso--alerta">
+                    <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+                    <span>{hecho.advertencia}</span>
+                  </div>
+                )}
+                <span className="campo-ayuda">¿Qué querés hacer ahora?</span>
+              </div>
+              <div className="ventanita-pie ventanita-pie--opciones">
+                {onInicio && !desdeActividad && (
+                  <button type="button" className="btn btn--texto btn--chico" onClick={onInicio}>
+                    <i className="fa-solid fa-house" aria-hidden="true" /> Volver al inicio
+                  </button>
+                )}
+                {hecho.que === 'cuenta' && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn--borde btn--chico"
+                      onClick={() => {
+                        setCuentaElegida(hecho.id)
+                        setTrabajo('contacto')
+                        setHecho(null)
+                      }}
+                    >
+                      <i className="fa-solid fa-user-plus" aria-hidden="true" /> Agregarle un
+                      contacto
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--borde btn--chico"
+                      onClick={() => {
+                        setTrabajo('editar')
+                        setQueEditar('cuenta')
+                        abrirCuenta(hecho.id)
+                        setHecho(null)
+                      }}
+                    >
+                      <i className="fa-solid fa-pen-to-square" aria-hidden="true" /> Modificarla
+                    </button>
+                  </>
+                )}
+                {hecho.que === 'contacto' && (
+                  <button
+                    type="button"
+                    className="btn btn--borde btn--chico"
+                    onClick={() => {
+                      setTrabajo('editar')
+                      setQueEditar('contacto')
+                      abrirContacto(hecho.id)
+                      setHecho(null)
+                    }}
+                  >
+                    <i className="fa-solid fa-pen-to-square" aria-hidden="true" /> Modificarlo
+                  </button>
+                )}
+                {(hecho.que === 'editarCuenta' || hecho.que === 'editarContacto') && (
+                  <button
+                    type="button"
+                    className="btn btn--borde btn--chico"
+                    onClick={() => {
+                      setEditandoCuenta('')
+                      setEditandoContacto('')
+                      setHecho(null)
+                    }}
+                  >
+                    <i className="fa-solid fa-pen-to-square" aria-hidden="true" /> Modificar otro
+                  </button>
+                )}
+                {hecho.que !== 'cuenta' && (
+                  <button
+                    type="button"
+                    className="btn btn--borde btn--chico"
+                    onClick={() => {
+                      setTrabajo('cuenta')
+                      setHecho(null)
+                    }}
+                  >
+                    <i className="fa-solid fa-building" aria-hidden="true" /> Crear una cuenta
+                  </button>
+                )}
+                {desdeActividad && creada ? (
+                  <button
+                    type="button"
+                    className="btn btn--primario btn--chico"
+                    autoFocus
+                    onClick={() => desdeActividad.onVolver(creada)}
+                  >
+                    <i className="fa-solid fa-arrow-left" aria-hidden="true" /> Volver a la actividad
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn--primario btn--chico"
+                    autoFocus
+                    onClick={() => {
+                      if (hecho.que === 'contacto') setCuentaElegida(hecho.cuentaId ?? '')
+                      /* Otra cuenta, otro contacto en la misma cuenta, o seguir donde estaba. */
+                      if (hecho.que === 'cuenta') setTrabajo('cuenta')
+                      setHecho(null)
+                    }}
+                  >
+                    {hecho.que === 'cuenta'
+                      ? 'Cargar otra cuenta'
+                      : hecho.que === 'contacto'
+                        ? 'Cargar otro contacto'
+                        : 'Seguir editando'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Lo que no se pudo guardar, también en una ventana: arriba no se ve si se está abajo. */}
+        {errorEnvio && (
+          <>
+            <button className="lateral-fondo" aria-label="Cerrar" onClick={() => setErrorEnvio(null)} />
+            <div className="ventanita" role="alertdialog" aria-modal="true">
+              <div className="ventanita-head">
+                <span>
+                  <i className="fa-solid fa-circle-exclamation texto-rojo" aria-hidden="true" /> No
+                  se pudo guardar
+                </span>
+                <button type="button" onClick={() => setErrorEnvio(null)} aria-label="Cerrar">
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="ventanita-cuerpo">
+                <span>{errorEnvio}</span>
+                <span className="campo-ayuda">Lo que cargaste sigue en el formulario.</span>
+              </div>
+              <div className="ventanita-pie">
+                <button
+                  type="button"
+                  className="btn btn--primario btn--chico"
+                  autoFocus
+                  onClick={() => setErrorEnvio(null)}
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          </>
         )}
 
         {/* Desde una actividad: lo que se estaba cargando allá sigue intacto. Si se creó una cuenta,

@@ -112,6 +112,7 @@ export type NombreOperacion =
   | 'actividadesDelTablero'
   | 'completarActividadCrm'
   | 'etiquetasDeActividad'
+  | 'usuarioDelToken'
   | 'crearPedido'
   | 'crearSubitemDePedido'
   | 'crearUnidadDeVenta'
@@ -902,6 +903,16 @@ const OPS_CRM = {
       nombre: nombre(v.nombre),
       valores: valoresAcotados(v.valores, COLUMNAS_DE_ACTIVIDAD, 'una actividad'),
     }),
+  },
+
+  /**
+   * El usuario dueño del token. Sólo lo pide la app en desarrollo, donde no hay sesión de monday;
+   * en producción el token es el de la cuenta y no diría nada de quién está usando la app.
+   */
+  usuarioDelToken: {
+    modulo: 'ventas' as const,
+    query: `query { me { id } }`,
+    validar: () => ({}),
   },
 
   /** Las etiquetas del tipo y el estado de una actividad. */

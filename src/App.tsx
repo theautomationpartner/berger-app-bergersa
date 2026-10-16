@@ -305,9 +305,9 @@ function AppAdentro({ sesion }: { sesion: SesionIngreso }) {
 
       {principal === 'usuarios' && <RegistroUsuario />}
 
-      {principal === 'clientes' && <CuentasYContactos />}
+      {principal === 'clientes' && <CuentasYContactos onInicio={() => navegar(RUTA_INICIO)} />}
 
-      {principal === 'actividades' && <Actividades />}
+      {principal === 'actividades' && <Actividades onInicio={() => navegar(RUTA_INICIO)} />}
 
       {principal === 'pedidos' && operacionPedidos === null && (
         <PanelOpciones

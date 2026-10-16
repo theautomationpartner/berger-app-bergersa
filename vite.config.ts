@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
 
@@ -8,6 +8,13 @@ import { fileURLToPath, URL } from 'node:url'
  * pantalla qué versión está corriendo.
  */
 const COMMIT = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'dev'
+
+/**
+ * Las variables SIN prefijo VITE_ de `.env.local` (la clave de ARCA). Vite no las pone en
+ * `process.env`: sin esto el proxy de ARCA mandaba la consulta sin clave y ARCA contestaba
+ * "clave_invalida". Se leen sólo acá, en el servidor de desarrollo: no entran al bundle.
+ */
+const ENTORNO = loadEnv('development', process.cwd(), '')
 
 export default defineConfig({
   plugins: [react()],
@@ -48,7 +55,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/arca-api/, '/api/padron'),
         configure: (proxy) => {
           proxy.on('proxyReq', (pedido) => {
-            const clave = process.env.ARCA_API_KEY?.trim()
+            const clave = (process.env.ARCA_API_KEY ?? ENTORNO.ARCA_API_KEY)?.trim()
             if (clave) pedido.setHeader('x-api-key', clave)
           })
         },

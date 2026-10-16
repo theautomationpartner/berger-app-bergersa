@@ -79,6 +79,35 @@ export const nombreDeActividad = (cuenta: string, tipo: string, fecha: string, h
     .filter(Boolean)
     .join(' - ')
 
+/**
+ * El id de monday de quien está usando la app.
+ *
+ * Adentro de monday sale del token de sesión. En desarrollo —localhost, fuera del iframe— no hay
+ * sesión, y antes eso dejaba "Mis pendientes" vacío y las actividades sin responsable aunque se
+ * estuviera trabajando con el usuario del token. Ahí se usa ese usuario: es con el que la app lee
+ * y escribe en local. En producción nunca: el token del servidor es el de la cuenta, no el de
+ * quien abrió la app.
+ *
+ * `''` si no se puede saber.
+ */
+export async function usuarioActual(): Promise<string> {
+  try {
+    const { userId } = await obtenerDatosSesion()
+    if (userId) return String(userId)
+  } catch {
+    /* sin sesión: puede ser desarrollo */
+  }
+  if (import.meta.env.DEV) {
+    try {
+      const r = await mondayApi<{ me: { id: string } | null }>('usuarioDelToken', {})
+      return r.me?.id ? String(r.me.id) : ''
+    } catch {
+      return ''
+    }
+  }
+  return ''
+}
+
 export async function crearActividad(d: AltaActividad): Promise<{ id: string; nombre: string }> {
   const valores: Record<string, unknown> = {
     [COL_ACTIVIDAD.cuenta]: { item_ids: [d.cuentaId] },
@@ -94,16 +123,12 @@ export async function crearActividad(d: AltaActividad): Promise<{ id: string; no
   /* El responsable es quien está usando la app: sale del token de sesión de monday, no de un
      desplegable. Preguntarlo sería dejar que alguien cargue una actividad a nombre de otro, y el
      dato que importa es quién la hizo de verdad. */
-  try {
-    const { userId } = await obtenerDatosSesion()
-    if (userId) {
-      valores[COL_ACTIVIDAD.responsable] = {
-        personsAndTeams: [{ id: userId, kind: 'person' }],
-      }
+  const userId = await usuarioActual()
+  /* Si no se puede saber quién es, la actividad se crea sin responsable en vez de no crearse. */
+  if (userId) {
+    valores[COL_ACTIVIDAD.responsable] = {
+      personsAndTeams: [{ id: Number(userId), kind: 'person' }],
     }
-  } catch {
-    /* Fuera de monday —en desarrollo— no hay sesión: la actividad se crea sin responsable en vez
-       de no crearse. */
   }
 
   const nombre = nombreDeActividad(d.cuentaNombre, d.tipo, d.fecha, d.hora)
@@ -189,22 +214,20 @@ function personasDe(c: ColumnaDeActividad | undefined): string[] {
  * entero para encontrar lo propio. Además, dar por hecha la actividad de otro no es algo que esta
  * pantalla tenga por qué permitir.
  *
- * Si no hay sesión de monday —en desarrollo, fuera del iframe— devuelve la lista vacía en vez de
- * fallar: no hay a quién filtrar.
+ * Si no se puede saber quién está usando la app, FALLA en vez de devolver la lista vacía: una
+ * lista vacía dice "no tenés pendientes", que es mentira, y así fue como pasó desapercibido que en
+ * local no había usuario.
  */
 export async function misActividadesPendientes(
   /** Sólo para poder probarlo: en la app sale siempre del token de sesión de monday. */
   usuarioDePrueba?: string,
 ): Promise<ActividadPendiente[]> {
-  let usuarioId = usuarioDePrueba ?? ''
+  const usuarioId = usuarioDePrueba || (await usuarioActual())
   if (!usuarioId) {
-    try {
-      usuarioId = String((await obtenerDatosSesion()).userId ?? '')
-    } catch {
-      return []
-    }
+    throw new Error(
+      'no se pudo saber qué usuario de monday está usando la app. Abrila desde monday y volvé a intentar.',
+    )
   }
-  if (!usuarioId) return []
 
   const r = await mondayApi<{
     boards: {

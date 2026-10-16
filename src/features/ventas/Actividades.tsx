@@ -64,7 +64,12 @@ interface Exito {
 const cuando = (fecha: string, hora: string): string =>
   [fecha ? aFechaCorta(fecha) : 'Sin fecha', hora].filter(Boolean).join(' ')
 
-export function Actividades() {
+interface Props {
+  /** Volver al inicio de la app, desde la ventana final. */
+  onInicio?: () => void
+}
+
+export function Actividades({ onInicio }: Props = {}) {
   const [cuentas, setCuentas] = useState<CuentaCrm[]>([])
   const [contactos, setContactos] = useState<ContactoCrm[]>([])
   const [opciones, setOpciones] = useState({ tipos: [] as string[], estados: [] as string[] })
@@ -378,12 +383,6 @@ export function Actividades() {
           </div>
         )}
 
-        {errorEnvio && (
-          <div className="aviso aviso--error" style={{ marginTop: 14 }}>
-            <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
-            <span>No se pudo guardar: {errorEnvio}</span>
-          </div>
-        )}
 
         {trabajo === 'cargar' && (
           <div className="card card--flush op-editor" style={{ marginTop: 14 }}>
@@ -864,14 +863,67 @@ export function Actividades() {
                   </div>
                 )}
               </div>
+              <div className="ventanita-pie ventanita-pie--opciones">
+                {onInicio && (
+                  <button type="button" className="btn btn--texto btn--chico" onClick={onInicio}>
+                    <i className="fa-solid fa-house" aria-hidden="true" /> Volver al inicio
+                  </button>
+                )}
+                {pendientes.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn--borde btn--chico"
+                    onClick={() => {
+                      setExito(null)
+                      irA('pendientes')
+                    }}
+                  >
+                    <i className="fa-solid fa-list-check" aria-hidden="true" /> Ver mis pendientes (
+                    {pendientes.length})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn--primario btn--chico"
+                  autoFocus
+                  onClick={() => {
+                    setExito(null)
+                    irA('cargar')
+                  }}
+                >
+                  <i className="fa-solid fa-calendar-plus" aria-hidden="true" /> Cargar otra actividad
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Lo que no se pudo guardar, en una ventana: arriba no se ve si se está abajo. */}
+        {errorEnvio && (
+          <>
+            <button className="lateral-fondo" aria-label="Cerrar" onClick={() => setErrorEnvio(null)} />
+            <div className="ventanita" role="alertdialog" aria-modal="true">
+              <div className="ventanita-head">
+                <span>
+                  <i className="fa-solid fa-circle-exclamation texto-rojo" aria-hidden="true" /> No
+                  se pudo guardar
+                </span>
+                <button type="button" onClick={() => setErrorEnvio(null)} aria-label="Cerrar">
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="ventanita-cuerpo">
+                <span>{errorEnvio}</span>
+                <span className="campo-ayuda">Lo que cargaste sigue en el formulario.</span>
+              </div>
               <div className="ventanita-pie">
                 <button
                   type="button"
                   className="btn btn--primario btn--chico"
                   autoFocus
-                  onClick={() => setExito(null)}
+                  onClick={() => setErrorEnvio(null)}
                 >
-                  Listo
+                  Entendido
                 </button>
               </div>
             </div>

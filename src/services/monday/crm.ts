@@ -306,6 +306,11 @@ export interface AltaContacto {
    * demás.
    */
   cuentaIds?: string[]
+  /**
+   * El mail que tenía antes de editarlo. Lo usa la app de concesionarios: allá cambiar el mail
+   * dispara una automatización de monday que hay que deshacer, y si no cambió no hace falta esperarla.
+   */
+  emailAnterior?: string
 }
 
 /** El nombre del item: "Nombre Apellido Otro". Monday no acepta items sin nombre. */
@@ -336,11 +341,12 @@ export async function crearContacto(d: AltaContacto): Promise<{ id: string; nomb
   if (d.comentarios.trim()) valores[COL_CONTACTO.comentarios] = d.comentarios.trim()
   if (d.cuentaId) valores[COL_CONTACTO.cuenta] = { item_ids: [d.cuentaId] }
 
+  const nombreItem = nombreDeContacto(d.nombres, d.apellidos, d.otro)
   const r = await mondayApi<{ create_item: { id: string; name: string } }>('crearContactoCrm', {
-    nombre: nombreDeContacto(d.nombres, d.apellidos, d.otro),
+    nombre: nombreItem,
     valores: JSON.stringify(valores),
   })
-  return { id: r.create_item.id, nombre: r.create_item.name }
+  return { id: r.create_item.id, nombre: r.create_item.name || nombreItem }
 }
 
 export interface AltaCuenta {
@@ -408,11 +414,12 @@ export async function crearCuenta(d: AltaCuenta): Promise<{ id: string; nombre: 
   if (d.contactoIds.length > 0) valores[COL_CUENTA.contactos] = { item_ids: d.contactoIds }
   Object.assign(valores, columnasDeConcesionario(d))
 
+  const nombreItem = d.razonSocial.trim()
   const r = await mondayApi<{ create_item: { id: string; name: string } }>('crearCuentaCrm', {
-    nombre: d.razonSocial.trim(),
+    nombre: nombreItem,
     valores: JSON.stringify(valores),
   })
-  return { id: r.create_item.id, nombre: r.create_item.name }
+  return { id: r.create_item.id, nombre: r.create_item.name || nombreItem }
 }
 
 /* ------------------------------------------------------------------ *
