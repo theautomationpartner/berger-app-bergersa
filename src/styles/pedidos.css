@@ -1499,39 +1499,76 @@
   justify-content: center;
 }
 
-/* Los tractores elegidos, en el panel. */
-.fact-elegidos {
+/* Una factura por tractor elegido, en el panel: el tractor, su PDF y su número. */
+.fact-cargas {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-height: 220px;
+  gap: 8px;
+  max-height: 46vh;
   overflow-y: auto;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.fact-elegidos li {
+.fact-carga {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--tint-input-bd);
+  border-left: 3px solid var(--orange);
+  border-radius: 8px;
+  background: var(--tint-neutral);
+}
+.fact-carga--lista {
+  border-color: var(--green-bd);
+  border-left-color: var(--green);
+}
+.fact-carga-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  background: var(--tint-neutral);
   font-size: 12px;
 }
-.fact-elegidos li > span:first-child {
+.fact-carga-head > span:first-child {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-width: 0;
 }
-.fact-elegidos li b {
+.fact-carga-head b {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.fact-elegidos li small {
+.fact-carga-head small {
+  overflow: hidden;
   color: var(--text-gray);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* La fila de archivo de Aduana, achicada para el panel. */
+.fact-carga .farch {
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.fact-carga .farch-nom {
+  flex: 0 0 auto;
+}
+.fact-carga .farch-tags {
+  flex: 1 1 0;
+  overflow: hidden;
+}
+/* El nombre del PDF se corta con puntos suspensivos: el número de abajo ya lo repite entero. */
+.fact-carga .farch-pend {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.fact-carga .farch-btn {
+  flex-shrink: 0;
 }
 
 /* Los tractores de un pedido, para tildar. */

@@ -1,33 +1,35 @@
 /**
  * VENTA · Cargar factura. Es de BERGER.
  *
- * Se elige tractor por tractor —las unidades de 🛍️Pedidos x UNIDAD, una por chasis—, no el renglón
- * con su cantidad: de un pedido de cinco tractores del mismo modelo se pueden facturar dos hoy y
- * tres la semana que viene. Una factura junta tractores de varios pedidos, pero de UN solo
- * concesionario: el primer tractor elegido fija a quién se le factura, y los de los demás quedan
- * bloqueados hasta que se vacíe la selección.
+ * Primero se eligen los pedidos y, de cada uno, los tractores —las unidades de 🛍️Pedidos x UNIDAD,
+ * una por chasis—, no el renglón con su cantidad: de un pedido de cinco tractores del mismo modelo
+ * se pueden facturar dos hoy y tres la semana que viene. Después, POR CADA TRACTOR elegido, se sube
+ * su factura en PDF: cada tractor es una factura, un item en 📄Facturas de Pedidos con su único
+ * subitem. Como cada factura es de un solo tractor, en una tanda pueden ir tractores de pedidos y
+ * de concesionarios distintos.
  *
  * La pantalla está partida en dos para no tener que bajar a buscar el botón: a la izquierda los
- * pedidos —plegados, con sus etiquetas, y se despliegan para elegir—, y a la derecha la factura,
- * siempre a la vista, con lo elegido, los montos y el PDF.
+ * pedidos —plegados, con sus etiquetas, y se despliegan para elegir—, y a la derecha las facturas
+ * a cargar, siempre a la vista, una fila por tractor con su PDF y su número.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DesplegableMulti } from '@/components/ui/DesplegableMulti'
+import { FilaArchivo } from '@/components/ui/FilaArchivo'
 import { Plata } from '@/components/ui/Plata'
-import { ZonaArchivo } from '@/components/ui/ZonaArchivo'
 import { useSalidaProtegida } from '@/hooks/useSalidaProtegida'
 import { normalizar } from '@/lib/format'
 import { ESTADO_UNIDAD } from '@/services/monday/columns'
 import {
-  cargarFactura,
-  montosSugeridos,
+  cargarFacturas,
   nombreDelTractor,
+  numeroDelArchivo,
   pedidoFacturable,
   porQueNoSeFactura,
-  problemaDeFactura,
+  problemaDeFacturas,
   unidadesParaFacturar,
   urlDeFactura,
-  type ResultadoFactura,
+  type FacturaDeTractor,
+  type ResultadoFacturas,
   type UnidadFacturable,
 } from '@/services/monday/facturas'
 import { hoy, pedidosCargados, type PedidoLeido } from '@/services/monday/pedidosBerger'
@@ -56,33 +58,22 @@ function tonoDeUnidad(estado: string): string {
   }
 }
 
-/** Lo que se escribe a mano. Los montos, vacíos, toman lo que suman los tractores. */
-interface Datos {
-  numero: string
+/** Lo que comparten todas las facturas de la tanda. */
+interface Comunes {
   fechaEmision: string
   fechaVencimiento: string
-  neto: string
-  iva: string
   notas: string
 }
 
-const DATOS_VACIOS = (): Datos => ({
-  numero: '',
-  fechaEmision: hoy(),
-  fechaVencimiento: '',
-  neto: '',
-  iva: '',
-  notas: '',
-})
+const COMUNES_VACIOS = (): Comunes => ({ fechaEmision: hoy(), fechaVencimiento: '', notas: '' })
 
-/** Un número escrito a mano, con coma o con punto. Vacío o inválido es `null`. */
-function aNumero(v: string): number | null {
-  const limpio = v.trim().replace(/\s/g, '')
-  if (!limpio) return null
-  /* "1.234,56" y "1234.56" valen igual: si hay coma, la coma es la de los decimales. */
-  const n = Number(limpio.includes(',') ? limpio.replace(/\./g, '').replace(',', '.') : limpio)
-  return Number.isFinite(n) ? n : null
+/** El PDF y el número de la factura de UN tractor. */
+interface Carga {
+  archivo: File | null
+  numero: string
 }
+
+const SIN_CARGA: Carga = { archivo: null, numero: '' }
 
 interface Props {
   onInicio?: () => void
@@ -99,16 +90,15 @@ export function CargarFactura({ onInicio }: Props) {
   const [modelos, setModelos] = useState<string[]>([])
   const [abierto, setAbierto] = useState<string | null>(null)
 
-  /** Los tractores elegidos, por id de unidad. */
+  /** Los tractores elegidos, por id de unidad, en el orden en que se eligieron. */
   const [elegidas, setElegidas] = useState<string[]>([])
-  const [datos, setDatos] = useState<Datos>(DATOS_VACIOS)
-  const [archivo, setArchivo] = useState<File | null>(null)
+  /** El PDF y el número de cada tractor elegido. */
+  const [cargas, setCargas] = useState<Record<string, Carga>>({})
+  const [comunes, setComunes] = useState<Comunes>(COMUNES_VACIOS)
 
   const [confirmando, setConfirmando] = useState(false)
   const [trabajando, setTrabajando] = useState(false)
-  const [resultado, setResultado] = useState<
-    (ResultadoFactura & { numero: string; tractores: string[]; concesionario: string }) | null
-  >(null)
+  const [resultado, setResultado] = useState<ResultadoFacturas | null>(null)
 
   const recargar = useCallback(async () => {
     setCargando(true)
@@ -160,10 +150,6 @@ export function CargarFactura({ onInicio }: Props) {
     () => elegidas.flatMap((id) => unidades.filter((u) => u.id === id)),
     [elegidas, unidades],
   )
-  /** A quién se le factura: lo fija el primer tractor elegido. */
-  const cuentaFijada = seleccion.length > 0 ? (porPedido.get(seleccion[0].pedidoId)?.cuentaId ?? '') : ''
-  const concesionarioFijado =
-    seleccion.length > 0 ? (porPedido.get(seleccion[0].pedidoId)?.cuentaNombre ?? '') : ''
 
   const opcionesConcesionario = useMemo(() => {
     const vistos = new Map<string, string>()
@@ -201,71 +187,71 @@ export function CargarFactura({ onInicio }: Props) {
   }, [facturables, unidadesDe, texto, concesionarios, modelos])
   const hayFiltros = Boolean(texto.trim() || concesionarios.length || modelos.length)
 
-  const sugeridos = useMemo(() => montosSugeridos(seleccion), [seleccion])
-  const neto = aNumero(datos.neto) ?? sugeridos.neto
-  const iva = aNumero(datos.iva) ?? sugeridos.iva
+  /** Lo que viaja: cada tractor con su PDF y su número. */
+  const aCargar: FacturaDeTractor[] = useMemo(
+    () =>
+      seleccion.map((u) => {
+        const c = cargas[u.id] ?? SIN_CARGA
+        return { unidad: u, numero: c.numero, archivo: c.archivo as File }
+      }),
+    [seleccion, cargas],
+  )
+  const conPdf = seleccion.filter((u) => cargas[u.id]?.archivo).length
+  const total = seleccion.reduce((s, u) => s + (u.precios.facturaConIva ?? u.precios.facturaSinIva ?? 0), 0)
+  const concesionariosElegidos = new Set(seleccion.map((u) => porPedido.get(u.pedidoId)?.cuentaId)).size
 
   /* Qué falta, dicho en el orden en que se completa. */
   const falta = useMemo(() => {
-    const regla = problemaDeFactura(seleccion, pedidos)
-    if (regla) return regla
-    if (!datos.numero.trim()) return 'Falta el número de la factura.'
-    if (!datos.fechaEmision) return 'Falta la fecha de emisión.'
-    if (!archivo) return 'Falta adjuntar el PDF de la factura.'
-    if (neto <= 0) return 'El monto neto tiene que ser mayor a cero.'
-    return null
-  }, [seleccion, pedidos, datos, archivo, neto])
+    if (seleccion.length === 0) return 'Elegí al menos un tractor.'
+    if (conPdf < seleccion.length) {
+      const n = seleccion.length - conPdf
+      return n === 1 ? 'Falta el PDF de un tractor.' : `Faltan los PDF de ${n} tractores.`
+    }
+    if (!comunes.fechaEmision) return 'Falta la fecha de emisión.'
+    return problemaDeFacturas(aCargar, pedidos)
+  }, [seleccion, conPdf, comunes, aCargar, pedidos])
 
   useSalidaProtegida(
     trabajando
-      ? 'Se está cargando la factura en monday: la factura, sus tractores y los estados. Si salís ahora puede quedar a medias.'
-      : seleccion.length > 0 || archivo
-        ? 'Tenés una factura a medio cargar. Si salís, se pierde lo elegido.'
+      ? 'Se están cargando las facturas en monday: cada factura, su tractor y los estados. Si salís ahora puede quedar a medias.'
+      : seleccion.length > 0
+        ? 'Tenés facturas a medio cargar. Si salís, se pierde lo elegido y los PDF adjuntados.'
         : null,
   )
 
   const alternar = (u: UnidadFacturable) =>
     setElegidas((e) => (e.includes(u.id) ? e.filter((x) => x !== u.id) : [...e, u.id]))
 
-  /** Por qué este tractor no se puede tildar AHORA: el de siempre, o que es de otro concesionario. */
-  const bloqueo = (u: UnidadFacturable, p: PedidoLeido): string | null =>
-    porQueNoSeFactura(u) ?? (cuentaFijada && p.cuentaId !== cuentaFijada ? 'Otro concesionario' : null)
+  const ponerArchivo = (id: string, archivo: File | null) =>
+    setCargas((c) => {
+      const antes = c[id] ?? SIN_CARGA
+      /* El número sale del nombre del PDF mientras nadie lo haya escrito a mano. */
+      const numeroAuto = !antes.numero || (antes.archivo && antes.numero === numeroDelArchivo(antes.archivo))
+      return {
+        ...c,
+        [id]: { archivo, numero: numeroAuto ? (archivo ? numeroDelArchivo(archivo) : '') : antes.numero },
+      }
+    })
 
   const empezarOtra = () => {
     setElegidas([])
-    setDatos(DATOS_VACIOS())
-    setArchivo(null)
+    setCargas({})
+    setComunes(COMUNES_VACIOS())
     setResultado(null)
   }
 
   const guardar = async () => {
-    if (!archivo || falta) return
+    if (falta) return
     setTrabajando(true)
     setError(null)
     try {
-      const r = await cargarFactura(
-        {
-          numero: datos.numero,
-          fechaEmision: datos.fechaEmision,
-          fechaVencimiento: datos.fechaVencimiento,
-          neto,
-          iva,
-          notas: datos.notas,
-          archivo,
-        },
-        seleccion,
-        pedidos,
-        unidades,
-      )
-      setResultado({
-        ...r,
-        numero: datos.numero.trim(),
-        tractores: seleccion.map(nombreDelTractor),
-        concesionario: concesionarioFijado,
-      })
-      setElegidas([])
-      setDatos(DATOS_VACIOS())
-      setArchivo(null)
+      const r = await cargarFacturas(aCargar, comunes, pedidos, unidades)
+      setResultado(r)
+      /* Lo que no se pudo crear queda elegido, con su PDF, para volver a intentarlo. */
+      const fallidas = r.facturas.filter((f) => !f.facturaId).map((f) => f.unidadId)
+      setElegidas(fallidas)
+      setCargas((c) => Object.fromEntries(fallidas.map((id) => [id, c[id] ?? SIN_CARGA])))
+      if (fallidas.length === 0) setComunes(COMUNES_VACIOS())
       await recargar()
     } catch (e) {
       setError(mensaje(e))
@@ -273,6 +259,9 @@ export function CargarFactura({ onInicio }: Props) {
       setTrabajando(false)
     }
   }
+
+  const creadas = resultado?.facturas.filter((f) => f.facturaId) ?? []
+  const noCreadas = resultado?.facturas.filter((f) => !f.facturaId) ?? []
 
   return (
     <div className="scroll">
@@ -284,8 +273,8 @@ export function CargarFactura({ onInicio }: Props) {
           <span className="sec-txt">
             <span className="sec-tit">Cargar factura</span>
             <span className="sec-det">
-              Elegí los tractores asignados de un concesionario —de uno o de varios pedidos— y
-              subí la factura en PDF.
+              Elegí los pedidos y sus tractores, y subí la factura en PDF de cada tractor: cada uno
+              es una factura.
             </span>
           </span>
         </div>
@@ -309,8 +298,12 @@ export function CargarFactura({ onInicio }: Props) {
             </span>
             <span className="tablero-num">{seleccion.length}</span>
             <span className="tablero-txt">
-              en esta factura
-              <small>{concesionarioFijado || 'Todavía sin concesionario'}</small>
+              factura{seleccion.length === 1 ? '' : 's'} a cargar
+              <small>
+                {seleccion.length === 0
+                  ? 'Todavía ningún tractor'
+                  : `${conPdf} de ${seleccion.length} con su PDF`}
+              </small>
             </span>
           </div>
           <button
@@ -376,10 +369,8 @@ export function CargarFactura({ onInicio }: Props) {
             <div className="pedidos-lista">
               {visibles.map((p) => {
                 const suyas = unidadesDe.get(p.id) ?? []
-                const disponibles = suyas.filter((u) => !bloqueo(u, p))
+                const disponibles = suyas.filter((u) => !porQueNoSeFactura(u))
                 const elegidasAca = suyas.filter((u) => elegidas.includes(u.id)).length
-                const deOtro = Boolean(cuentaFijada) && p.cuentaId !== cuentaFijada
-                const paraFacturar = suyas.filter((u) => !porQueNoSeFactura(u)).length
                 return (
                   <TarjetaPedido
                     key={p.id}
@@ -390,14 +381,14 @@ export function CargarFactura({ onInicio }: Props) {
                     chips={
                       <>
                         <span className="chip chip--gris" title="Concesionario">
-                          <i className="fa-solid fa-store" aria-hidden="true" /> {p.cuentaNombre || 'Sin concesionario'}
+                          <i className="fa-solid fa-store" aria-hidden="true" />{' '}
+                          {p.cuentaNombre || 'Sin concesionario'}
                         </span>
-                        <span className={`chip ${deOtro ? 'chip--gris' : 'chip--verde'}`}>
-                          {paraFacturar} para facturar
-                        </span>
+                        <span className="chip chip--verde">{disponibles.length} para facturar</span>
                         {elegidasAca > 0 && (
                           <span className="chip chip--azul">
-                            <i className="fa-solid fa-check" aria-hidden="true" /> {elegidasAca} en la factura
+                            <i className="fa-solid fa-check" aria-hidden="true" /> {elegidasAca} elegido
+                            {elegidasAca === 1 ? '' : 's'}
                           </span>
                         )}
                       </>
@@ -406,18 +397,13 @@ export function CargarFactura({ onInicio }: Props) {
                       <div className="fact-tractores">
                         <div className="fact-tractores-head">
                           <span className="unidades-tit">Tractores del pedido</span>
-                          {disponibles.length > 0 && (
+                          {disponibles.length > 1 && (
                             <button
                               type="button"
                               className="btn btn--texto btn--chico"
                               disabled={trabajando}
                               onClick={() =>
-                                setElegidas((e) => [
-                                  ...new Set([
-                                    ...e,
-                                    ...disponibles.map((u) => u.id),
-                                  ]),
-                                ])
+                                setElegidas((e) => [...new Set([...e, ...disponibles.map((u) => u.id)])])
                               }
                             >
                               <i className="fa-solid fa-check-double" aria-hidden="true" /> Elegir los{' '}
@@ -425,17 +411,8 @@ export function CargarFactura({ onInicio }: Props) {
                             </button>
                           )}
                         </div>
-                        {deOtro && (
-                          <div className="aviso aviso--alerta">
-                            <i className="fa-solid fa-lock" aria-hidden="true" />
-                            <span>
-                              La factura que estás armando es de <b>{concesionarioFijado}</b>. Para
-                              facturar este pedido, vaciá la selección.
-                            </span>
-                          </div>
-                        )}
                         {suyas.map((u) => {
-                          const por = bloqueo(u, p)
+                          const por = porQueNoSeFactura(u)
                           const si = elegidas.includes(u.id)
                           return (
                             <label
@@ -451,12 +428,16 @@ export function CargarFactura({ onInicio }: Props) {
                               <span className="fact-tractor-nom">
                                 <b>{u.catalogoNombre || u.nombre}</b>
                                 <small>
-                                  {u.chasis ? `Chasis ${u.chasis}` : u.inventarioNombre || 'Sin tractor del inventario'}
+                                  {u.chasis
+                                    ? `Chasis ${u.chasis}`
+                                    : u.inventarioNombre || 'Sin tractor del inventario'}
                                   {u.chasis && u.inventarioNombre ? ` · ${u.inventarioNombre}` : ''}
                                 </small>
                               </span>
                               <span className="fact-tractor-der">
-                                <span className={`chip ${tonoDeUnidad(u.estado)}`}>{u.estado || 'Sin estado'}</span>
+                                <span className={`chip ${tonoDeUnidad(u.estado)}`}>
+                                  {u.estado || 'Sin estado'}
+                                </span>
                                 {por && por !== u.estado && <span className="chip chip--gris">{por}</span>}
                                 {u.precios.facturaSinIva !== null && (
                                   <Plata valor={u.precios.facturaSinIva} nota="s/IVA" />
@@ -473,10 +454,11 @@ export function CargarFactura({ onInicio }: Props) {
             </div>
           </div>
 
-          {/* La factura, siempre a la vista. */}
+          {/* Las facturas a cargar, siempre a la vista: una por tractor elegido. */}
           <aside className="facturar-panel">
             <div className="facturar-panel-tit">
-              <i className="fa-solid fa-file-invoice-dollar" aria-hidden="true" /> La factura
+              <i className="fa-solid fa-file-invoice-dollar" aria-hidden="true" /> Facturas a cargar
+              {seleccion.length > 0 && <span className="solapa-num">{seleccion.length}</span>}
               {seleccion.length > 0 && (
                 <button
                   type="button"
@@ -489,52 +471,60 @@ export function CargarFactura({ onInicio }: Props) {
               )}
             </div>
 
-            <dl className="datos-pares facturar-a">
-              <div>
-                <dt>Concesionario</dt>
-                <dd>{concesionarioFijado || '— lo fija el primer tractor que elijas'}</dd>
-              </div>
-            </dl>
-
             {seleccion.length === 0 ? (
               <span className="campo-ayuda">
-                Desplegá un pedido y tildá los tractores que entran en esta factura.
+                Desplegá un pedido y tildá sus tractores. Por cada tractor elegido aparece acá una
+                factura, y a cada una le subís su PDF.
               </span>
             ) : (
-              <ul className="fact-elegidos">
-                {seleccion.map((u) => (
-                  <li key={u.id}>
-                    <span>
-                      <b>{nombreDelTractor(u)}</b>
-                      <small>{porPedido.get(u.pedidoId)?.nombre}</small>
-                    </span>
-                    <Plata valor={u.precios.facturaSinIva ?? 0} />
-                    <button
-                      type="button"
-                      className="unir-quitar"
-                      aria-label="Quitar"
-                      disabled={trabajando}
-                      onClick={() => alternar(u)}
-                    >
-                      <i className="fa-solid fa-xmark" aria-hidden="true" />
-                    </button>
-                  </li>
-                ))}
+              <ul className="fact-cargas">
+                {seleccion.map((u) => {
+                  const p = porPedido.get(u.pedidoId)
+                  const c = cargas[u.id] ?? SIN_CARGA
+                  return (
+                    <li key={u.id} className={`fact-carga${c.archivo ? ' fact-carga--lista' : ''}`}>
+                      <div className="fact-carga-head">
+                        <span>
+                          <b>{nombreDelTractor(u)}</b>
+                          <small>
+                            {p?.nombre}
+                          </small>
+                        </span>
+                        <Plata valor={u.precios.facturaConIva ?? u.precios.facturaSinIva ?? 0} nota="c/IVA" />
+                        <button
+                          type="button"
+                          className="unir-quitar"
+                          aria-label="Quitar"
+                          disabled={trabajando}
+                          onClick={() => alternar(u)}
+                        >
+                          <i className="fa-solid fa-xmark" aria-hidden="true" />
+                        </button>
+                      </div>
+                      <FilaArchivo
+                        rotulo="PDF"
+                        yaSubidos={[]}
+                        pendientes={c.archivo ? [c.archivo] : []}
+                        onCambiar={(fs) => ponerArchivo(u.id, fs[0] ?? null)}
+                        trabado={trabajando ? 'Cargando…' : undefined}
+                      />
+                      <input
+                        className="input input--chico"
+                        placeholder="N° de factura (sale del nombre del PDF)"
+                        aria-label={`N° de factura de ${nombreDelTractor(u)}`}
+                        value={c.numero}
+                        disabled={trabajando}
+                        onChange={(e) =>
+                          setCargas((x) => ({ ...x, [u.id]: { ...(x[u.id] ?? SIN_CARGA), numero: e.target.value } }))
+                        }
+                      />
+                    </li>
+                  )
+                })}
               </ul>
             )}
 
             <div className="facturar-campos">
-              <label className="campo facturar-campos-ancho">
-                <span className="campo-lbl">
-                  N° de factura <span className="campo-req">· obligatorio</span>
-                </span>
-                <input
-                  className="input"
-                  placeholder="Ej.: A-0001-00001234"
-                  value={datos.numero}
-                  onChange={(e) => setDatos({ ...datos, numero: e.target.value })}
-                />
-              </label>
               <label className="campo">
                 <span className="campo-lbl">
                   Emisión <span className="campo-req">· obligatorio</span>
@@ -542,8 +532,8 @@ export function CargarFactura({ onInicio }: Props) {
                 <input
                   className="input"
                   type="date"
-                  value={datos.fechaEmision}
-                  onChange={(e) => setDatos({ ...datos, fechaEmision: e.target.value })}
+                  value={comunes.fechaEmision}
+                  onChange={(e) => setComunes({ ...comunes, fechaEmision: e.target.value })}
                 />
               </label>
               <label className="campo">
@@ -551,67 +541,35 @@ export function CargarFactura({ onInicio }: Props) {
                 <input
                   className="input"
                   type="date"
-                  value={datos.fechaVencimiento}
-                  onChange={(e) => setDatos({ ...datos, fechaVencimiento: e.target.value })}
+                  value={comunes.fechaVencimiento}
+                  onChange={(e) => setComunes({ ...comunes, fechaVencimiento: e.target.value })}
                 />
               </label>
-              <label className="campo">
-                <span className="campo-lbl">Neto (USD)</span>
-                <input
-                  className="input input--num"
-                  inputMode="decimal"
-                  placeholder={sugeridos.neto.toLocaleString('es-AR')}
-                  value={datos.neto}
-                  onChange={(e) => setDatos({ ...datos, neto: e.target.value })}
-                />
-              </label>
-              <label className="campo">
-                <span className="campo-lbl">IVA (USD)</span>
-                <input
-                  className="input input--num"
-                  inputMode="decimal"
-                  placeholder={sugeridos.iva.toLocaleString('es-AR')}
-                  value={datos.iva}
-                  onChange={(e) => setDatos({ ...datos, iva: e.target.value })}
+              <label className="campo facturar-campos-ancho">
+                <span className="campo-lbl">Notas</span>
+                <textarea
+                  className="input textarea"
+                  rows={2}
+                  value={comunes.notas}
+                  onChange={(e) => setComunes({ ...comunes, notas: e.target.value })}
                 />
               </label>
               <span className="campo-ayuda facturar-campos-ancho">
-                Vacíos, toman lo que suman los tractores (factura s/IVA y c/IVA de cada unidad).
+                Las fechas y las notas van en todas las facturas. Los montos de cada una salen de su
+                tractor (factura s/IVA y c/IVA de la unidad).
               </span>
             </div>
 
             <div className="totales-pedido totales-pedido--dos">
               <div className="total-cuadro">
-                <small>Neto + IVA</small>
-                <Plata valor={neto} apagado />
+                <small>Concesionarios</small>
+                <b>{concesionariosElegidos}</b>
               </div>
               <div className="total-cuadro total-cuadro--fuerte">
-                <small>Total de la factura</small>
-                <Plata valor={neto + iva} grande />
+                <small>Total con IVA</small>
+                <Plata valor={total} grande />
               </div>
             </div>
-
-            <div className="campo">
-              <span className="campo-lbl">
-                Factura en PDF <span className="campo-req">· obligatorio</span>
-              </span>
-              <ZonaArchivo
-                archivo={archivo}
-                onElegir={setArchivo}
-                acepta=".pdf"
-                titulo="Arrastrá el PDF de la factura o hacé clic"
-              />
-            </div>
-
-            <label className="campo">
-              <span className="campo-lbl">Notas</span>
-              <textarea
-                className="input textarea"
-                rows={2}
-                value={datos.notas}
-                onChange={(e) => setDatos({ ...datos, notas: e.target.value })}
-              />
-            </label>
 
             {falta && seleccion.length > 0 && (
               <span className="campo-ayuda campo-ayuda--aviso">{falta}</span>
@@ -622,10 +580,15 @@ export function CargarFactura({ onInicio }: Props) {
               disabled={Boolean(falta) || trabajando}
               onClick={() => setConfirmando(true)}
             >
-              <i className={`fa-solid ${trabajando ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} aria-hidden="true" />{' '}
+              <i
+                className={`fa-solid ${trabajando ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`}
+                aria-hidden="true"
+              />{' '}
               {trabajando
-                ? 'Cargando la factura…'
-                : `Cargar factura${seleccion.length > 0 ? ` (${seleccion.length} tractor${seleccion.length === 1 ? '' : 'es'})` : ''}`}
+                ? 'Cargando las facturas…'
+                : seleccion.length > 1
+                  ? `Cargar ${seleccion.length} facturas`
+                  : 'Cargar la factura'}
             </button>
           </aside>
         </div>
@@ -635,31 +598,35 @@ export function CargarFactura({ onInicio }: Props) {
             <button className="lateral-fondo" aria-label="Cancelar" onClick={() => setConfirmando(false)} />
             <div className="ventanita" role="dialog" aria-modal="true">
               <div className="ventanita-head">
-                <span>¿Cargar la factura {datos.numero.trim()}?</span>
+                <span>
+                  ¿Cargar {seleccion.length === 1 ? 'la factura' : `${seleccion.length} facturas`}?
+                </span>
                 <button type="button" onClick={() => setConfirmando(false)} aria-label="Cerrar">
                   <i className="fa-solid fa-xmark" aria-hidden="true" />
                 </button>
               </div>
-              <div className="ventanita-cuerpo">
-                <span className="campo-lbl">
-                  {concesionarioFijado} · <Plata valor={neto + iva} /> con IVA
-                </span>
+              <div className="ventanita-cuerpo ventanita-cuerpo--scroll">
                 <ul className="lista-compacta">
-                  {seleccion.map((u) => (
+                  {aCargar.map(({ unidad: u, numero }) => (
                     <li key={u.id}>
-                      <b>{nombreDelTractor(u)}</b> — {porPedido.get(u.pedidoId)?.nombre}
+                      <b>{numero}</b> — {nombreDelTractor(u)} · {porPedido.get(u.pedidoId)?.cuentaNombre}
                     </li>
                   ))}
                 </ul>
                 <span className="campo-ayuda">
-                  Se crea la factura con su PDF y un subelemento por tractor. Cada tractor pasa a
-                  Facturado en Pedidos x UNIDAD y en el Inventario, y su renglón y su pedido a
-                  Facturado (o Facturado Parcialmente si les queda alguno). Desde la app no se
-                  deshace.
+                  Se crea una factura por tractor, con su PDF y su tractor como subelemento. Cada
+                  tractor pasa a Facturado en Pedidos x UNIDAD y en el Inventario, y su renglón y su
+                  pedido a Facturado (o Facturado Parcialmente si les queda alguno). Desde la app no
+                  se deshace.
                 </span>
               </div>
               <div className="ventanita-pie">
-                <button type="button" className="btn btn--borde btn--chico" autoFocus onClick={() => setConfirmando(false)}>
+                <button
+                  type="button"
+                  className="btn btn--borde btn--chico"
+                  autoFocus
+                  onClick={() => setConfirmando(false)}
+                >
                   Cancelar
                 </button>
                 <button
@@ -683,25 +650,56 @@ export function CargarFactura({ onInicio }: Props) {
             <div className="ventanita" role="dialog" aria-modal="true">
               <div className="ventanita-head">
                 <span>
-                  <i className="fa-solid fa-circle-check texto-verde" aria-hidden="true" /> Factura cargada
+                  <i
+                    className={`fa-solid ${noCreadas.length ? 'fa-triangle-exclamation texto-rojo' : 'fa-circle-check texto-verde'}`}
+                    aria-hidden="true"
+                  />{' '}
+                  {creadas.length === 1 ? 'Factura cargada' : `${creadas.length} facturas cargadas`}
                 </span>
                 <button type="button" onClick={() => setResultado(null)} aria-label="Cerrar">
                   <i className="fa-solid fa-xmark" aria-hidden="true" />
                 </button>
               </div>
-              <div className="ventanita-cuerpo">
-                <span className="exito-titulo">
-                  La factura {resultado.numero} de {resultado.concesionario} fue cargada con{' '}
-                  {resultado.tractores.length} tractor{resultado.tractores.length === 1 ? '' : 'es'}.
-                </span>
+              <div className="ventanita-cuerpo ventanita-cuerpo--scroll">
+                {creadas.length > 0 && (
+                  <span className="exito-titulo">
+                    {creadas.length === 1
+                      ? 'La factura fue cargada de manera exitosa.'
+                      : `Las ${creadas.length} facturas fueron cargadas de manera exitosa.`}
+                  </span>
+                )}
                 <ul className="exito-lista">
-                  {resultado.tractores.map((t) => (
-                    <li key={t}>
-                      <i className="fa-solid fa-tractor" aria-hidden="true" />
-                      <span>{t}</span>
+                  {creadas.map((f) => (
+                    <li key={f.unidadId}>
+                      <i className="fa-solid fa-file-invoice" aria-hidden="true" />
+                      <span>
+                        <a href={urlDeFactura(f.facturaId)} target="_blank" rel="noreferrer">
+                          <b>{f.numero}</b>
+                        </a>
+                        <small>
+                          {f.tractor} · {f.concesionario}
+                        </small>
+                      </span>
                     </li>
                   ))}
                 </ul>
+                {noCreadas.length > 0 && (
+                  <div className="aviso aviso--error">
+                    <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+                    <span>
+                      {noCreadas.length === 1
+                        ? 'Una factura no se pudo crear; su tractor quedó elegido para reintentar:'
+                        : `${noCreadas.length} facturas no se pudieron crear; sus tractores quedaron elegidos para reintentar:`}
+                      <ul className="lista-compacta">
+                        {noCreadas.map((f) => (
+                          <li key={f.unidadId}>
+                            {f.numero} — {f.tractor}: {f.error}
+                          </li>
+                        ))}
+                      </ul>
+                    </span>
+                  </div>
+                )}
                 <span className="resumen-chips">
                   {resultado.pedidos.map((p) => (
                     <span key={p.id} className={`chip ${tonoDeEstado(p.estado)}`}>
@@ -709,7 +707,7 @@ export function CargarFactura({ onInicio }: Props) {
                     </span>
                   ))}
                 </span>
-                {resultado.advertencias.length > 0 && (
+                {resultado.advertencias.length > noCreadas.length && (
                   <div className="aviso aviso--alerta">
                     <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
                     <span>
@@ -729,16 +727,14 @@ export function CargarFactura({ onInicio }: Props) {
                     <i className="fa-solid fa-house" aria-hidden="true" /> Volver al inicio
                   </button>
                 )}
-                <a
-                  className="btn btn--borde btn--chico"
-                  href={urlDeFactura(resultado.facturaId)}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  className="btn btn--primario btn--chico"
+                  autoFocus
+                  onClick={noCreadas.length ? () => setResultado(null) : empezarOtra}
                 >
-                  <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden="true" /> Ver en monday
-                </a>
-                <button type="button" className="btn btn--primario btn--chico" autoFocus onClick={empezarOtra}>
-                  <i className="fa-solid fa-plus" aria-hidden="true" /> Cargar otra factura
+                  <i className="fa-solid fa-plus" aria-hidden="true" />{' '}
+                  {noCreadas.length ? 'Reintentar las que faltan' : 'Cargar más facturas'}
                 </button>
               </div>
             </div>

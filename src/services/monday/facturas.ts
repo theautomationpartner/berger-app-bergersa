@@ -1,14 +1,14 @@
 /**
- * Cargar la factura de BERGER por los tractores de uno o varios pedidos.
+ * Cargar las facturas de BERGER: UNA por tractor, cada una con su PDF.
  *
- * Se factura de a TRACTOR, no de a renglón: un renglón de cinco tractores del mismo modelo puede
- * facturarse en tres facturas distintas, a medida que se entregan. Por eso lo que se elige son las
+ * Se elige de a TRACTOR, no de a renglón: un renglón de cinco tractores del mismo modelo puede
+ * facturarse en cinco días distintos, a medida que se entregan. Por eso lo que se elige son las
  * unidades de 🛍️Pedidos x UNIDAD —una por tractor—, y el renglón y el pedido quedan en
  * "Facturado Parcialmente" hasta que no les quede ninguna sin facturar.
  *
- * Una factura es de UN concesionario: puede juntar tractores de varios pedidos suyos, nunca de dos
- * concesionarios. Se controla acá y no sólo en la pantalla, porque la factura que sale mezclada es
- * una factura que hay que anular.
+ * Cada tractor genera su propio item en 📄Facturas de Pedidos, con un único subitem y su PDF. Como
+ * cada factura es de un solo tractor, en una misma tanda pueden ir tractores de pedidos y
+ * concesionarios distintos: cada item toma el concesionario y el team de su propio pedido.
  *
  * Igual que en el resto de la venta, nada se revierte: la factura toca cinco tableros y monday no
  * tiene transacciones. Lo que no se pudo escribir vuelve dicho, para corregirlo sabiendo qué pasó.
@@ -190,30 +190,35 @@ export const pedidoFacturable = (p: PedidoLeido, suyas: UnidadFacturable[]): boo
  * Lo que se escribe
  * ------------------------------------------------------------------ */
 
-export interface AltaFactura {
+/** Un tractor con su factura: cada uno tiene su PDF y su número. */
+export interface FacturaDeTractor {
+  unidad: UnidadFacturable
   /** El número de la factura. Es el nombre del item. */
   numero: string
-  fechaEmision: string
-  fechaVencimiento: string
-  neto: number
-  iva: number
-  notas: string
   archivo: File
 }
 
-export interface ResultadoFactura {
-  facturaId: string
+/** Lo que comparten todas las facturas de una tanda. */
+export interface DatosComunes {
+  fechaEmision: string
+  fechaVencimiento: string
+  notas: string
+}
+
+export interface ResultadoFacturas {
+  /** Una por tractor. `facturaId` vacío = no se pudo crear, y `error` dice por qué. */
+  facturas: {
+    unidadId: string
+    tractor: string
+    numero: string
+    concesionario: string
+    facturaId: string
+    error?: string
+  }[]
   /** Lo que no se pudo hacer. Vacío = salió todo. */
   advertencias: string[]
   /** Cómo quedó cada pedido tocado. */
   pedidos: { id: string; nombre: string; estado: string }[]
-}
-
-/** Lo que vale la factura según sus tractores: es lo que la pantalla propone, y se puede corregir. */
-export function montosSugeridos(unidades: UnidadFacturable[]): { neto: number; iva: number } {
-  const neto = unidades.reduce((s, u) => s + (u.precios.facturaSinIva ?? 0), 0)
-  const total = unidades.reduce((s, u) => s + (u.precios.facturaConIva ?? 0), 0)
-  return { neto: redondear(neto), iva: redondear(Math.max(total - neto, 0)) }
 }
 
 const redondear = (n: number): number => Math.round(n * 100) / 100
@@ -275,120 +280,134 @@ function valoresDelSubitem(
 }
 
 /**
- * Por qué no se puede cargar esta factura, o `null` si se puede.
+ * Por qué no se pueden cargar estas facturas, o `null` si se puede.
  *
  * Es la misma regla que aplica la pantalla, repetida acá para que no dependa de ella.
  */
-export function problemaDeFactura(
-  elegidas: UnidadFacturable[],
-  pedidos: PedidoLeido[],
-): string | null {
-  if (elegidas.length === 0) return 'Elegí al menos un tractor.'
+export function problemaDeFacturas(cargas: FacturaDeTractor[], pedidos: PedidoLeido[]): string | null {
+  if (cargas.length === 0) return 'Elegí al menos un tractor.'
   const porPedido = new Map(pedidos.map((p) => [p.id, p]))
-  const cuentas = new Set<string>()
-  for (const u of elegidas) {
+  const vistos = new Set<string>()
+  for (const { unidad: u, numero, archivo } of cargas) {
+    if (vistos.has(u.id)) return `${nombreDelTractor(u)} está dos veces.`
+    vistos.add(u.id)
     const p = porPedido.get(u.pedidoId)
     if (!p) return `No se encontró el pedido de ${nombreDelTractor(u)}.`
     if (PEDIDO_NO_FACTURABLE.includes(p.estado)) return `${p.nombre} está ${p.estado}: no se factura.`
+    if (!p.cuentaId) return `${p.nombre} no tiene concesionario: no se sabe a quién facturarle.`
     const por = porQueNoSeFactura(u)
     if (por) return `${nombreDelTractor(u)} no se puede facturar: ${por}.`
-    cuentas.add(p.cuentaId)
+    if (!archivo) return `Falta el PDF de la factura de ${nombreDelTractor(u)}.`
+    if (!numero.trim()) return `Falta el número de la factura de ${nombreDelTractor(u)}.`
   }
-  if (cuentas.size > 1) return 'Una factura no puede tener tractores de dos concesionarios.'
-  if ([...cuentas][0] === '') return 'El pedido no tiene concesionario: no se sabe a quién facturarle.'
   return null
 }
 
+/** El número que se propone para la factura: el nombre del PDF, sin la extensión. */
+export const numeroDelArchivo = (archivo: File): string => archivo.name.replace(/\.pdf$/i, '').trim()
+
 /**
- * Cargar la factura.
+ * Cargar las facturas: UNA por tractor, cada una con su PDF.
  *
- * El orden importa: primero la factura y su PDF, después un subitem por tractor, y recién ahí se
- * mueven los estados. Así, si algo se corta, lo que quedó es una factura con menos filas —que se ve
- * y se completa en monday—, y no tractores marcados como facturados sin factura que lo diga.
+ * Por cada tractor se crea un item en 📄Facturas de Pedidos —con el concesionario y el team de SU
+ * pedido, así que en una misma tanda pueden ir tractores de concesionarios distintos— y un
+ * subitem con los datos de la unidad. El orden importa: primero la factura y su PDF, después el
+ * subitem, y recién ahí se mueven los estados. Un tractor cuya factura no se pudo crear no se marca
+ * como facturado: un tractor facturado sin factura que lo diga es lo que no se encuentra después.
  *
  * `todas` son TODAS las unidades leídas: hacen falta para saber si al renglón o al pedido le queda
  * algún tractor sin facturar.
  */
-export async function cargarFactura(
-  alta: AltaFactura,
-  elegidas: UnidadFacturable[],
+export async function cargarFacturas(
+  cargas: FacturaDeTractor[],
+  comunes: DatosComunes,
   pedidos: PedidoLeido[],
   todas: UnidadFacturable[],
-): Promise<ResultadoFactura> {
-  const problema = problemaDeFactura(elegidas, pedidos)
+): Promise<ResultadoFacturas> {
+  const problema = problemaDeFacturas(cargas, pedidos)
   if (problema) throw new Error(problema)
-  if (!alta.numero.trim()) throw new Error('Falta el número de la factura.')
-  if (!alta.archivo) throw new Error('Falta el PDF de la factura.')
 
   const advertencias: string[] = []
   const porPedido = new Map(pedidos.map((p) => [p.id, p]))
-  const primero = porPedido.get(elegidas[0].pedidoId)!
-  const equipo = equipoDelPedido(primero)
-  const neto = redondear(alta.neto)
-  const iva = redondear(alta.iva)
-
-  const valores: Record<string, unknown> = {
-    [COL_FACTURA.concesionario]: { item_ids: [Number(primero.cuentaId)] },
-    [COL_FACTURA.estado]: { label: ESTADO_FACTURA_EMITIDA },
-    [COL_FACTURA.montoNeto]: String(neto),
-    [COL_FACTURA.montoIva]: String(iva),
-    [COL_FACTURA.montoTotal]: String(redondear(neto + iva)),
-  }
-  if (neto > 0) valores[COL_FACTURA.ivaPorcentaje] = String(redondear((iva / neto) * 100))
-  if (equipo.length > 0) valores[COL_FACTURA.equipo] = { personsAndTeams: equipo }
-  if (alta.fechaEmision) valores[COL_FACTURA.fechaEmision] = { date: alta.fechaEmision }
-  if (alta.fechaVencimiento) valores[COL_FACTURA.fechaVencimiento] = { date: alta.fechaVencimiento }
-  if (alta.notas.trim()) valores[COL_FACTURA.notas] = { text: alta.notas.trim() }
-
-  const r = await mondayApi<{ create_item: { id: string } }>('crearFactura', {
-    nombre: alta.numero.trim(),
-    valores: JSON.stringify(valores),
-  })
-  const facturaId = r.create_item.id
-
-  try {
-    await subirArchivoAColumna(facturaId, COL_FACTURA.pdf, alta.archivo)
-  } catch (e) {
-    advertencias.push(`La factura quedó cargada sin el PDF; subilo desde monday: ${motivo(e)}`)
-  }
-
-  /* Un subitem por tractor. El que no entra no se marca como facturado: un tractor facturado que
-     no figura en ninguna factura es justo lo que no se puede encontrar después. */
+  const hechas: ResultadoFacturas['facturas'] = []
   const facturadas: UnidadFacturable[] = []
-  for (const u of elegidas) {
-    const { alCrear, despues } = valoresDelSubitem(u, porPedido.get(u.pedidoId)!)
-    let subitemId: string
+  /** Las facturas nuevas de cada pedido, para la Factura Vinculada. */
+  const nuevasDe = new Map<string, string[]>()
+
+  for (const { unidad: u, numero, archivo } of cargas) {
+    const p = porPedido.get(u.pedidoId)!
+    const tractor = nombreDelTractor(u)
+    const neto = redondear(u.precios.facturaSinIva ?? 0)
+    const total = redondear(u.precios.facturaConIva ?? neto)
+    const iva = redondear(Math.max(total - neto, 0))
+    const equipo = equipoDelPedido(p)
+
+    const valores: Record<string, unknown> = {
+      [COL_FACTURA.concesionario]: { item_ids: [Number(p.cuentaId)] },
+      [COL_FACTURA.estado]: { label: ESTADO_FACTURA_EMITIDA },
+      [COL_FACTURA.montoNeto]: String(neto),
+      [COL_FACTURA.montoIva]: String(iva),
+      [COL_FACTURA.montoTotal]: String(redondear(neto + iva)),
+    }
+    if (neto > 0) valores[COL_FACTURA.ivaPorcentaje] = String(redondear((iva / neto) * 100))
+    if (equipo.length > 0) valores[COL_FACTURA.equipo] = { personsAndTeams: equipo }
+    if (comunes.fechaEmision) valores[COL_FACTURA.fechaEmision] = { date: comunes.fechaEmision }
+    if (comunes.fechaVencimiento) valores[COL_FACTURA.fechaVencimiento] = { date: comunes.fechaVencimiento }
+    if (comunes.notas.trim()) valores[COL_FACTURA.notas] = { text: comunes.notas.trim() }
+
+    let facturaId: string
+    try {
+      const r = await mondayApi<{ create_item: { id: string } }>('crearFactura', {
+        nombre: numero.trim(),
+        valores: JSON.stringify(valores),
+      })
+      facturaId = r.create_item.id
+    } catch (e) {
+      hechas.push({ unidadId: u.id, tractor, numero, concesionario: p.cuentaNombre, facturaId: '', error: motivo(e) })
+      advertencias.push(`La factura ${numero} de ${tractor} no se pudo crear y el tractor sigue sin facturar: ${motivo(e)}`)
+      continue
+    }
+
+    try {
+      await subirArchivoAColumna(facturaId, COL_FACTURA.pdf, archivo)
+    } catch (e) {
+      advertencias.push(`La factura ${numero} quedó cargada sin el PDF; subilo desde monday: ${motivo(e)}`)
+    }
+
+    const { alCrear, despues } = valoresDelSubitem(u, p)
     try {
       const s = await mondayApi<{ create_subitem: { id: string } }>('crearSubitemDeFactura', {
         padre: facturaId,
-        nombre: nombreDelTractor(u),
+        nombre: tractor,
         valores: JSON.stringify(alCrear),
       })
-      subitemId = s.create_subitem.id
-    } catch (e) {
-      advertencias.push(`${nombreDelTractor(u)} no entró en la factura y sigue sin facturar: ${motivo(e)}`)
-      continue
-    }
-    if (Object.keys(despues).length > 0) {
-      try {
-        await mondayApi('completarSubitemDeFactura', { item: subitemId, valores: JSON.stringify(despues) })
-      } catch (e) {
-        advertencias.push(
-          `${nombreDelTractor(u)} entró en la factura sin sus conexiones (tractor, pedido, catálogo): ${motivo(e)}`,
-        )
+      if (Object.keys(despues).length > 0) {
+        try {
+          await mondayApi('completarSubitemDeFactura', {
+            item: s.create_subitem.id,
+            valores: JSON.stringify(despues),
+          })
+        } catch (e) {
+          advertencias.push(
+            `En la factura ${numero}, ${tractor} quedó sin sus conexiones (tractor, pedido, catálogo): ${motivo(e)}`,
+          )
+        }
       }
+    } catch (e) {
+      advertencias.push(`La factura ${numero} quedó sin el tractor en sus subelementos; agregalo en monday: ${motivo(e)}`)
     }
-    facturadas.push(u)
-  }
 
-  for (const u of facturadas) {
+    hechas.push({ unidadId: u.id, tractor, numero, concesionario: p.cuentaNombre, facturaId })
+    facturadas.push(u)
+    nuevasDe.set(u.pedidoId, [...(nuevasDe.get(u.pedidoId) ?? []), facturaId])
+
     try {
       await mondayApi('resolverUnidadDeVenta', {
         item: u.id,
         valores: JSON.stringify({ [COL_VENTA.estado]: { label: ESTADO_UNIDAD.FACTURADA } }),
       })
     } catch (e) {
-      advertencias.push(`${nombreDelTractor(u)} quedó en la factura pero la unidad no pasó a Facturada: ${motivo(e)}`)
+      advertencias.push(`${tractor} tiene su factura pero la unidad no pasó a Facturada: ${motivo(e)}`)
     }
     try {
       await mondayApi('reservarEnInventario', {
@@ -420,9 +439,8 @@ export async function cargarFactura(
     }
   }
 
-  const resultadoPedidos: ResultadoFactura['pedidos'] = []
-  const pedidosTocados = [...new Set(facturadas.map((u) => u.pedidoId))]
-  for (const pedidoId of pedidosTocados) {
+  const resultadoPedidos: ResultadoFacturas['pedidos'] = []
+  for (const [pedidoId, nuevas] of nuevasDe) {
     const p = porPedido.get(pedidoId)!
     const suyas = todas.filter((u) => u.pedidoId === pedidoId)
     const estado = suyas.every(yaFacturada) ? ESTADO_PEDIDO.FACTURADO : ESTADO_PEDIDO.FACTURADO_PARCIAL
@@ -431,9 +449,9 @@ export async function cargarFactura(
         item: pedidoId,
         valores: JSON.stringify({
           [COL_PEDIDO.estado]: { label: estado },
-          /* Se suma a las que ya tenía: un pedido facturado en tres veces tiene tres facturas. */
+          /* Se suman a las que ya tenía: un pedido de cinco tractores termina con cinco facturas. */
           [COL_PEDIDO.facturaVinculada]: {
-            item_ids: [...new Set([...p.facturaIds, facturaId])].map(Number),
+            item_ids: [...new Set([...p.facturaIds, ...nuevas])].map(Number),
           },
         }),
       })
@@ -444,7 +462,7 @@ export async function cargarFactura(
     }
   }
 
-  return { facturaId, advertencias, pedidos: resultadoPedidos }
+  return { facturas: hechas, advertencias, pedidos: resultadoPedidos }
 }
 
 /** El enlace a la factura en monday, para el "ver en monday" del resultado. */
