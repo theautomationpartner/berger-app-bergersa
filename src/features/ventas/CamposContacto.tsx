@@ -18,6 +18,8 @@ import {
 export interface DatosContacto {
   nombres: string
   apellidos: string
+  /** Un sector, un mail general: lo que no tiene nombre ni apellido. */
+  otro: string
   categorias: string[]
   email: string
   paisCodigo: string
@@ -38,6 +40,7 @@ export interface DatosContacto {
 export const CONTACTO_VACIO: DatosContacto = {
   nombres: '',
   apellidos: '',
+  otro: '',
   categorias: [],
   email: '',
   paisCodigo: PAIS_POR_DEFECTO,
@@ -74,14 +77,15 @@ export function CamposContacto({
   const problemaTel = enEdicion
     ? null
     : problemaDelTelefono(datos.paisCodigo, datos.area, datos.abonado)
+  /* Con "Otro" cargado —un sector, un mail general— el nombre y el apellido dejan de hacer falta. */
+  const conOtro = Boolean(datos.otro.trim())
+  const obligatorio = conOtro ? null : <span className="campo-req">· obligatorio</span>
 
   return (
     <>
       <div className="datos datos--form">
         <label className="campo">
-          <span className="campo-lbl">
-            Nombre/s <span className="campo-req">· obligatorio</span>
-          </span>
+          <span className="campo-lbl">Nombre/s {obligatorio}</span>
           <input
             className="input"
             placeholder="Ej: Ricardo"
@@ -91,15 +95,26 @@ export function CamposContacto({
         </label>
 
         <label className="campo">
-          <span className="campo-lbl">
-            Apellido/s <span className="campo-req">· obligatorio</span>
-          </span>
+          <span className="campo-lbl">Apellido/s {obligatorio}</span>
           <input
             className="input"
             placeholder="Ej: Gutiérrez"
             value={datos.apellidos}
             onChange={(e) => cambiar({ apellidos: e.target.value })}
           />
+        </label>
+
+        <label className="campo">
+          <span className="campo-lbl">Otro</span>
+          <input
+            className="input"
+            placeholder="Ej: Ventas, Administración, Recepción"
+            value={datos.otro}
+            onChange={(e) => cambiar({ otro: e.target.value })}
+          />
+          <span className="campo-ayuda">
+            Para un sector o un número sin nombre. Si lo completás, nombre y apellido son opcionales.
+          </span>
         </label>
 
         <label className="campo">
@@ -117,17 +132,19 @@ export function CamposContacto({
           </span>
         </label>
 
-        <div className="campo">
-          <span className="campo-lbl">Categoría</span>
-          <DesplegableMulti
-            valores={datos.categorias}
-            opciones={categorias}
-            vacio="Elegir…"
-            bloqueado={cargando}
-            onCambiar={(v) => cambiar({ categorias: v })}
-          />
-          <span className="campo-ayuda">Puede tener más de una.</span>
-        </div>
+        {categorias.length > 0 && (
+          <div className="campo">
+            <span className="campo-lbl">Categoría</span>
+            <DesplegableMulti
+              valores={datos.categorias}
+              opciones={categorias}
+              vacio="Elegir…"
+              bloqueado={cargando}
+              onCambiar={(v) => cambiar({ categorias: v })}
+            />
+            <span className="campo-ayuda">Puede tener más de una.</span>
+          </div>
+        )}
       </div>
 
       {/* El teléfono ocupa su propia fila: son cuatro casilleros y, metidos en la grilla junto a

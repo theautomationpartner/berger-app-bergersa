@@ -1335,3 +1335,76 @@
   gap: 6px;
   margin: 6px 0 10px;
 }
+
+/* =====================================================================
+   Actividades y Cuentas y contactos: solapas, alta de cuenta desde la
+   actividad y la ventana de lo que quedó hecho.
+   ===================================================================== */
+
+.solapa-num--rojo {
+  background: var(--berger-red-soft);
+  color: var(--berger-red-dark);
+}
+/* El buscador del cliente y, al lado, el botón para crearlo si no existe. */
+.cliente-con-alta {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.cliente-con-alta > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.cliente-con-alta > .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.volver-actividad {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
+  font-size: 13px;
+}
+.exito-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.exito-lista li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+}
+.exito-lista li > i {
+  margin-top: 2px;
+  color: var(--green-dark);
+}
+.exito-lista li span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.exito-lista small {
+  color: var(--text-gray);
+  white-space: pre-wrap;
+}
+@media (max-width: 720px) {
+  .cliente-con-alta,
+  .volver-actividad {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

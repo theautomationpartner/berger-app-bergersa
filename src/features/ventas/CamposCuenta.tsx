@@ -7,11 +7,10 @@
  */
 import { useCallback, useState } from 'react'
 import { Desplegable } from '@/components/ui/Desplegable'
-import { DesplegableMulti } from '@/components/ui/DesplegableMulti'
 import { formatearCuit, problemaDelCuit, soloDigitos, tipoDePersonaSegunCuit } from '@/lib/cuit'
 import { PAIS_POR_DEFECTO, PAISES } from '@/lib/telefono'
 import { condicionFiscalDeArca, consultarArca } from '@/services/arca'
-import type { Concesionario } from '@/services/monday/crm'
+import { CATEGORIA_CONCESIONARIO } from '@/services/monday/columns'
 
 export interface DatosCuenta {
   razonSocial: string
@@ -24,7 +23,11 @@ export interface DatosCuenta {
   provincia: string
   paisCodigo: string
   descripcion: string
-  concesionarioIds: string[]
+  /**
+   * Pedidos x concesión permitidos, como se tipea. Sólo cuenta si la categoría es Concesionario:
+   * arranca en 0 y no puede ser negativo.
+   */
+  concesionLimite: string
   /** Contactos que ya existen y quedan enganchados a la cuenta. */
   contactoIds: string[]
 }
@@ -40,8 +43,15 @@ export const CUENTA_VACIA: DatosCuenta = {
   provincia: '',
   paisCodigo: PAIS_POR_DEFECTO,
   descripcion: '',
-  concesionarioIds: [],
+  concesionLimite: '0',
   contactoIds: [],
+}
+
+/** El tope tipeado, como número. `null` si está vacío o no es un entero de 0 para arriba. */
+export const limiteDeConcesion = (texto: string): number | null => {
+  const t = texto.trim()
+  if (!/^\d+$/.test(t)) return null
+  return Number(t)
 }
 
 export interface OpcionesCuenta {
@@ -54,7 +64,6 @@ interface Props {
   datos: DatosCuenta
   onCambiar: (datos: DatosCuenta) => void
   opciones: OpcionesCuenta
-  concesionarios: Concesionario[]
   cargando?: boolean
   /** Editando, el CUIT identifica a la cuenta: cambiarlo es otra cuenta. */
   cuitBloqueado?: boolean
@@ -64,7 +73,6 @@ export function CamposCuenta({
   datos,
   onCambiar,
   opciones,
-  concesionarios,
   cargando,
   cuitBloqueado,
 }: Props) {
@@ -241,30 +249,48 @@ export function CamposCuenta({
         />
       </div>
 
-      <div className="campo">
-        <span className="campo-lbl">Categoría</span>
-        <Desplegable
-          valor={datos.categoria}
-          opciones={opciones.categoriaCuenta}
-          vacio="Elegir…"
-          bloqueado={cargando}
-          onCambiar={(v) => cambiar({ categoria: v })}
-        />
-      </div>
-
-      {concesionarios.length > 0 && (
+      {/* Un tablero sin la columna de categoría no la ofrece: no hay dónde guardarla. */}
+      {opciones.categoriaCuenta.length > 0 && (
         <div className="campo">
-          <span className="campo-lbl">Concesionario asignado</span>
-          <DesplegableMulti
-            valores={datos.concesionarioIds}
-            opciones={concesionarios.map((c) => ({ valor: c.id, rotulo: c.nombre }))}
-            vacio="Ninguno"
-            buscable={concesionarios.length > 6}
+          <span className="campo-lbl">Categoría</span>
+          <Desplegable
+            valor={datos.categoria}
+            opciones={opciones.categoriaCuenta}
+            vacio="Elegir…"
             bloqueado={cargando}
-            onCambiar={(ids) => cambiar({ concesionarioIds: ids })}
+            onCambiar={(v) => cambiar({ categoria: v })}
           />
-          <span className="campo-ayuda">Puede ser más de uno.</span>
         </div>
+      )}
+
+      {/* Un concesionario lleva además su tope de pedidos en concesión. El nombre de su equipo de
+          monday no se pregunta: es la razón social, y lo escribe la app al guardar. */}
+      {datos.categoria === CATEGORIA_CONCESIONARIO && (
+        <label className="campo">
+          <span className="campo-lbl">
+            Cantidad de pedidos x concesión permitidos{' '}
+            <span className="campo-req">· obligatorio</span>
+          </span>
+          <input
+            className="input"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            value={datos.concesionLimite}
+            onChange={(e) => cambiar({ concesionLimite: e.target.value })}
+          />
+          {limiteDeConcesion(datos.concesionLimite) === null ? (
+            <span className="campo-ayuda campo-ayuda--falta">
+              Tiene que ser un número entero, de 0 para arriba.
+            </span>
+          ) : (
+            <span className="campo-ayuda">
+              0 = no puede pedir en concesión. El equipo de monday va a llamarse{' '}
+              <b>{datos.razonSocial.trim() || 'como la razón social'}</b>.
+            </span>
+          )}
+        </label>
       )}
     </div>
   )

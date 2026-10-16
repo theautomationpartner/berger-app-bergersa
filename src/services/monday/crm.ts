@@ -11,7 +11,7 @@
  * sí: el mismo señor puede ser el comprador de dos empresas, y son dos contactos legítimos con los
  * mismos datos de contacto.
  */
-import { CRM, COL_CONTACTO, COL_CUENTA, COL_CUENTA_VENTA } from './columns'
+import { CATEGORIA_CONCESIONARIO, CRM, COL_CONTACTO, COL_CUENTA, COL_CUENTA_VENTA } from './columns'
 import { normalizarWhatsapp } from '@/lib/telefono'
 import { aNumeroEspejo, porId, texto, type ColumnaCruda } from './parse'
 import { mondayApi } from './sdk'
@@ -45,7 +45,10 @@ export interface CuentaCrm {
   /** La línea de crédito que BERGER le asignó, y cuánto lleva usado. */
   creditoAsignado: number | null
   creditoUtilizado: number | null
-  concesionarioIds: string[]
+  /** El nombre del equipo de monday del concesionario. Sólo lo tienen las de categoría Concesionario. */
+  equipoNombre: string
+  /** Cuántos pedidos en concesión puede tener a la vez. `null` = sin cargar. */
+  concesionLimite: number | null
   /** Ids de los contactos conectados. */
   contactoIds: string[]
 }
@@ -55,6 +58,8 @@ export interface ContactoCrm {
   nombre: string
   nombres: string
   apellidos: string
+  /** Lo que no es una persona: "Ventas", "Administración", un mail general. */
+  otro: string
   email: string
   whatsapp: string
   categoria: string
@@ -90,13 +95,15 @@ const COLUMNAS_CUENTA = [
   COL_CUENTA.estado,
   COL_CUENTA_VENTA.creditoAsignado,
   COL_CUENTA_VENTA.creditoUtilizado,
-  COL_CUENTA.concesionario,
+  COL_CUENTA_VENTA.equipoNombre,
+  COL_CUENTA_VENTA.concesionLimite,
   COL_CUENTA.contactos,
 ]
 
 const COLUMNAS_CONTACTO = [
   COL_CONTACTO.nombres,
   COL_CONTACTO.apellidos,
+  COL_CONTACTO.otro,
   COL_CONTACTO.pais,
   COL_CONTACTO.comentarios,
   COL_CONTACTO.email,
@@ -135,7 +142,8 @@ export async function cuentasDelCrm(): Promise<CuentaCrm[]> {
         estado: texto(c[COL_CUENTA.estado]),
         creditoAsignado: aNumeroEspejo(texto(c[COL_CUENTA_VENTA.creditoAsignado])),
         creditoUtilizado: aNumeroEspejo(texto(c[COL_CUENTA_VENTA.creditoUtilizado])),
-        concesionarioIds: conectados(c[COL_CUENTA.concesionario]),
+        equipoNombre: texto(c[COL_CUENTA_VENTA.equipoNombre]),
+        concesionLimite: aNumeroEspejo(texto(c[COL_CUENTA_VENTA.concesionLimite])),
         contactoIds: conectados(c[COL_CUENTA.contactos]),
       }
     })
@@ -156,6 +164,7 @@ export async function contactosDelCrm(): Promise<ContactoCrm[]> {
         nombre: i.name.trim(),
         nombres: texto(c[COL_CONTACTO.nombres]),
         apellidos: texto(c[COL_CONTACTO.apellidos]),
+        otro: texto(c[COL_CONTACTO.otro]),
         email: texto(c[COL_CONTACTO.email]),
         whatsapp: texto(c[COL_CONTACTO.whatsapp]),
         categoria: texto(c[COL_CONTACTO.categoria]),
@@ -165,20 +174,6 @@ export async function contactosDelCrm(): Promise<ContactoCrm[]> {
         cuentaIds: conectados(c[COL_CONTACTO.cuenta]),
       }
     })
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-}
-
-export interface Concesionario {
-  id: string
-  nombre: string
-}
-
-export async function concesionariosDelCrm(): Promise<Concesionario[]> {
-  const r = await mondayApi<{
-    boards: { items_page: { items: { id: string; name: string }[] } }[]
-  }>('concesionariosDelCrm', { limite: 200 })
-  return (r.boards?.[0]?.items_page.items ?? [])
-    .map((i) => ({ id: i.id, nombre: i.name.trim() }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 }
 
@@ -288,6 +283,11 @@ export function cuentaConElMismoCuit(cuentas: CuentaCrm[], cuit: string): Cuenta
 export interface AltaContacto {
   nombres: string
   apellidos: string
+  /**
+   * Lo que no es una persona: un sector, un mail general, el teléfono de la oficina. Con esto
+   * cargado, el nombre y el apellido dejan de ser obligatorios.
+   */
+  otro: string
   categorias: string[]
   email: string
   /** Ya armado: `+5492494520152`. Vacío si no cargaron teléfono. */
@@ -308,9 +308,9 @@ export interface AltaContacto {
   cuentaIds?: string[]
 }
 
-/** El nombre del item: "Nombre Apellido". Monday no acepta items sin nombre. */
-export const nombreDeContacto = (nombres: string, apellidos: string): string =>
-  [nombres.trim(), apellidos.trim()].filter(Boolean).join(' ')
+/** El nombre del item: "Nombre Apellido Otro". Monday no acepta items sin nombre. */
+export const nombreDeContacto = (nombres: string, apellidos: string, otro = ''): string =>
+  [nombres.trim(), apellidos.trim(), otro.trim()].filter(Boolean).join(' ')
 
 export async function crearContacto(d: AltaContacto): Promise<{ id: string; nombre: string }> {
   const valores: Record<string, unknown> = {
@@ -332,11 +332,12 @@ export async function crearContacto(d: AltaContacto): Promise<{ id: string; nomb
   if (d.paisCodigo) {
     valores[COL_CONTACTO.pais] = { countryCode: d.paisCodigo, countryName: d.paisNombre }
   }
+  if (d.otro.trim()) valores[COL_CONTACTO.otro] = d.otro.trim()
   if (d.comentarios.trim()) valores[COL_CONTACTO.comentarios] = d.comentarios.trim()
   if (d.cuentaId) valores[COL_CONTACTO.cuenta] = { item_ids: [d.cuentaId] }
 
   const r = await mondayApi<{ create_item: { id: string; name: string } }>('crearContactoCrm', {
-    nombre: nombreDeContacto(d.nombres, d.apellidos),
+    nombre: nombreDeContacto(d.nombres, d.apellidos, d.otro),
     valores: JSON.stringify(valores),
   })
   return { id: r.create_item.id, nombre: r.create_item.name }
@@ -355,9 +356,32 @@ export interface AltaCuenta {
   paisCodigo: string
   paisNombre: string
   descripcion: string
-  concesionarioIds: string[]
+  /**
+   * Cuántos pedidos en concesión puede tener a la vez. Sólo se escribe si la cuenta es de categoría
+   * Concesionario; para las demás no significa nada.
+   */
+  concesionLimite: number | null
   /** Contactos que ya existen y se conectan a la cuenta nueva. */
   contactoIds: string[]
+}
+
+/** ¿La cuenta es un concesionario? Es lo que la habilita a tener equipo y pedidos en concesión. */
+export const esConcesionario = (categorias: string[]): boolean =>
+  categorias.includes(CATEGORIA_CONCESIONARIO)
+
+/**
+ * Lo que una cuenta de concesionario lleva además del resto.
+ *
+ * El nombre del equipo es la razón social, siempre: el equipo de monday que se le crea al
+ * concesionario se llama igual que su cuenta, y es por ese nombre que la app de concesionarios
+ * sabe de quién es cada usuario. Escribirlo a mano invitaba a que no coincidieran por un punto.
+ */
+function columnasDeConcesionario(d: AltaCuenta): Record<string, unknown> {
+  if (!esConcesionario(d.categorias)) return {}
+  return {
+    [COL_CUENTA_VENTA.equipoNombre]: d.razonSocial.trim(),
+    [COL_CUENTA_VENTA.concesionLimite]: String(d.concesionLimite ?? 0),
+  }
 }
 
 export async function crearCuenta(d: AltaCuenta): Promise<{ id: string; nombre: string }> {
@@ -381,10 +405,8 @@ export async function crearCuenta(d: AltaCuenta): Promise<{ id: string; nombre: 
     valores[COL_CUENTA.pais] = { countryCode: d.paisCodigo, countryName: d.paisNombre }
   }
   if (d.descripcion.trim()) valores[COL_CUENTA.descripcion] = d.descripcion.trim()
-  if (d.concesionarioIds.length > 0) {
-    valores[COL_CUENTA.concesionario] = { item_ids: d.concesionarioIds }
-  }
   if (d.contactoIds.length > 0) valores[COL_CUENTA.contactos] = { item_ids: d.contactoIds }
+  Object.assign(valores, columnasDeConcesionario(d))
 
   const r = await mondayApi<{ create_item: { id: string; name: string } }>('crearCuentaCrm', {
     nombre: d.razonSocial.trim(),
@@ -402,8 +424,11 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 /** Qué falta para dar de alta un contacto. Vacío = se puede. */
 export function faltaParaElContacto(d: AltaContacto): string[] {
   const faltan: string[] = []
-  if (!d.nombres.trim()) faltan.push('el nombre')
-  if (!d.apellidos.trim()) faltan.push('el apellido')
+  /* Un sector o un mail general no tiene nombre ni apellido: con "Otro" cargado alcanza. */
+  if (!d.otro.trim()) {
+    if (!d.nombres.trim()) faltan.push('el nombre')
+    if (!d.apellidos.trim()) faltan.push('el apellido')
+  }
   if (d.email.trim() && !EMAIL.test(d.email.trim())) faltan.push('un e-mail válido')
   /* Sin mail y sin WhatsApp el contacto no sirve para nada: es una fila con un nombre. Y son
      justamente los dos datos con los que se detectan los duplicados. */
@@ -417,6 +442,12 @@ export function faltaParaLaCuenta(d: AltaCuenta): string[] {
   if (!d.razonSocial.trim()) faltan.push('la razón social')
   if (!d.cuit.trim()) faltan.push('el CUIT')
   if (!d.condicionFiscal) faltan.push('la condición fiscal')
+  if (
+    esConcesionario(d.categorias) &&
+    (d.concesionLimite === null || !Number.isInteger(d.concesionLimite) || d.concesionLimite < 0)
+  ) {
+    faltan.push('los pedidos x concesión permitidos (0 o más)')
+  }
   return faltan
 }
 
@@ -451,8 +482,8 @@ export async function actualizarCuenta(id: string, d: AltaCuenta): Promise<void>
   valores[COL_CUENTA.pais] = d.paisCodigo
     ? { countryCode: d.paisCodigo, countryName: d.paisNombre }
     : {}
-  valores[COL_CUENTA.concesionario] = { item_ids: d.concesionarioIds }
   valores[COL_CUENTA.contactos] = { item_ids: d.contactoIds }
+  Object.assign(valores, columnasDeConcesionario(d))
 
   await mondayApi('actualizarCuentaCrm', {
     item: id,
@@ -466,6 +497,7 @@ export async function actualizarContacto(id: string, d: AltaContacto): Promise<v
   const valores: Record<string, unknown> = {
     [COL_CONTACTO.nombres]: d.nombres.trim(),
     [COL_CONTACTO.apellidos]: d.apellidos.trim(),
+    [COL_CONTACTO.otro]: d.otro.trim(),
     [COL_CONTACTO.comentarios]: d.comentarios.trim(),
   }
   valores[COL_CONTACTO.email] = d.email.trim()
@@ -484,7 +516,7 @@ export async function actualizarContacto(id: string, d: AltaContacto): Promise<v
 
   await mondayApi('actualizarContactoCrm', {
     item: id,
-    nombre: nombreDeContacto(d.nombres, d.apellidos),
+    nombre: nombreDeContacto(d.nombres, d.apellidos, d.otro),
     valores: JSON.stringify(valores),
   })
 }
@@ -511,5 +543,5 @@ export const textoDeBusquedaDeCuenta = (c: CuentaCrm): string =>
 /** Un contacto, por nombre, apellido, mail o WhatsApp. */
 export const textoDeBusquedaDeContacto = (c: ContactoCrm): string =>
   sinTildes(
-    `${c.nombre} ${c.nombres} ${c.apellidos} ${c.email} ${c.whatsapp} ${c.whatsapp.replace(/\D/g, '')}`,
+    `${c.nombre} ${c.nombres} ${c.apellidos} ${c.otro} ${c.email} ${c.whatsapp} ${c.whatsapp.replace(/\D/g, '')}`,
   )

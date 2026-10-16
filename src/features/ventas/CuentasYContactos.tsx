@@ -10,6 +10,12 @@
  * esté bien formado, que no haya un contacto repetido dentro de una cuenta, y que si el CUIT ya
  * existe alguien lo sepa antes de crear la segunda—. Una fila cargada a mano en monday no
  * comprueba nada.
+ *
+ * Los tres trabajos van en solapas y no en tarjetas grandes: cada formulario es largo, y lo que
+ * importa arriba es saber en cuál se está, no leer de nuevo qué hace cada uno.
+ *
+ * También se abre desde Actividades, cuando el cliente todavía no existe (`desdeActividad`): ahí
+ * aparece abajo el botón para volver, y la cuenta que se cree vuelve elegida en la actividad.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { SelectorBuscable, SelectorBuscableMulti } from '@/components/ui/SelectorBuscable'
@@ -18,7 +24,6 @@ import { PAIS_POR_DEFECTO, PAISES, paisPorCodigo } from '@/lib/telefono'
 import {
   actualizarContacto,
   actualizarCuenta,
-  concesionariosDelCrm,
   contactoRepetido,
   contactosDelCrm,
   crearContacto,
@@ -31,13 +36,12 @@ import {
   nombreDeContacto,
   textoDeBusquedaDeContacto,
   textoDeBusquedaDeCuenta,
-  type Concesionario,
   type ContactoCrm,
   type CuentaCrm,
 } from '@/services/monday/crm'
 import { SinAcceso } from '@/services/monday/sdk'
 import { CamposContacto, CONTACTO_VACIO, whatsappDe, type DatosContacto } from './CamposContacto'
-import { CamposCuenta, CUENTA_VACIA, type DatosCuenta } from './CamposCuenta'
+import { CamposCuenta, CUENTA_VACIA, limiteDeConcesion, type DatosCuenta } from './CamposCuenta'
 
 const mensaje = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
@@ -63,7 +67,7 @@ const aFormularioCuenta = (c: CuentaCrm): DatosCuenta => ({
   provincia: c.provincia,
   paisCodigo: codigoDePais(c.pais),
   descripcion: c.descripcion,
-  concesionarioIds: c.concesionarioIds,
+  concesionLimite: String(c.concesionLimite ?? 0),
   contactoIds: c.contactoIds,
 })
 
@@ -71,6 +75,7 @@ const aFormularioCuenta = (c: CuentaCrm): DatosCuenta => ({
 const aFormularioContacto = (c: ContactoCrm): DatosContacto => ({
   nombres: c.nombres,
   apellidos: c.apellidos,
+  otro: c.otro,
   categorias: c.categoria
     ? c.categoria
         .split(',')
@@ -86,13 +91,33 @@ const aFormularioContacto = (c: ContactoCrm): DatosContacto => ({
   whatsappCompleto: c.whatsapp,
 })
 
-export function CuentasYContactos() {
+/** Las tres solapas, con lo que dice cada una. */
+const SOLAPAS: { id: Trabajo; icono: string; titulo: string }[] = [
+  { id: 'cuenta', icono: 'fa-solid fa-building', titulo: 'Crear Cuenta y Contacto' },
+  { id: 'contacto', icono: 'fa-solid fa-user-plus', titulo: 'Agregar Contacto' },
+  { id: 'editar', icono: 'fa-solid fa-pen-to-square', titulo: 'Modificar Cuenta/Contacto' },
+]
+
+interface Props {
+  /**
+   * Abierta desde una actividad: la cuenta que se cree acá vuelve elegida. `null` = se vuelve sin
+   * haber creado ninguna.
+   */
+  desdeActividad?: {
+    /** El cliente que ya tenía elegido la actividad: "Agregar Contacto" arranca con él. */
+    cuentaId?: string
+    onVolver: (cuenta: { id: string; nombre: string } | null) => void
+  }
+}
+
+export function CuentasYContactos({ desdeActividad }: Props = {}) {
   const [trabajo, setTrabajo] = useState<Trabajo>('cuenta')
+  /** La última cuenta creada en esta visita. Es la que vuelve a la actividad. */
+  const [creada, setCreada] = useState<{ id: string; nombre: string } | null>(null)
   const [queEditar, setQueEditar] = useState<QueEditar>('cuenta')
 
   const [cuentas, setCuentas] = useState<CuentaCrm[]>([])
   const [contactos, setContactos] = useState<ContactoCrm[]>([])
-  const [concesionarios, setConcesionarios] = useState<Concesionario[]>([])
   const [opciones, setOpciones] = useState({
     tipoPersona: [] as string[],
     clasificacion: [] as string[],
@@ -109,7 +134,7 @@ export function CuentasYContactos() {
 
   const [cuenta, setCuenta] = useState<DatosCuenta>(CUENTA_VACIA)
   const [contacto, setContacto] = useState<DatosContacto>(CONTACTO_VACIO)
-  const [cuentaElegida, setCuentaElegida] = useState('')
+  const [cuentaElegida, setCuentaElegida] = useState(desdeActividad?.cuentaId ?? '')
 
   /** Que sepa que está creando una segunda cuenta con un CUIT que ya existe. */
   const [duplicadoAceptado, setDuplicadoAceptado] = useState(false)
@@ -131,15 +156,9 @@ export function CuentasYContactos() {
     setCargando(true)
     setError(null)
     try {
-      const [c, k, con, et] = await Promise.all([
-        cuentasDelCrm(),
-        contactosDelCrm(),
-        concesionariosDelCrm(),
-        etiquetasDelCrm(),
-      ])
+      const [c, k, et] = await Promise.all([cuentasDelCrm(), contactosDelCrm(), etiquetasDelCrm()])
       setCuentas(c)
       setContactos(k)
-      setConcesionarios(con)
       setOpciones(et)
     } catch (e) {
       setError(
@@ -188,7 +207,7 @@ export function CuentasYContactos() {
     paisCodigo: d.paisCodigo,
     paisNombre: paisPorCodigo(d.paisCodigo)?.nombre ?? '',
     descripcion: d.descripcion,
-    concesionarioIds: d.concesionarioIds,
+    concesionLimite: limiteDeConcesion(d.concesionLimite),
     contactoIds: d.contactoIds,
   })
 
@@ -199,6 +218,7 @@ export function CuentasYContactos() {
   const datosDeContacto = (d: DatosContacto, cuentaId: string) => ({
     nombres: d.nombres,
     apellidos: d.apellidos,
+    otro: d.otro,
     categorias: d.categorias,
     email: d.email,
     whatsapp: whatsappDe(d),
@@ -277,7 +297,7 @@ export function CuentasYContactos() {
           try {
             await crearContacto(datosDeContacto(n, r.id))
           } catch {
-            fallados.push(nombreDeContacto(n.nombres, n.apellidos))
+            fallados.push(nombreDeContacto(n.nombres, n.apellidos, n.otro))
           }
         }
         const cuantos = nuevos.length - fallados.length + cuenta.contactoIds.length
@@ -289,6 +309,9 @@ export function CuentasYContactos() {
         setNuevos([])
         setArmando(null)
         setDuplicadoAceptado(false)
+        setCreada({ id: r.id, nombre: r.nombre })
+        /* Si después quiere sumarle otro contacto, la solapa de contactos ya la tiene elegida. */
+        setCuentaElegida(r.id)
       } else if (trabajo === 'contacto') {
         const r = await crearContacto(datosDeContacto(contacto, cuentaElegida))
         const nombreCuenta = cuentas.find((c) => c.id === cuentaElegida)?.nombre ?? 'la cuenta'
@@ -303,7 +326,7 @@ export function CuentasYContactos() {
           cuentaIds: cuentasDelContacto,
         })
         setHecho(
-          `Los cambios de ${nombreDeContacto(formContacto.nombres, formContacto.apellidos)} quedaron guardados.`,
+          `Los cambios de ${nombreDeContacto(formContacto.nombres, formContacto.apellidos, formContacto.otro)} quedaron guardados.`,
         )
       }
       await recargar()
@@ -332,34 +355,6 @@ export function CuentasYContactos() {
     busqueda: textoDeBusquedaDeCuenta(c),
   }))
 
-  const tarjeta = (
-    id: Trabajo,
-    clase: string,
-    icono: string,
-    titulo: string,
-    detalle: string,
-    pie?: React.ReactNode,
-  ) => (
-    <button
-      type="button"
-      aria-pressed={trabajo === id}
-      className={`opcion ${clase}${trabajo === id ? ' opcion--elegida' : ''}`}
-      onClick={() => {
-        setTrabajo(id)
-        setHecho(null)
-        setErrorEnvio(null)
-      }}
-    >
-      <span className="opcion-ic">
-        <i className={icono} aria-hidden="true" />
-      </span>
-      <span className="opcion-txt">
-        <span className="opcion-tit">{titulo}</span>
-        <span className="opcion-det">{detalle}</span>
-        {pie}
-      </span>
-    </button>
-  )
 
   return (
     <div className="scroll">
@@ -371,39 +366,30 @@ export function CuentasYContactos() {
           <span className="sec-txt">
             <span className="sec-tit">Cuentas y contactos</span>
             <span className="sec-det">
-              Se cargan y se corrigen acá, no en los tableros: es el único lugar donde se controla
-              que el CUIT esté bien y que no haya duplicados sin que nadie se entere.
+              {desdeActividad
+                ? 'Estás cargando una actividad: creá la cuenta y volvé, que queda elegida.'
+                : 'Se cargan y se corrigen acá, donde se controla el CUIT y los duplicados.'}
             </span>
           </span>
         </div>
 
-        <div className="decision decision--grande decision--elige">
-          {tarjeta(
-            'cuenta',
-            'opcion--confirmar',
-            'fa-solid fa-building',
-            'Una cuenta nueva',
-            'El cliente, con su CUIT y su condición fiscal. Se le pueden enganchar contactos acá mismo.',
-          )}
-          {tarjeta(
-            'contacto',
-            'opcion--proponer',
-            'fa-solid fa-user-plus',
-            'Un contacto de una cuenta que ya existe',
-            'La persona con la que se habla: mail y WhatsApp.',
-            <span className="opcion-req opcion-req--aviso">
-              <i className="fa-solid fa-address-book" aria-hidden="true" />
-              {cuentas.length} cuenta{cuentas.length === 1 ? '' : 's'} cargada
-              {cuentas.length === 1 ? '' : 's'}
-            </span>,
-          )}
-          {tarjeta(
-            'editar',
-            'opcion--editar',
-            'fa-solid fa-pen-to-square',
-            'Modificar una cuenta o un contacto',
-            'Buscar lo que ya está cargado y cambiarle los datos.',
-          )}
+        <div className="solapas">
+          {SOLAPAS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              aria-pressed={trabajo === s.id}
+              className={`solapa${trabajo === s.id ? ' solapa--si' : ''}`}
+              onClick={() => {
+                setTrabajo(s.id)
+                setHecho(null)
+                setErrorEnvio(null)
+              }}
+            >
+              <i className={s.icono} aria-hidden="true" /> {s.titulo}
+              {s.id === 'contacto' && <span className="solapa-num">{cuentas.length} cuentas</span>}
+            </button>
+          ))}
         </div>
 
         {error && (
@@ -444,7 +430,6 @@ export function CuentasYContactos() {
                 datos={cuenta}
                 onCambiar={setCuenta}
                 opciones={opciones}
-                concesionarios={concesionarios}
                 cargando={cargando}
               />
 
@@ -547,7 +532,7 @@ export function CuentasYContactos() {
                       <li key={`${n.email}-${n.abonado}-${i}`} className="pendiente">
                         <i className="fa-solid fa-user-plus" aria-hidden="true" />
                         <span className="pendiente-txt">
-                          <b>{nombreDeContacto(n.nombres, n.apellidos)}</b>
+                          <b>{nombreDeContacto(n.nombres, n.apellidos, n.otro)}</b>
                           {n.email && <span> · {n.email}</span>}
                           {whatsappDe(n) && <span> · {whatsappDe(n)}</span>}
                         </span>
@@ -770,7 +755,7 @@ export function CuentasYContactos() {
                   <i className="fa-solid fa-user-check" aria-hidden="true" />{' '}
                   {enviando
                     ? 'Creando…'
-                    : `Crear ${nombreDeContacto(contacto.nombres, contacto.apellidos) || 'el contacto'}`}
+                    : `Crear ${nombreDeContacto(contacto.nombres, contacto.apellidos, contacto.otro) || 'el contacto'}`}
                 </button>
               </div>
             </div>
@@ -833,7 +818,6 @@ export function CuentasYContactos() {
                           datos={formCuenta}
                           onCambiar={setFormCuenta}
                           opciones={opciones}
-                          concesionarios={concesionarios}
                           cargando={cargando}
                           cuitBloqueado
                         />
@@ -980,6 +964,31 @@ export function CuentasYContactos() {
                 </>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Desde una actividad: lo que se estaba cargando allá sigue intacto. Si se creó una cuenta,
+            vuelve elegida; los contactos que se le hayan sumado aparecen para tildar. */}
+        {desdeActividad && (
+          <div className="volver-actividad">
+            <span>
+              {creada ? (
+                <>
+                  <i className="fa-solid fa-circle-check texto-verde" aria-hidden="true" />{' '}
+                  <b>{creada.nombre}</b> va a quedar elegida en la actividad.
+                </>
+              ) : (
+                'Lo que estabas cargando en la actividad sigue ahí.'
+              )}
+            </span>
+            <button
+              type="button"
+              className="btn btn--primario"
+              disabled={enviando}
+              onClick={() => desdeActividad.onVolver(creada)}
+            >
+              <i className="fa-solid fa-arrow-left" aria-hidden="true" /> Volver a la actividad
+            </button>
           </div>
         )}
       </div>

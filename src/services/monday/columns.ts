@@ -994,7 +994,6 @@ export const COL_CUENTA = {
   descripcion: 'company_description',
   /** Contactos de la cuenta. Es de doble vía con `COL_CONTACTO.cuenta`. */
   contactos: 'account_contact',
-  concesionario: 'board_relation_mm7vab3s',
   fechaAlta: 'date_mm7a6c3b',
 } as const
 
@@ -1007,6 +1006,8 @@ export const COL_CUENTA = {
 export const COL_CONTACTO = {
   nombres: 'text_mm7a5rkb',
   apellidos: 'text_mm7a4dqr',
+  /** Lo que no es una persona: un sector, un mail general. Con esto, nombre y apellido sobran. */
+  otro: 'text_mm7y2d2r',
   /** Todo contacto nace Activo. */
   estado: 'color_mm7aa66j',
   categoria: 'dropdown_mm7acm6r',
@@ -1019,6 +1020,12 @@ export const COL_CONTACTO = {
   cuenta: 'contact_account',
   fechaAlta: 'date_mm7atktf',
 } as const
+
+/**
+ * La categoría de cuenta que la convierte en concesionario: con ella la cuenta lleva el nombre de
+ * su equipo de monday y cuántos pedidos en concesión puede tener.
+ */
+export const CATEGORIA_CONCESIONARIO = 'Concesionario'
 
 /** Etiquetas del CRM que la app fija al crear. Las demás se leen del tablero. */
 export const CRM = {

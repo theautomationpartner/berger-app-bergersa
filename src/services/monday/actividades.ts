@@ -106,11 +106,12 @@ export async function crearActividad(d: AltaActividad): Promise<{ id: string; no
        de no crearse. */
   }
 
-  const r = await mondayApi<{ create_item: { id: string; name: string } }>('crearActividadCrm', {
-    nombre: nombreDeActividad(d.cuentaNombre, d.tipo, d.fecha, d.hora),
+  const nombre = nombreDeActividad(d.cuentaNombre, d.tipo, d.fecha, d.hora)
+  const r = await mondayApi<{ create_item: { id: string; name?: string } }>('crearActividadCrm', {
+    nombre,
     valores: JSON.stringify(valores),
   })
-  return { id: r.create_item.id, nombre: r.create_item.name }
+  return { id: r.create_item.id, nombre: r.create_item.name || nombre }
 }
 
 /** Las etiquetas de los dos desplegables del tablero, leídas de monday. */
@@ -255,12 +256,17 @@ export async function misActividadesPendientes(
   )
 }
 
-/** La da por hecha. Es lo ÚNICO que esta pantalla le cambia a una actividad que ya existe. */
-export async function completarActividad(id: string): Promise<void> {
-  await mondayApi('completarActividadCrm', {
-    item: id,
-    valores: JSON.stringify({
-      [COL_ACTIVIDAD.estado]: { label: ESTADO_ACTIVIDAD.COMPLETADA },
-    }),
-  })
+/**
+ * La da por hecha. Es lo ÚNICO que esta pantalla le cambia a una actividad que ya existe.
+ *
+ * Las observaciones son opcionales y llegan ya con lo que tenía escrito: la pantalla le muestra
+ * a quien la cierra el texto anterior para que lo complete, no para que lo pise sin verlo. Si no
+ * se mandan (`undefined`), la columna queda como estaba.
+ */
+export async function completarActividad(id: string, observaciones?: string): Promise<void> {
+  const valores: Record<string, unknown> = {
+    [COL_ACTIVIDAD.estado]: { label: ESTADO_ACTIVIDAD.COMPLETADA },
+  }
+  if (observaciones !== undefined) valores[COL_ACTIVIDAD.descripcion] = observaciones.trim()
+  await mondayApi('completarActividadCrm', { item: id, valores: JSON.stringify(valores) })
 }

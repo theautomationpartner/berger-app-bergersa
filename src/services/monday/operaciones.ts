@@ -28,6 +28,7 @@ import {
   COL_VENTA,
   COL_CONTACTO,
   COL_CUENTA,
+  COL_CUENTA_VENTA,
   COL_DESPACHANTE,
   COL_DESPACHANTE_SUB,
   COL_DRAFT,
@@ -128,7 +129,6 @@ export type NombreOperacion =
   | 'configuracionDeVenta'
   | 'cuentasDelCrm'
   | 'contactosDelCrm'
-  | 'concesionariosDelCrm'
   | 'etiquetasDelCrm'
   | 'crearCuentaCrm'
   | 'actualizarCuentaCrm'
@@ -632,8 +632,10 @@ const COLUMNAS_DE_CUENTA = new Set<string>([
   COL_CUENTA.pais,
   COL_CUENTA.descripcion,
   COL_CUENTA.contactos,
-  COL_CUENTA.concesionario,
   COL_CUENTA.fechaAlta,
+  /* Sólo para las de categoría Concesionario: el nombre de su equipo y su tope de concesiones. */
+  COL_CUENTA_VENTA.equipoNombre,
+  COL_CUENTA_VENTA.concesionLimite,
 ])
 
 /**
@@ -652,6 +654,7 @@ const COLUMNAS_DE_CUENTA_EDITABLES = new Set<string>(
 const COLUMNAS_DE_CONTACTO = new Set<string>([
   COL_CONTACTO.nombres,
   COL_CONTACTO.apellidos,
+  COL_CONTACTO.otro,
   COL_CONTACTO.estado,
   COL_CONTACTO.categoria,
   COL_CONTACTO.email,
@@ -863,10 +866,10 @@ const OPS_CRM = {
   },
 
   /**
-   * Dar por hecha una actividad. UNA sola columna escribible.
+   * Dar por hecha una actividad: el estado, y las observaciones de cómo se resolvió.
    *
    * Desde acá no se le puede cambiar la fecha, el cliente ni el responsable a una actividad que ya
-   * existe: lo único que esta pantalla hace es cerrarla.
+   * existe: lo único que esta pantalla hace es cerrarla, contando cómo se cerró.
    */
   completarActividadCrm: {
     modulo: 'ventas' as const,
@@ -880,7 +883,7 @@ const OPS_CRM = {
       item: idMonday(v.item, 'item'),
       valores: valoresAcotados(
         v.valores,
-        new Set([COL_ACTIVIDAD.estado]),
+        new Set([COL_ACTIVIDAD.estado, COL_ACTIVIDAD.descripcion]),
         'el cierre de una actividad',
       ),
     }),
@@ -1222,20 +1225,6 @@ const OPS_CRM = {
     validar: (v: Record<string, unknown>) => ({
       tablero: TABLEROS.contactos,
       columnas: idsDeColumnas(v.columnas),
-      limite: entero(v.limite, 'limite', 1, 500),
-    }),
-  },
-
-  /** Los concesionarios, sólo por nombre: es lo único que se elige de ellos. */
-  concesionariosDelCrm: {
-    modulo: 'ventas' as const,
-    query: `
-      query ($tablero: ID!, $limite: Int!) {
-        boards(ids: [$tablero]) { items_page(limit: $limite) { items { id name } } }
-      }
-    `,
-    validar: (v: Record<string, unknown>) => ({
-      tablero: TABLEROS.concesionarios,
       limite: entero(v.limite, 'limite', 1, 500),
     }),
   },
