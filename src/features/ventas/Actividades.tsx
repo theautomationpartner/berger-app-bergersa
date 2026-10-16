@@ -326,7 +326,8 @@ export function Actividades({ onInicio }: Props = {}) {
   if (creandoCuenta) {
     return (
       <CuentasYContactos
-        desdeActividad={{
+        volverA={{
+          que: 'la actividad',
           cuentaId: datos.cuentaId,
           onVolver: (cuenta) => {
             setCreandoCuenta(false)

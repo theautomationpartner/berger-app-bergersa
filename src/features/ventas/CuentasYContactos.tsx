@@ -14,8 +14,9 @@
  * Los tres trabajos van en solapas y no en tarjetas grandes: cada formulario es largo, y lo que
  * importa arriba es saber en cuál se está, no leer de nuevo qué hace cada uno.
  *
- * También se abre desde Actividades, cuando el cliente todavía no existe (`desdeActividad`): ahí
- * aparece abajo el botón para volver, y la cuenta que se cree vuelve elegida en la actividad.
+ * También se abre desde otra pantalla cuando el cliente todavía no existe (`volverA`): desde
+ * Actividades y, en la app de concesionarios, desde el pedido (el cliente final). Ahí aparece abajo
+ * el botón para volver, y la cuenta que se cree vuelve elegida donde se estaba.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { SelectorBuscable, SelectorBuscableMulti } from '@/components/ui/SelectorBuscable'
@@ -124,17 +125,38 @@ interface Props {
   /** Volver al inicio de la app, desde la ventana final. */
   onInicio?: () => void
   /**
-   * Abierta desde una actividad: la cuenta que se cree acá vuelve elegida. `null` = se vuelve sin
+   * Abierta desde otra pantalla: la cuenta que se cree acá vuelve elegida. `null` = se vuelve sin
    * haber creado ninguna.
    */
-  desdeActividad?: {
-    /** El cliente que ya tenía elegido la actividad: "Agregar Contacto" arranca con él. */
+  volverA?: {
+    /** Adónde se vuelve, como se lee en la frase: "la actividad", "el pedido". */
+    que: string
+    /**
+     * La categoría con que arrancan la cuenta y los contactos nuevos, escrita como se parezca a la
+     * etiqueta del tablero ("cliente final"). Desde el pedido, el cliente nuevo es un cliente final.
+     */
+    categoria?: string
+    /** El cliente que ya estaba elegido: "Agregar Contacto" arranca con él. */
     cuentaId?: string
     onVolver: (cuenta: { id: string; nombre: string } | null) => void
   }
 }
 
-export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
+/** La etiqueta del tablero que corresponde a un texto, sin mirar mayúsculas, tildes ni espacios. */
+const normal = (t: string) =>
+  t
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+const etiquetaParecida = (etiquetas: string[], texto?: string): string =>
+  texto ? (etiquetas.find((e) => normal(e) === normal(texto)) ?? '') : ''
+
+/** "a la actividad", "al pedido": la contracción que pide el castellano. */
+const aDonde = (que: string): string => (que.startsWith('el ') ? `al ${que.slice(3)}` : `a ${que}`)
+
+export function CuentasYContactos({ volverA, onInicio }: Props = {}) {
   const [trabajo, setTrabajo] = useState<Trabajo>('cuenta')
   /** La última cuenta creada en esta visita. Es la que vuelve a la actividad. */
   const [creada, setCreada] = useState<{ id: string; nombre: string } | null>(null)
@@ -158,7 +180,7 @@ export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
 
   const [cuenta, setCuenta] = useState<DatosCuenta>(CUENTA_VACIA)
   const [contacto, setContacto] = useState<DatosContacto>(CONTACTO_VACIO)
-  const [cuentaElegida, setCuentaElegida] = useState(desdeActividad?.cuentaId ?? '')
+  const [cuentaElegida, setCuentaElegida] = useState(volverA?.cuentaId ?? '')
 
   /** Que sepa que está creando una segunda cuenta con un CUIT que ya existe. */
   const [duplicadoAceptado, setDuplicadoAceptado] = useState(false)
@@ -198,6 +220,25 @@ export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
   useEffect(() => {
     void recargar()
   }, [recargar])
+
+  /* La cuenta y el contacto con que arranca un alta: desde el pedido, ya como cliente final. */
+  const categoriaCuenta = etiquetaParecida(opciones.categoriaCuenta, volverA?.categoria)
+  const categoriaContacto = etiquetaParecida(opciones.categoriaContacto, volverA?.categoria)
+  const cuentaInicial = useMemo(
+    () => ({ ...CUENTA_VACIA, categoria: categoriaCuenta }),
+    [categoriaCuenta],
+  )
+  const contactoInicial = useMemo(
+    () => ({ ...CONTACTO_VACIO, categorias: categoriaContacto ? [categoriaContacto] : [] }),
+    [categoriaContacto],
+  )
+  /* Las etiquetas llegan después de montar: cuando están, se completan las que siguen vacías. */
+  useEffect(() => {
+    if (categoriaCuenta) setCuenta((c) => (c.categoria ? c : { ...c, categoria: categoriaCuenta }))
+    if (categoriaContacto) {
+      setContacto((c) => (c.categorias.length ? c : { ...c, categorias: [categoriaContacto] }))
+    }
+  }, [categoriaCuenta, categoriaContacto])
 
   /* ---------------- el alta de una cuenta ---------------- */
 
@@ -347,7 +388,7 @@ export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
               ? `La cuenta quedó, pero no se pudieron crear estos contactos: ${fallados.join(', ')}.`
               : undefined,
         })
-        setCuenta(CUENTA_VACIA)
+        setCuenta(cuentaInicial)
         setNuevos([])
         setArmando(null)
         setDuplicadoAceptado(false)
@@ -364,7 +405,7 @@ export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
           mensaje: `El contacto ${r.nombre} fue cargado de manera exitosa!`,
           detalle: nombreCuenta ? [`En la cuenta ${nombreCuenta}`] : [],
         })
-        setContacto(CONTACTO_VACIO)
+        setContacto(contactoInicial)
       } else if (queEditar === 'cuenta' && editandoCuenta) {
         await actualizarCuenta(editandoCuenta, paraMonday(formCuenta))
         setHecho({
@@ -426,8 +467,8 @@ export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
           <span className="sec-txt">
             <span className="sec-tit">Cuentas y contactos</span>
             <span className="sec-det">
-              {desdeActividad
-                ? 'Estás cargando una actividad: creá la cuenta y volvé, que queda elegida.'
+              {volverA
+                ? `Estás cargando ${volverA.que}: creá la cuenta y volvé, que queda elegida.`
                 : 'Se cargan y se corrigen acá, donde se controla el CUIT y los duplicados.'}
             </span>
           </span>
@@ -600,7 +641,7 @@ export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
                   <button
                     type="button"
                     className="btn btn--borde btn--chico"
-                    onClick={() => setArmando(CONTACTO_VACIO)}
+                    onClick={() => setArmando(contactoInicial)}
                   >
                     <i className="fa-solid fa-plus" aria-hidden="true" /> Crear un contacto nuevo
                   </button>
@@ -679,7 +720,7 @@ export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
                   className="btn btn--texto btn--chico"
                   disabled={enviando}
                   onClick={() => {
-                    setCuenta(CUENTA_VACIA)
+                    setCuenta(cuentaInicial)
                     setNuevos([])
                     setArmando(null)
                     setDuplicadoAceptado(false)
@@ -789,7 +830,7 @@ export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
                   type="button"
                   className="btn btn--texto btn--chico"
                   disabled={enviando}
-                  onClick={() => setContacto(CONTACTO_VACIO)}
+                  onClick={() => setContacto(contactoInicial)}
                 >
                   <i className="fa-solid fa-eraser" aria-hidden="true" /> Vaciar el formulario
                 </button>
@@ -1061,7 +1102,7 @@ export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
                 <span className="campo-ayuda">¿Qué querés hacer ahora?</span>
               </div>
               <div className="ventanita-pie ventanita-pie--opciones">
-                {onInicio && !desdeActividad && (
+                {onInicio && !volverA && (
                   <button type="button" className="btn btn--texto btn--chico" onClick={onInicio}>
                     <i className="fa-solid fa-house" aria-hidden="true" /> Volver al inicio
                   </button>
@@ -1133,14 +1174,14 @@ export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
                     <i className="fa-solid fa-building" aria-hidden="true" /> Crear una cuenta
                   </button>
                 )}
-                {desdeActividad && creada ? (
+                {volverA && creada ? (
                   <button
                     type="button"
                     className="btn btn--primario btn--chico"
                     autoFocus
-                    onClick={() => desdeActividad.onVolver(creada)}
+                    onClick={() => volverA.onVolver(creada)}
                   >
-                    <i className="fa-solid fa-arrow-left" aria-hidden="true" /> Volver a la actividad
+                    <i className="fa-solid fa-arrow-left" aria-hidden="true" /> Volver {aDonde(volverA.que)}
                   </button>
                 ) : (
                   <button
@@ -1198,27 +1239,27 @@ export function CuentasYContactos({ desdeActividad, onInicio }: Props = {}) {
           </>
         )}
 
-        {/* Desde una actividad: lo que se estaba cargando allá sigue intacto. Si se creó una cuenta,
+        {/* Desde otra pantalla: lo que se estaba cargando allá sigue intacto. Si se creó una cuenta,
             vuelve elegida; los contactos que se le hayan sumado aparecen para tildar. */}
-        {desdeActividad && (
+        {volverA && (
           <div className="volver-actividad">
             <span>
               {creada ? (
                 <>
                   <i className="fa-solid fa-circle-check texto-verde" aria-hidden="true" />{' '}
-                  <b>{creada.nombre}</b> va a quedar elegida en la actividad.
+                  <b>{creada.nombre}</b> va a quedar elegida en {volverA.que}.
                 </>
               ) : (
-                'Lo que estabas cargando en la actividad sigue ahí.'
+                `Lo que estabas cargando en ${volverA.que} sigue ahí.`
               )}
             </span>
             <button
               type="button"
               className="btn btn--primario"
               disabled={enviando}
-              onClick={() => desdeActividad.onVolver(creada)}
+              onClick={() => volverA.onVolver(creada)}
             >
-              <i className="fa-solid fa-arrow-left" aria-hidden="true" /> Volver a la actividad
+              <i className="fa-solid fa-arrow-left" aria-hidden="true" /> Volver {aDonde(volverA.que)}
             </button>
           </div>
         )}
